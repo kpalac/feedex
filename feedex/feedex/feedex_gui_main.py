@@ -746,7 +746,7 @@ It will also take some time to perform""") ))
                         self.upper_notebook.set_menu_label_text( tb, tb.header.get_text() )
 
                         if tb.uid == self.curr_upper.uid:
-                            if tb.type in (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TREE, FX_TAB_NOTES):
+                            if tb.type in (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDING,):
                                 self.feed_win.feed_aggr = self.curr_upper.feed_aggr
                             self.feed_win.reload_feeds()
                         break
@@ -1029,7 +1029,7 @@ It will also take some time to perform""") ))
         if self.curr_upper is None: type = -1
         else: type = self.curr_upper.type
 
-        if type in (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TREE, FX_TAB_NOTES):
+        if type in (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDING,):
             self.feed_win.feed_aggr = self.curr_upper.feed_aggr
         else: self.feed_win.feed_aggr = {}
 

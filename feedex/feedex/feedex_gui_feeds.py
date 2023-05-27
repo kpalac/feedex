@@ -366,7 +366,7 @@ Hit <b>Ctrl-F</b> for interactive search""") )
     def on_activate_feed(self, *args):
         """ Feed or category activate - change filter on entries """   
         if self.selected_place == FX_PLACE_ALL_CHANNELS:
-            if self.parent.curr_upper.type in (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TREE, FX_TAB_NOTES):
+            if self.parent.curr_upper.type in (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDING):
                 self.parent.curr_upper.create_list(False, None, True)
                 self.parent.curr_upper.feed_filter_id = 0
                 self._add_underline(0)
@@ -384,7 +384,7 @@ Hit <b>Ctrl-F</b> for interactive search""") )
                     break
 
         elif self.selected_feed_id not in (None,0):
-            if self.parent.curr_upper.type in (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TREE, FX_TAB_NOTES):
+            if self.parent.curr_upper.type in (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDING,):
 
                 if self.selected_feed_id == self.parent.curr_upper.feed_filter_id:
                     self.parent.curr_upper.create_list(False, None, True)
