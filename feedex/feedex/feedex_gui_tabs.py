@@ -803,12 +803,12 @@ Escape: \ (only if before wildcards and field markers)""") )
 
             filters['rev'] = True
             filters['default_sort'] = '+pubdate'
-            self.results_tmp = FX.QP.query(qr, filters)
+            self.results_tmp = FX.Q.query(qr, filters)
 
             if self.type == FX_TAB_NOTES: marker = '*'
             else: marker = ''
 
-            if FX.QP.phrase.get('empty',False):
+            if FX.Q.phrase.get('empty',False):
                 if feed_name is None: self.final_status = f"""{marker}{_('Results')}"""
                 else: self.final_status = f'<b>{marker}{esc_mu(feed_name, ell=50)}</b>'
             else: 
@@ -821,20 +821,20 @@ Escape: \ (only if before wildcards and field markers)""") )
         elif self.type == FX_TAB_PLACES:
  
             if qr == FX_PLACE_STARTUP:
-                self.results_tmp = FX.QP.query('', {'last':True, 'sort':'-importance'})
+                self.results_tmp = FX.Q.query('', {'last':True, 'sort':'-importance'})
                 if len(self.results_tmp) <= 2:
-                    self.results_tmp = FX.QP.query('', {'last_hour':True, 'sort':'-importance'})
+                    self.results_tmp = FX.Q.query('', {'last_hour':True, 'sort':'-importance'})
                     if len(self.results_tmp) <= 2:
-                        self.results_tmp = FX.QP.query('', {'today':True, 'sort':'-importance'})
+                        self.results_tmp = FX.Q.query('', {'today':True, 'sort':'-importance'})
                         if len(self.results_tmp) <= 2:
-                            self.results_tmp = FX.QP.query('', {'last_n':2, 'sort':'-importance'})
+                            self.results_tmp = FX.Q.query('', {'last_n':2, 'sort':'-importance'})
 
                 self.final_status = 'News'
 
 
             elif qr == FX_PLACE_TRASH_BIN:
 
-                self.results_tmp = FX.QP.query('', {'deleted_entries':True, 'sort':'-pubdate'}, no_history=True)
+                self.results_tmp = FX.Q.query('', {'deleted_entries':True, 'sort':'-pubdate'}, no_history=True)
                 self.final_status = _('Trash bin')
 
             else:
@@ -867,41 +867,41 @@ Escape: \ (only if before wildcards and field markers)""") )
                     filters['last_year'] = True
                     self.final_status = _('Year')
 
-                self.results_tmp = FX.QP.query('', filters, no_history=True)
+                self.results_tmp = FX.Q.query('', filters, no_history=True)
 
 
         elif self.type == FX_TAB_SIMILAR:
 
             self.final_status = _('Similar to ...')            
             filters['rev'] = True
-            self.results_tmp = FX.QP.find_similar(self.top_entry['id'], **filters)
+            self.results_tmp = FX.Q.find_similar(self.top_entry['id'], **filters)
             add_top_entry = True
 
         elif self.type == FX_TAB_REL_TIME:
             self.final_status = f"{_('Relevance in Time ')}(<b>{self.top_entry['id']}</b>)..."            
-            self.results_tmp = FX.QP.relevance_in_time(self.top_entry['id'], **filters)
+            self.results_tmp = FX.Q.relevance_in_time(self.top_entry['id'], **filters)
 
         elif self.type == FX_TAB_CONTEXTS:
             self.final_status = f'{_("Contexts for ")}<b>{esc_mu(qr, ell=50)}</b>'
             filters['rev'] = True
-            self.results_tmp = FX.QP.term_context(qr, **filters)
+            self.results_tmp = FX.Q.term_context(qr, **filters)
 
         elif self.type == FX_TAB_TERM_NET:
             self.final_status = f'{_("Terms related to ")}<b>{esc_mu(qr, ell=50)}</b>'
-            self.results_tmp = FX.QP.term_net(qr, print=False, lang=filters.get('lang'), rev=True)
+            self.results_tmp = FX.Q.term_net(qr, print=False, lang=filters.get('lang'), rev=True)
 
         elif self.type == FX_TAB_TRENDS:
             self.final_status = f'{_("Trends ")}<b>{esc_mu(qr, ell=50)}</b>'
-            self.results_tmp = FX.QP.get_trends(qr, filters, rev=True)
+            self.results_tmp = FX.Q.get_trends(qr, filters, rev=True)
         
         elif self.type == FX_TAB_TRENDING:
             self.final_status = f'{_("Trending ")}<b>{esc_mu(qr, ell=50)}</b>'
-            self.results_tmp = FX.QP.get_trending(qr, filters, rev=True)
+            self.results_tmp = FX.Q.get_trending(qr, filters, rev=True)
 
 
         elif self.type == FX_TAB_TIME_SERIES:
             self.final_status = f'{_("Time Series for ")}<b>{esc_mu(qr, ell=50)}</b>'
-            self.results_tmp = FX.QP.term_in_time(qr, **filters)
+            self.results_tmp = FX.Q.term_in_time(qr, **filters)
 
         elif self.type == FX_TAB_TREE:
 
@@ -910,13 +910,13 @@ Escape: \ (only if before wildcards and field markers)""") )
             if qr == FX_PLACE_STARTUP:
                 
                 self.final_status = f'{_("Summary - latest")}'
-                self.results_tmp = FX.QP.query('', {'last':True, 'sort':'+importance', 'group':group, 'rev':True}, allow_group=True)
+                self.results_tmp = FX.Q.query('', {'last':True, 'sort':'+importance', 'group':group, 'rev':True}, allow_group=True)
                 if len(self.results_tmp) <= 5:
-                    self.results_tmp = FX.QP.query('', {'last_hour':True, 'sort':'+importance', 'group':group, 'rev':True}, allow_group=True)
+                    self.results_tmp = FX.Q.query('', {'last_hour':True, 'sort':'+importance', 'group':group, 'rev':True}, allow_group=True)
                     if len(self.results_tmp) <= 5:
-                        self.results_tmp = FX.QP.query('', {'today':True, 'sort':'+importance', 'group':group, 'rev':True}, allow_group=True)
+                        self.results_tmp = FX.Q.query('', {'today':True, 'sort':'+importance', 'group':group, 'rev':True}, allow_group=True)
                         if len(self.results_tmp) <= 6:
-                            self.results_tmp = FX.QP.query('', {'last_n':2, 'sort':'+importance', 'group':group, 'rev':True}, allow_group=True)
+                            self.results_tmp = FX.Q.query('', {'last_n':2, 'sort':'+importance', 'group':group, 'rev':True}, allow_group=True)
             else:
                 if group == 'category': 
                     self.final_status = f'{_("Summary by Category")} <b>{esc_mu(qr, ell=50)}</b>'
@@ -934,7 +934,7 @@ Escape: \ (only if before wildcards and field markers)""") )
                     self.final_status = f'{_("Summary by Hour")} <b>{esc_mu(qr, ell=50)}</b>'
 
                 filters['rev'] = True
-                self.results_tmp = FX.QP.query(qr, filters, allow_group=True)
+                self.results_tmp = FX.Q.query(qr, filters, allow_group=True)
 
         if FX.db_error is not None: 
             self.final_status = f'<span foreground="red">{self.final_status}</span>'
@@ -1426,7 +1426,7 @@ Escape: \ (only if before wildcards and field markers)""") )
     def create_rules_list(self):
         """ Reload rules store """
         self.tmp_store = Gtk.ListStore(*self.column_types)
-        tmp_results = self.parent.FX.QP.show_rules(results=self.parent.FX.qr_sql("""select * from rules where learned <> 1 order by id desc""", all=True) )
+        tmp_results = self.parent.FX.Q.show_rules(results=self.parent.FX.qr_sql("""select * from rules where learned <> 1 order by id desc""", all=True) )
         self.results = tmp_results.copy()
         if self.parent.FX.db_error is not None: self.parent.message_q.append((-2, _('DB Error: %a') ,self.parent.FX.db_error))
 
@@ -1488,7 +1488,7 @@ Escape: \ (only if before wildcards and field markers)""") )
 
                     elif self.type == FX_TAB_RULES:
                         self.rule.merge(entry)
-                        entry_tmp = slist( self.parent.FX.QP.show_rules(results=(self.rule.tuplify(),), print=False), 0, ())
+                        entry_tmp = slist( self.parent.FX.Q.show_rules(results=(self.rule.tuplify(),), print=False), 0, ())
                         self.results[ix] = entry_tmp
 
                     elif self.type == FX_TAB_FLAGS:

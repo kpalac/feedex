@@ -676,22 +676,50 @@ It will also take some time to perform""") ))
     def _on_right_click_prev(self, widget, menu, *args, **kargs):
         """ Add some option to the popup menu of preview box """
         selection = widget.get_selection_bounds()
-        if selection == () or len(selection) != 3: return 0
-        text = widget.get_text()
-        self.selection_text = text[selection[1]:selection[2]]
-        self.selection_text = scast( self.selection_text, str, '')
-        if self.debug in (1,7): print(f'Selected text: {self.selection_text}')
-        if self.selection_text != '':
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Search for this Term'), self.add_tab, kargs={'type': FX_TAB_SEARCH, 'phrase':self.selection_text}, icon='edit-find-symbolic'))  
-            menu.append( f_menu_item(1, _('Show this Term\'s Contexts'), self.add_tab, kargs={'type': FX_TAB_CONTEXTS, 'phrase':self.selection_text}, icon='view-list-symbolic'))  
-            menu.append( f_menu_item(1, _('Show Terms related to this Term'), self.add_tab, kargs={'type': FX_TAB_TERM_NET, 'phrase':self.selection_text}, icon='emblem-shared-symbolic'))  
-            menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab,kargs={'type': FX_TAB_TIME_SERIES, 'phrase':self.selection_text}, icon='office-calendar-symbolic'))  
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Search WWW'), self._on_www_search_sel, icon='www-symbolic', tooltip=_("Search WWW for selected text") ) )
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Add as Rule'), self._on_add_as_rule, icon='view-list-compact-symbolic'))  
-            menu.show_all()
+        
+        summ_menu = Gtk.Menu()
+        summ_menu.append( f_menu_item(1, _('90%'), self._on_summarize, kargs={'level':90} ) )
+        summ_menu.append( f_menu_item(1, _('80%'), self._on_summarize, kargs={'level':80} ) )
+        summ_menu.append( f_menu_item(1, _('70%'), self._on_summarize, kargs={'level':70} ) )
+        summ_menu.append( f_menu_item(1, _('60%'), self._on_summarize, kargs={'level':60} ) )
+        summ_menu.append( f_menu_item(1, _('50%'), self._on_summarize, kargs={'level':50} ) )
+        summ_menu.append( f_menu_item(1, _('40%'), self._on_summarize, kargs={'level':40} ) )
+        summ_menu.append( f_menu_item(1, _('30%'), self._on_summarize, kargs={'level':30} ) )
+        summ_menu.append( f_menu_item(1, _('20%'), self._on_summarize, kargs={'level':20} ) )
+        summ_menu.append( f_menu_item(1, _('10%'), self._on_summarize, kargs={'level':10} ) )
+        menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        menu.append( f_menu_item(3, _('Summarize...'), summ_menu, icon='filter-symbolic')) 
+        
+        if not (selection == () or len(selection) != 3):
+            text = widget.get_text()
+            self.selection_text = text[selection[1]:selection[2]]
+            self.selection_text = scast( self.selection_text, str, '')
+            if self.debug in (1,7): print(f'Selected text: {self.selection_text}')
+            if self.selection_text != '':
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Search for this Term'), self.add_tab, kargs={'type': FX_TAB_SEARCH, 'phrase':self.selection_text}, icon='edit-find-symbolic'))  
+                menu.append( f_menu_item(1, _('Show this Term\'s Contexts'), self.add_tab, kargs={'type': FX_TAB_CONTEXTS, 'phrase':self.selection_text}, icon='view-list-symbolic'))  
+                menu.append( f_menu_item(1, _('Show Terms related to this Term'), self.add_tab, kargs={'type': FX_TAB_TERM_NET, 'phrase':self.selection_text}, icon='emblem-shared-symbolic'))  
+                menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab,kargs={'type': FX_TAB_TIME_SERIES, 'phrase':self.selection_text}, icon='office-calendar-symbolic'))  
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Search WWW'), self._on_www_search_sel, icon='www-symbolic', tooltip=_("Search WWW for selected text") ) )
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Add as Rule'), self._on_add_as_rule, icon='view-list-compact-symbolic'))  
+        menu.show_all()
+
+
+
+
+
+    def _on_summarize(self, *args, **kargs):
+        level = args[-1].get('level',0)
+        summarized_text = self.FX.LP.summarize_entry(self.selection_res, level, separator=" (...) \n\n (...) ")
+        if self.debug in (1,): print(f'Summarize level: {level}')
+        if type(summarized_text) is str and summarized_text.strip() != '':
+            self.selection_res['text'] = ''
+            self.selection_res['desc'] = summarized_text
+            self.on_changed_selection()
+
 
 
     def _on_www_search_auth(self, *args, **kargs): ext_open(self.config, 'search_engine', self.selection_res.get('author',None))
@@ -1361,7 +1389,7 @@ Click to open in image viewer""")
                     'group':self.config.get('gui_notify_group','feed'), 
                     'depth':self.config.get('gui_notify_depth',0)
                     }
-                    results = FX.QP.query('', filters , rev=False, print=False, allow_group=True)
+                    results = FX.Q.query('', filters , rev=False, print=False, allow_group=True)
                     fx_notifier.load(results)
                     fx_notifier.show()
 
@@ -1964,14 +1992,15 @@ Click to open in image viewer""")
 
 
 
+
+
     def on_show_detailed(self, *args):
         """ Shows dialog with entry's detailed technical info """
-        if self.FX.db_error is not None:
-            self.update_status(0, (-2, _('DB Error: %a'), self.FX.db_error) )
-            return 0
-        det_str=f"""\n\n{self.selection_res.__str__()}\n\n"""
+        entry = EntryContainer(self.FX, id=self.selection_res['id'])
+        if not entry.exists: self.update_status(0, (-2, _('Entry %a not found!'), self.selection_res['id']) ) 
+
         tmp_file = os.path.join(self.FX.cache_path, f'{random_str(length=5)}_entry_details.txt')
-        with open(tmp_file, 'w') as f: f.write(det_str)
+        with open(tmp_file, 'w') as f: f.write(entry.__str__())
 
         err = ext_open(self.config, 'text_viewer', tmp_file, file=True, debug=self.debug)
         if err != 0: self.update_status(0, err)
@@ -1979,18 +2008,20 @@ Click to open in image viewer""")
 
     def on_feed_details(self, *args):
         """ Shows feed's techical details in a dialog """
-        det_str=self.FX.QP.read_feed(self.selection_feed['id'], to_var=True)
-        if self.FX.db_error is not None:
-            self.update_status(0, (-2, _('DB Error: %a'), self.FX.db_error) )
-            return 0
+        feed = FeedContainer(self.FX, id=self.selection_feed['id'])
+        if not feed.exists: self.update_status(0, (-2, _('Channel %a not found!'), self.selection_res['id']) )
 
         tmp_file = os.path.join(self.FX.cache_path, f'{random_str(length=5)}_feed_details.txt' )
-        with open(tmp_file, 'w') as f: f.write(det_str)
+        with open(tmp_file, 'w') as f: f.write(feed.display())
 
         err = ext_open(self.config, 'text_viewer', tmp_file, file=True, debug=self.debug)
         if err != 0: self.update_status(0, err)
 
         
+
+
+
+
 
     def on_show_stats(self, *args):
         """ Shows dialog with SQLite DB statistics """
@@ -2013,7 +2044,7 @@ Click to open in image viewer""")
         entry = EntryContainer(self.FX, id=self.selection_res['id'])
         if not entry.exists: return -1
             
-        importance, flag, best_entries, flag_dist, rules_tmp = entry.ling(rank=True, index=False, learn=False, to_var=True)
+        importance, flag, best_entries, flag_dist, rules_tmp = entry.ling(rank=True, index=False, learn=False, to_disp=True)
         footer = f"""{_('Rules matched')}: <b>{len(rules_tmp)}</b>
 {_('Saved Importance')}: <b>{self.selection_res['importance']:.3f}</b>
 {_('Saved Flag')}: <b>{self.selection_res['flag']:.0f}</b>
@@ -2032,7 +2063,7 @@ Click to open in image viewer""")
         for e in best_entries: footer = f"""{footer}{e}, """
 
         r = SQLContainer('rules', RULES_SQL_TABLE_RES)
-        rules = self.FX.QP.show_rules(results=rules_tmp, print=False)
+        rules = self.FX.Q.show_rules(results=rules_tmp, print=False)
         store = Gtk.ListStore(str, str, int,  str, str, str, str, str, str,  float, int, str, str, int)
         for rl in rules: 
             r.populate(rl)
@@ -2086,7 +2117,7 @@ Click to open in image viewer""")
     def on_show_keywords(self, *args, **kargs):
         """ Shows keywords for entry """
         title = f'{_("Keywords for entry ")}<b>{esc_mu(self.selection_res.name())}</b> ({_("id")}: {self.selection_res["id"]})'
-        keywords = self.FX.QP.get_keywords(self.selection_res.get('id'), rev=True)
+        keywords = self.FX.Q.get_keywords(self.selection_res.get('id'), rev=True)
         if self.FX.db_error is not None:
             self.update_status(0, (-2, _('DB Error: %a'), self.FX.db_error) )
             return 0

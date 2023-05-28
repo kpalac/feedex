@@ -50,13 +50,14 @@ class EntryContainer(SQLContainerEditable):
         # String to extract features from
         self.learning_string = ''
 
-        # Last Xapian doc id
-        self.last_xap_doc = 0
-
         # Source link (useful as a feature and independent of db structure)
         self.source_url = None
 
         self.rules = [] # Rules extracted by LP
+
+
+
+
 
 
 
@@ -549,7 +550,7 @@ class EntryContainer(SQLContainerEditable):
         rank = kargs.get('rank',True)
         save_rules = kargs.get('save_rules', learn)
         index = kargs.get('index', stats)
-        to_var = kargs.get('to_var',False)
+        to_disp = kargs.get('to_disp',False)
         counter = kargs.get('counter',0) # Counter for generating UUIDs
         rebuilding = kargs.get('rebuilding',False) # This tells if we are creating index anew and, if yes, we clear IX_IDs
 
@@ -654,10 +655,10 @@ class EntryContainer(SQLContainerEditable):
         if rank:
             # Perform ranking based on saved rules. Construct laerning string for stemmed rules
             if self.feed['url'] not in (None, ''): self.rank_string = f"""  {self.rank_string}  URL:{self.feed['url']}  """
-            if not to_var:
-                self.vals['importance'], self.vals['flag'] = self.FX.LP.rank(self.vals, self.rank_string, to_var=False)
+            if not to_disp:
+                self.vals['importance'], self.vals['flag'] = self.FX.LP.rank(self.vals, self.rank_string, to_disp=False)
             else: 
-                return self.FX.LP.rank(self.vals, self.rank_string, to_var=True)
+                return self.FX.LP.rank(self.vals, self.rank_string, to_disp=True)
 
 
         if learn:
@@ -720,4 +721,83 @@ class EntryContainer(SQLContainerEditable):
 
 
 
+    #######################################################################################################
+    # Display routines
 
+
+
+
+    def display(self, **kargs):
+        """ Display entry in str """
+        summarize = scast(kargs.get('summarize'), int, 0)        
+        if not (summarize >= 0 and summarize <= 100): return -5, _("Summary level must be between 0..100!")
+
+        self.set_feed()
+
+        if summarize > 0: body = f"""{_('Summary:')} {self.FX.LP.summarize_entry(self.vals, summarize, separator=' (...) ')}"""
+        else:
+            body = f"""{_('Descripton')} (desc):     {self.vals['desc']}
+----------------------------------------------------------------------------------------------------------
+{_('Text')} (text): {scast(self.vals['text'], str, '')}
+
+"""
+        disp_str = f"""
+{_('Feed or Category')} (feed_id): {self.vals['feed_id']} ({self.feed.name()})  
+----------------------------------------------------------------------------------------------------------
+{_('Title:')}  {self.vals['title']}
+----------------------------------------------------------------------------------------------------------
+{body}
+----------------------------------------------------------------------------------------------------------
+{_('Links and enclosures:')}
+{self.vals['links']}
+{self.vals['enclosures']}
+{_('Images')}:
+{self.vals['images']}
+{_('Comments')}:       {self.vals['comments']}
+----------------------------------------------------------------------------------------------------------
+{_('Category')}:       {self.vals['category']}
+{_('Tags')}:           {self.vals['tags']}
+{_('Author')}:         {self.vals['author']} ({_('contact')}: {self.vals['author_contact']})
+{_('Publisher')}:      {self.vals['publisher']} ({_('contact')}: {self.vals['publisher_contact']})
+{_('Contributors')}:   {self.vals['contributors']}
+{_('Published')}:      {self.vals['pubdate_str']}    {_('Added')}:  {self.vals['adddate_str']}
+----------------------------------------------------------------------------------------------------------
+{_('ID')}:             {self.vals['id']}
+{_('Language')} (lang):       {self.vals['lang']}
+{_('Read?')} (read):   {self.vals['read']}
+{_('Flagged')} (flag):        {self.vals['flag']}
+{_('Deleted?')} (deleted):     {self.vals['deleted']}
+-----------------------------------------------------------------------------------------------------------
+{_('Weight')}:         {self.vals['weight']}       {_('Importance')}:     {self.vals['importance']}
+"""
+        kwds = self.FX.qr_sql("""select name from rules r where r.context_id = :id""", {'id':self.vals['id']} , all=True, ignore_errors=False) 
+        kwd_str = ''
+        for kw in kwds: kwd_str = f"""{kwd_str}{kw[0]}; """
+
+        if kwd_str != '': disp_str = f"""{disp_str}
+------------------------------------------------------------------------------------------------------------
+{_('Keywords')}: {kwd_str}
+"""
+        return disp_str
+
+
+
+
+
+
+
+
+    def __str__(self):
+        ostring = SQLContainerEditable.__str__(self)
+        terms = []
+        try: ix_doc = self.FX.ix.get_document(self.vals['ix_id'])
+        except (xapian.DatabaseError, xapian.DocNotFoundError) as e: ix_doc = None
+        if isinstance(ix_doc, xapian.Document):
+            for t in ix_doc.termlist(): terms.append(t.term.decode('utf-8')) 
+        term_str = ''
+        for t in terms: term_str = f"""{term_str}{t} """
+        ostring = f"""{ostring}
+-----------------------------------------------------------------------------------------------------------
+{term_str}
+"""
+        return ostring

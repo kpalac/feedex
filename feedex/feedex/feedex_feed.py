@@ -346,6 +346,17 @@ class FeedContainer(FeedContainerBasic):
         return -1
 
 
+    def get_parent(self, **kargs):
+        """ Load parent into container """
+        for f in self.FX.MC.feeds:
+            if f[self.parent_feed.get_index('id')] == self.vals['parent_id']:
+                self.parent_feed.populate(f)
+                break
+
+
+
+
+
 
     def open(self, **kargs): self.FX.MC.ret_status = cli_msg(self.open(**kargs))
     def r_open(self, **kargs):
@@ -755,5 +766,25 @@ class FeedContainer(FeedContainerBasic):
         return 0, _('Display order changed successfully...')
 
 
+    ##################################################3
+    #    Display Stuff
+    #
 
-        
+
+    def display(self, **kargs):
+        """ Clean display this feed """
+        disp_vals = self.vals.copy()
+        self.get_parent()
+        disp_vals['parent_name'] = self.parent_feed.name()
+        if scast(disp_vals['passwd'], str, '').strip() != '': disp_vals['passwd'] = '*********'
+
+        DISP_LIST = FEEDS_SQL_TABLE_PRINT + (_('Parent Category Name'),)
+
+        disp_str = ''
+        for i,d in enumerate(disp_vals.items()):
+            k,v = d[0], d[1]
+            disp_str = f"""{disp_str}
+{DISP_LIST[i]} ({k}): {v}"""
+
+        return disp_str
+

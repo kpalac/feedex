@@ -721,6 +721,10 @@ def main():
                 params['depth'] = sanitize_arg(arg, int, 0, exit_fail=True)
                 continue
 
+            elif arg.startswith('--summarize='):
+                params['summarize'] = sanitize_arg(arg, int, 0, exit_fail=True)
+                continue
+
 
             elif arg.startswith('--term-width='):
                 params['term_width'] = sanitize_arg(arg, int, 150, exit_fail=False)
@@ -836,12 +840,12 @@ def main():
         if feedex.new_items > 0:
             if params.get('print',False) or params.get('desktop_notify',False): 
                 params['last'] = True
-                feedex.QP.query('', params, rank=True, snippets=False, allow_group=True)
+                feedex.Q.query('', params, rank=True, snippets=False, allow_group=True)
 
 
     # Check if query input is a JSON string and parse it
     if params.get('json_query',False) and action in ('query_entries', 'term_net', 'term_in_time', 'term_context', 'find_similar'):
-        argument, filters = feedex.QP.parse_json_query(argument)
+        argument, filters = feedex.Q.parse_json_query(argument)
         if argument == -1: action = None
         # Replace relevant keys for parameters
         for k,v in filters.items():
@@ -867,7 +871,7 @@ def main():
         
 
     elif action == 'list_feeds':
-        feedex.QP.list_feeds()
+        feedex.Q.list_feeds()
     elif action == 'add_url':
         feed = FeedContainer(feedex)
         params['url'] = argument
@@ -905,21 +909,21 @@ def main():
     elif action == 'read_feed':
         params['feed'] = argument
         params['columns'] = RESULTS_SHORT_PRINT2
-        feedex.QP.query('', params, rank=False, cnt=False, snippets=False)
+        feedex.Q.query('', params, rank=False, cnt=False, snippets=False)
     elif action == 'read_category':
         params['category'] = argument
         params['columns'] = RESULTS_SHORT_PRINT2
-        feedex.QP.query('', params, rank=False, cnt=False, snippets=False)
+        feedex.Q.query('', params, rank=False, cnt=False, snippets=False)
     elif action == 'examine_feed':
-        feedex.QP.read_feed(argument)
+        feedex.Q.read_feed(argument)
     elif action == 'test_regexes':
-        feedex.QP.test_regexes(argument)
+        feedex.Q.test_regexes(argument)
 
 		
     elif action == 'read_entry':
-        feedex.QP.read_entry(argument)
+        feedex.Q.read_entry(argument, summarize=params.get('summarize'))
     elif action == 'find_similar':
-        feedex.QP.find_similar(argument, **params)
+        feedex.Q.find_similar(argument, **params)
     elif action == 'mark':
         entry = EntryContainer(feedex, id=argument)
         entry.update({'read': argument2})
@@ -956,11 +960,11 @@ def main():
 
     # Main query
     elif action == 'query_entries': 
-        feedex.QP.query(argument, params, json_file=params.get('json_file'), rank=True, snippets=True, allow_group=True)
+        feedex.Q.query(argument, params, json_file=params.get('json_file'), rank=True, snippets=True, allow_group=True)
 
 
-    elif action == 'list_rules': feedex.QP.show_rules()
-    elif action == 'list_history': feedex.QP.show_history()
+    elif action == 'list_rules': feedex.Q.show_rules()
+    elif action == 'list_history': feedex.Q.show_history()
 
 
 
@@ -1006,26 +1010,26 @@ def main():
 
 
     elif action == 'term_net':
-        feedex.QP.term_net(argument, **params)
+        feedex.Q.term_net(argument, **params)
     elif action == 'term_in_time':
-        feedex.QP.term_in_time(argument, **params)
+        feedex.Q.term_in_time(argument, **params)
     elif action == 'rel_in_time':
-        feedex.QP.relevance_in_time(argument, **params)
+        feedex.Q.relevance_in_time(argument, **params)
     elif action == 'term_context':
-        feedex.QP.term_context(argument, **params)
+        feedex.Q.term_context(argument, **params)
     elif action == 'keywords':
-        feedex.QP.get_keywords(argument)
+        feedex.Q.get_keywords(argument)
     elif action == 'trends':
-        feedex.QP.get_trends(argument, params)
+        feedex.Q.get_trends(argument, params)
     elif action == 'trending':
-        feedex.QP.get_trending(argument, params)
+        feedex.Q.get_trending(argument, params)
     elif action == 'rules_for_entry':
-        feedex.QP.rules_for_entry(argument)
+        feedex.Q.rules_for_entry(argument)
 
     elif action == 'list_categories':
-        feedex.QP.list_feeds(cats=True)
+        feedex.Q.list_feeds(cats=True)
     elif action == 'show_categories_tree':
-        feedex.QP.cat_tree_print()
+        feedex.Q.cat_tree_print()
     elif action == 'add_category':
         feed = FeedContainer(feedex)
         feed.add(new={'title':argument, 'name': argument, 'subtitle':argument2, 'is_category':True})
@@ -1037,7 +1041,7 @@ def main():
         feed.update({argument2: argument3})
 
     elif action == 'list_flags':
-        feedex.QP.list_flags()
+        feedex.Q.list_flags()
     elif action == 'add_flag':
         flag = FlagContainer(feedex)
         flag.add(new={'name':argument, 'desc': argument2})
@@ -1135,7 +1139,7 @@ def main():
     if params.get('desktop_notify',False) and action in ('get_news','check','query_entries'):
 
         desktop_notifier.clear()
-        desktop_notifier.load(feedex.QP.results)
+        desktop_notifier.load(feedex.Q.results)
         desktop_notifier.show()
 
 

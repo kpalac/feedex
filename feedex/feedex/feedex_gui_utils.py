@@ -635,6 +635,23 @@ def f_page_len_combo(**kargs):
     return f_dual_combo(store, **kargs)
 
 
+def f_ranking_scheme_combo(**kargs):
+    """ Construct combo for query page length """
+    store = (
+    ('simple',_('Simple')), 
+    ('similarity',_('Similarity')) 
+    )
+    tooltip = """Which ranking algorithm should be used to rank incomming items?
+        <b>Simple:</b>  a basic summation on matched rules' weights (may overrank long articles)
+        <b>Similarity:</b>  importance by only top matched most similar important entries
+    """
+    kargs['tooltip'] = tooltip
+    return f_dual_combo(store, **kargs)
+
+
+
+
+
 
 
 

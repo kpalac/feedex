@@ -153,6 +153,8 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         Every entry has a unique ID. See <b>--help-entries</b> for more detailed information
 
         -r, --read-entry [ID]                   Read entry contents by ID (does not cause learning)
+                                                --summarize=INT    Give summarization level for this entry for display (1..100)
+
         -S, --find-similar [ID]                 Find similar entries to ID'd (filters like in --query)
                                                 --limit=INT        Limit results to INT-best (inproves performance)
         --rel-in-time [ID]                      Entry's relevance as a time series - like --term-in -time for entry's keywords (filters like in --query)

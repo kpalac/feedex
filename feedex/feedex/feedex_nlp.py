@@ -55,11 +55,15 @@ class FeedexLP(SmallSem):
 
         # Dictionary of stemming variants
         self.variants = {}
-
-
         
         # Regex string for tokenizing query
         self.REGEX_xap_query = re.compile('''(OR|AND|NOT|XOR|NEAR\d+|~\d+|~|NEAR|<\w+>|[\\\(]|[\\\)]|\(|\)|\"|\'|\w+|\d+|[^\s]+)''')
+
+        self.ranked_sents = [] # List of tokenized and ranked sentences
+        self.last_entry_id = 0  # ID of the last processed entry (for caching)
+
+
+
 
 
 
@@ -293,7 +297,13 @@ class FeedexLP(SmallSem):
 
 
     def validate_rules(self): 
-        """ This routine validates all rules once to ensure one does not have to do it every time later """
+        """ This routine lazily validates all rules once to ensure one does not have to do it every time later """
+        # Ranking scheme
+        if self.config.get('ranking_scheme','simple') == 'simple': self.ranking_algo = 0
+        elif self.config.get('ranking_scheme','simple') == 'similarity': self.ranking_algo = 1
+        else: self.ranking_algo = 0
+        
+        # Abort, if already validated ...
         if self.MC.rules_validated: return 0
 
         if self.debug in (1,4): print('Validating rules...')
@@ -360,12 +370,13 @@ class FeedexLP(SmallSem):
 
     def rank(self, entry, ranking_token_str:str, **kargs):
         """ Match rules for entry """
-        to_var = kargs.get('to_var',False)
-        if to_var:
+        to_disp = kargs.get('to_disp',False)
+        if to_disp:
             display_list = []
             rule = SQLContainer('rules', RULES_SQL_TABLE_RES, replace_nones=True)   
 
         importance = 0
+        raw_importance = 0
         flag = 0
 
         flag_freq_dist = {}
@@ -395,6 +406,8 @@ class FeedexLP(SmallSem):
             rflag       = r[11]
             context_id  = r[12]
 
+            matched = 0
+
             if learned == 1:
                 matched = ranking_token_str.count(string)
 
@@ -408,7 +421,6 @@ class FeedexLP(SmallSem):
 
                 if qtype == 2:
 
-                    matched = 0
                     for f in field_lst:
                         if type(entry[f]) is not str: continue
 
@@ -419,7 +431,6 @@ class FeedexLP(SmallSem):
 
                 elif qtype == 0:
 
-                    matched = 0
                     for f in field_lst:
                         if type(entry[f]) is not str: continue
                         f = entry[f]
@@ -434,13 +445,17 @@ class FeedexLP(SmallSem):
 
             if matched > 0:
 
-                if additive == 1: context_freq_dist[context_id] = context_freq_dist.get(context_id,0) + (matched * rweight)
-                else: context_freq_dist[context_id] = matched * rweight
+                if additive == 1: 
+                    raw_importance += matched * rweight
+                    context_freq_dist[context_id] = context_freq_dist.get(context_id,0) + (matched * rweight)
+                else:
+                    raw_importance = matched * rweight
+                    context_freq_dist[context_id] = matched * rweight
 
                 if learned != 1 and rflag > 0: flag_freq_dist[rflag] = flag_freq_dist.get(rflag,0) + (rweight * matched)
 
                 # Create list for display
-                if to_var: 
+                if to_disp: 
                     rule.clear()
                     rule['learned'] = learned
                     rule['case_insensitive'] = case_ins
@@ -479,12 +494,35 @@ class FeedexLP(SmallSem):
             best_contexts.append(cx[0])
 
         importance = importance * entry['weight']
+        raw_importance = raw_importance * entry['weight']
         
+        # Decide final importance with ranking algo parameter
+        if self.ranking_algo == 0: final_importance = raw_importance
+        elif self.ranking_algo == 1: final_importance = importance
+        else: final_importance = raw_importance
+
         if flag_freq_dist != {}: flag = max(flag_freq_dist, key=flag_freq_dist.get)
 
-        if to_var: return importance, flag, best_contexts, flag_freq_dist, display_list
-        else: return importance, flag
+        if to_disp: return final_importance, flag, best_contexts, flag_freq_dist, display_list
+        else: return final_importance, flag
              
+
+
+
+
+
+    def summarize_entry(self, entry, level=50, **kargs):
+        """ Returns of a given entry """
+        # Check if chunked sentences exist for this entry
+        if self.last_entry_id != entry['id']:
+            summ_str = f"""{scast(entry['desc'],str,'')}
+{scast(entry['text'],str,'')}
+"""
+            self.ranked_sents = self.chunk_sents(summ_str)
+            self.last_entry_id = entry['id']
+
+        # And execute main summarizing method...
+        return self.summarize(scast(level, int, 0), **kargs)
 
 
 

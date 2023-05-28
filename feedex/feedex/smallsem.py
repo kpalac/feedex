@@ -34,8 +34,8 @@ import pyphen
 
 
 
-
-
+# Constants
+DEFAULT_SENTENCE_CHUNKER_RE="""(?:\.\.\.|\.|\?|!|^\s|[\n\t]*?)((?:\s+[A-Z]\w+|\"\s|\'\s|\n+).*?(?:\.\.\.|\.|\?|!| $))(?:\s+[A-Z]\w+|\"\s|\'\s|[\n\t]*?)"""
 
 
 
@@ -81,6 +81,10 @@ class SmallSem:
 
         self.tokens = []
         self.units = []
+
+        # summarization stuff...
+        self.ranked_sents = [] # List of tokenized and ranked sentences
+
         
 
 
@@ -510,13 +514,67 @@ class SmallSem:
 
 
 
-    def summarize(self, text, depth=10, **kwargs):
+    def chunk_sents(self, text, **kwargs):
         """ Summarize a text into N sentences """
-        features = self.extract_features(text, 30)
-        units = self.tokenize(text, units=True)
+        features = self.extract_features(text, 100)
+        
+        self.ranked_sents = []
+        sents_raw = re.findall(self.ling.get('sentence_chunker', DEFAULT_SENTENCE_CHUNKER_RE), text)
+
+        # Tokenize and rank each sentence separately and create a list
+        for s in sents_raw:
+
+            if type(s) is not str: continue
+
+            s = s.replace("\n",'').replace("\t",'').replace('\r','')
+            self.tokenize(s, units=False, stem=True)
+
+            # Construct a string for ranking
+            sent_string = ' '
+            for t in self.tokens: sent_string = f"""{sent_string}{t} """
+
+            weight = 0
+            for f in features:
+                matched = sent_string.lower().count(f' {f[2].lower()} ')
+                weight += matched * f[1]        
+
+            weight = float(weight)
+            self.ranked_sents.append( (s, weight) )
+            
+        return self.ranked_sents
 
 
 
+
+
+
+    def summarize(self, level=50, **kwargs):
+        """ Summarize previously chunked document by selecting weight threshold (like a rising water level covering unimportant sentences)"""
+        sep = kwargs.get('separator','')
+        if not (level >= 0 and level <= 100): raise ValueError('Summary level must be between 0 and 100')
+
+        # Sort weights for normalization
+        sents = []
+
+        if level == 0: thres = 0
+        else:
+            for i,s in enumerate(self.ranked_sents): sents.append( (i,s[1]) )
+            sents.sort(key=lambda x: x[1])
+
+            divider = int(round(len(sents)*level/100, 0) - 1)
+            thres = sents[divider][1]
+
+        if thres <= sents[0][1]: return None
+
+        summ_doc = ''
+        last_cand = 0
+        for i,s in enumerate(self.ranked_sents):
+            if s[1] >= thres:
+                if i - last_cand > 1: summ_doc = f'''{summ_doc}{sep}{s[0]}'''
+                else: summ_doc = f'''{summ_doc} {s[0]}'''
+                last_cand = i
+
+        return summ_doc
 
 
 
@@ -655,6 +713,9 @@ Options:
     --keywords FILE         Extract keyword list from a given text file
     --depth=INT             How many best keywords to extract?
 
+    --summarize FILE        Summarize file
+    --level=1..100          Summarization level
+
     --term_context TERM     Show n (--depth) best context words for a term
     
     --index_dir DIR         Learn vocab and train on all text files in a folder
@@ -682,10 +743,13 @@ if __name__ == '__main__':
     term = None
     action = None
     depth = 10
+    level = 50
+    separator = ''
     file = None
     models_path = ''
     matrix_file = ''
     debug = False
+
 
     if  par_len > 1:
         for i, arg in enumerate(sys.argv):
@@ -713,6 +777,11 @@ if __name__ == '__main__':
                 action = 'kw_from_file'
                 break
 
+            elif arg == '--summarize' and par_len > i:
+                file = sys.argv[i+1]      
+                action = 'summarize'
+                break
+
 
             elif arg.startswith('--lang=') and arg != '--lang=':
                 lang = arg.split('=')[1]
@@ -722,6 +791,12 @@ if __name__ == '__main__':
             
             elif arg.startswith('--depth=') and arg != '--depth=':
                 depth = arg.split('=')[1]
+
+            elif arg.startswith('--level=') and arg != '--level=':
+                level = arg.split('=')[1]
+
+            elif arg.startswith('--separator=') and arg != '--separator=':
+                separator = arg.split('=')[1]
 
             elif arg == '--debug':
                 debug = True
@@ -734,7 +809,7 @@ if __name__ == '__main__':
 
 
 
-    if action in ('index_dir', 'term_freq','build','term_context','kw_from_file'):
+    if action in ('index_dir', 'term_freq','build','term_context','kw_from_file', 'summarize'):
         
         if action == 'index_dir': 
             kl = SmallSemTrainer(lang, models_path, debug=debug)
@@ -767,5 +842,18 @@ if __name__ == '__main__':
             for kw in kwrds: print(kw)
 
 
-
-
+        elif action == 'summarize':
+            lp = SmallSem(models_path, ling=lang, debug=debug)
+            try:
+                # Detect encodng...
+                with open(file, 'rb') as f:
+                    contents = f.read()
+                    encoding = chardet.detect(contents)['encoding']
+                with open(file, 'r', encoding=encoding) as f:
+                    contents = f.read()
+            except OSError as e:
+                print(f'Error loading {file} file: {e}')
+                sys.exit(1)
+            
+            lp.chunk_sents(contents)
+            print( lp.summarize(int(level), separator=separator) )

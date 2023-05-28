@@ -453,6 +453,7 @@ DEFAULT_CONFIG = {
             'use_keyword_learning' : True,
             'use_search_habits' : True,
             'learn_from_added_entries': True,
+            'ranking_scheme' : 'simple',
             'no_history': False,
             'default_entry_weight' : 2,
             'default_rule_weight' : 2,
@@ -512,6 +513,7 @@ CONFIG_NAMES = {
             'ignore_media' : _('Ignore handling media'),
             'rule_limit' : _('Limit for rules'),
             'use_keyword_learning' : _('Use keyword learning'),
+            'ranking_scheme' : _('Ranking Scheme/Algo'),
             'use_search_habits' : _('Use search habits'),
             'no_history' : _('Do not save queries in History'),
             'learn_from_added_entries': _('Learn from added Entries'),
@@ -564,7 +566,7 @@ CONFIG_INTS_Z=('rule_limit','gui_clear_cache','default_depth','gui_layout','gui_
 
 CONFIG_FLOATS=('default_entry_weight', 'default_rule_weight', 'query_rule_weight' )
 
-CONFIG_STRINGS=('log','db_path','browser','lang','user_agent', 'fallback_user_agent', 'gui_notify_group', 'window_name_exclude', \
+CONFIG_STRINGS=('log','db_path','browser','lang','user_agent', 'fallback_user_agent', 'gui_notify_group', 'window_name_exclude', 'ranking_scheme',\
     'gui_new_color','gui_deleted_color', 'gui_hilight_color', 'gui_default_flag_color' ,'imave_viewer','text_viewer','search_engine','bold_markup_beg','bold_markup_end')
 CONFIG_KEYS=('gui_key_search','gui_key_new_entry', 'gui_key_new_rule')
 
@@ -654,6 +656,6 @@ from feedex_nlp import FeedexLP
 from feedex_entry import EntryContainer, ResultContainer
 from feedex_rule import RuleContainerBasic, RuleContainer, FlagContainerBasic, FlagContainer, HistoryItem
 from feedex_handlers import FeedexRSSHandler, FeedexHTMLHandler, FeedexScriptHandler
-from feeder_query_parser import FeederQueryParser
+from feeder_query import FeederQuery
 from feeder import Feeder
 

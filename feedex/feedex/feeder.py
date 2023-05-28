@@ -17,10 +17,8 @@ class Feeder:
 
     def __init__(self, top_parent, **kargs):
 
-        # Make sure we are feeding metadata to and getting it from the right place ...
-        if isinstance(top_parent, FeedexMainDataContainer): self.MC = top_parent
-        else: raise FeedexTypeError(_('Top_parent should be an instance of FeedexMainDataContainer class!'))
-
+        # Make sure we are feeding shared data to and getting it from the right place ...
+        self.MC = top_parent
 
         # Main configuration
         self.config = kargs.get('config', DEFAULT_CONFIG)
@@ -109,7 +107,7 @@ class Feeder:
         # initialize linguistic processor for tokenizing and stemming
         self.LP = FeedexLP(self.MC, **kargs)
         # And query parser ...
-        if not kargs.get('no_qp', False): self.QP = FeederQueryParser(self, **kargs)
+        if not kargs.get('no_qp', False): self.Q = FeederQuery(self, **kargs)
 
 
 

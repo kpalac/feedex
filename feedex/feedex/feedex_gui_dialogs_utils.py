@@ -503,6 +503,10 @@ If no grouping is selected, it will simply show top results"""))
         self.default_similar_weight_entry = Gtk.Entry()
         self.default_similar_weight_entry.set_tooltip_markup(_('How much weight for ranking should items for which similar ones are searched for be given. Zero to disable'))
         
+        ranking_scheme_label = f_label(_('Incomming articles ranking scheme:'))
+        self.ranking_scheme_combo = f_ranking_scheme_combo()
+
+
         new_color_label = f_label(_('Added entry color:'))
         new_color = Gdk.color_parse(self.config.get('gui_new_color','#0FDACA'))
         self.new_color_button = Gtk.ColorButton(color=new_color)
@@ -702,6 +706,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         learn_grid.attach(self.default_rule_weight_entry, 4, 9, 3,1)
         learn_grid.attach(default_similar_wieght_label, 1,10,4,1)
         learn_grid.attach(self.default_similar_weight_entry, 5, 10, 3,1)
+        learn_grid.attach(ranking_scheme_label, 1,11,4,1)
+        learn_grid.attach(self.ranking_scheme_combo, 5, 11, 3,1)
 
 
         system_grid = create_grid()
@@ -868,6 +874,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
         self.default_similar_weight_entry.set_text(scast(self.config.get('default_similar_weight',2), str, _('<<ERROR>>')))
 
+        f_set_combo(self.ranking_scheme_combo, self.config.get('ranking_scheme','simple'))
+
         self.max_context_length_entry.set_text(scast(self.config.get('max_context_length',500), str, _('<<ERROR>>')))
         self.default_depth_entry.set_text(scast(self.config.get('default_depth',5), str, _('<<ERROR>>')))
 
@@ -966,6 +974,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         self.result['default_rule_weight'] = nullif(self.default_rule_weight_entry.get_text(),'')
 
         self.result['default_similar_weight'] = nullif(self.default_similar_weight_entry.get_text(),'')
+
+        self.result['ranking_scheme'] = f_get_combo(self.ranking_scheme_combo)
 
         self.result['max_context_length'] = nullif(self.max_context_length_entry.get_text(),'')
         self.result['default_depth'] = nullif(self.default_depth_entry.get_text(),'')
