@@ -41,7 +41,7 @@ Features:
       i) Keyword extraction
       j) Extracting trending terms from a group of articles
       k) Ranking articles according to trends (i.e. "most talked about")
-      g) Text summarization 
+      l) Text summarization 
 
   - Exporting results to CSV or JSON
 
