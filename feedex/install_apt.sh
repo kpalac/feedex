@@ -36,6 +36,7 @@ sudo find /usr/share/feedex/ -type f -exec chmod 644 {} +
 sudo chmod 755 /usr/share/feedex/data/examples/scripts/*
 
 
+
 # Install dependencies
 if [[ "$1" != "no_deps" ]]; then
 
@@ -45,8 +46,8 @@ if [[ "$1" != "no_deps" ]]; then
     sudo apt-get install pip3
     sudo apt-get install python3-pip
     sudo apt-get install -y python3-feedparser
-    sudo apt-get install xapian-core
-    sudo apt-get install xapian-bingings
+    sudo apt-get install apt-xapian-index libxapian30 python3-xapian
+    sudo apt-get install xapian-bindings
 
     sudo pip install feedparser
     sudo pip install urllib3
@@ -55,6 +56,7 @@ if [[ "$1" != "no_deps" ]]; then
     sudo pip install snowballstemmer
     sudo pip install Pyphen
     sudo pip install xapian-bingings
+    
 
     if [[ "$1" != "no_gui" ]]; then
         sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0

@@ -20,15 +20,16 @@ if PLATFORM == 'linux':
     FEEDEX_GUI_ATTR_CACHE = os.path.join(FEEDEX_SHARED_PATH, 'feedex_gui_cache.json')
 
 
-FEEDEX_GUI_DEFAULT_SEARCH_FIELDS = {'rev': True, 'print': False,  
+FEEDEX_GUI_DEFAULT_SEARCH_FIELDS = {  
 'field': None, 
 'feed_or_cat' : None,
-'today': True,
+'last': True,
 'qtype': 1,
 'exact': False,
 'group': 'daily', 
 'lang': None,
 'hadler': None,
+'logic' : 'any',
 'page' : 1,
 'page_len' : 1000,
 }
@@ -51,6 +52,11 @@ FEEDEX_GUI_SEARCH_ENGINES=(
 "https://www.bing.com/search?q=%Q",
 "https://search.yahoo.com/search?p=%Q",
 "https://yandex.com/search/?text=%Q",
+)
+
+# This is needed to ignore downloading useless icons etc.
+FEEDEX_GUI_IGNORE_THUMBNAILS=(
+'http://feeds.feedburner.com',
 )
 
 FEEDEX_GUI_ICONS=('rss','www','script','mail','twitter','calendar','document','ok','edit')
@@ -91,6 +97,9 @@ FX_TAB_MAP = 14
 FX_TAB_TRENDS = 15
 FX_TAB_TRENDING = 16
 
+# Tab type compatibility sets
+FX_TT_ENTRY = (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_NOTES, FX_TAB_RESULTS,)
+
 
 # Places IDs
 FX_PLACE_STARTUP = 0
@@ -109,7 +118,6 @@ FX_PLACE_LAST_YEAR = 17
 FX_PLACE_ALL_CHANNELS = 18
 
 # Action IDs
-FX_ACTION_FINISHED_SEARCH = 0
 FX_ACTION_EDIT = 1
 FX_ACTION_ADD = 2
 FX_ACTION_BLOCK_FETCH = 3
@@ -119,18 +127,47 @@ FX_ACTION_RELOAD_FEEDS_DB = 6
 FX_ACTION_BLOCK_DB = 7
 FX_ACTION_UNBLOCK_DB = 8
 FX_ACTION_DELETE = 9
+FX_ACTION_HANDLE_IMAGES = 10
+FX_ACTION_FINISHED_SEARCH = 11
+FX_ACTION_FINISHED_FILTERING = 12
 
 
 
-# Default column orders for tabs
-FX_DEF_COLS_RESULTS = (25,4,3,5,7,8,9,26,10,12,14,15,16,17,18,19,6,21,20)
-FX_DEF_COLS_CONTEXTS = (3,17,4,5,19,7,9,10,11,12,13,14,6,15,16)
-FX_DEF_COLS_TERM_NET = (1,2)
-FX_DEF_COLS_TIME_SERIES = (1,2,3)
-FX_DEF_COLS_RULES = (1,2,3,4,5,6,7,8,9)
-FX_DEF_COLS_FLAGS = (1,2,3)
-FX_DEF_COLS_NOTES = (1,2,3,4,5,6,7,8,9)
+# Default column layouts for tabs
+FX_DEF_LAYOUTS = {
+'entries' : (('pubdate_short',100),('title',650),('feed_name',200),('desc',650),('author',200),('flag_name',100),
+             ('category',150),('tags',150),('read',50), ('importance',50),('readability',50),('weight',50),('word_count',50),
+             ('adddate_str',70), ('pubdate_str',70), ('publisher',150),('link',150), ('rank',50),('count',50),),
 
+'tree' : (('pubdate_short',100),('title',650),('feed_name',200),('desc',650),('author',200),('flag_name',100),
+             ('category',150),('tags',150),('read',50), ('importance',50),('readability',50),('weight',50),('word_count',50),('rank',50),
+             ('count',50),('adddate_str',70), ('pubdate_str',70), ('publisher',150),('link',150),),
+
+'notes' : ( ('pubdate_short',100), ('entry',650), ('feed_name',200),  ('author',200), ('category',150),('tags',150),
+                   ('read',50), ('importance',50),('readability',50),('weight',50),('word_count',50),('rank',50), ('count',50),
+                   ('adddate_str',70), ('pubdate_str',70), ('publisher',150),('link',150),),
+
+'contexts' : (('pubdate_short',100),('context',700),('feed_name',200),('title',650),('desc',650),('author',200),('flag_name',100),
+             ('category',150),('tags',150),('sread',50), ('importance',50),('readability',50),('weight',50),('word_count',50),('rank',50),
+             ('count',50),('adddate_str',70), ('pubdate_str',70), ('publisher',150),('link',150),),
+
+'terms' : (('term',200), ('weight',100)),
+
+'time_series' : (('time',200), ('gui_plot',650), ('freq',70) ),
+
+'rules' : (('name',250), ('string',250), ('weight',70), ('scase_insensitive',50), ('query_type',70), ('flag_name',70),('field_name',100),('feed_name',400),  ),
+
+'flags' : (('id',30), ('name',200), ('desc',700),),
+
+'rules_rank' : ( ('name',150), ('string',150), ('matched',30), ('slearned',20), ('scase_insensitive',20), ('query_type',100), ('field_name',100),
+                 ('feed_name',100), ('lang',50), ('weight',50), ('flag',20), ('flag_name',100), ('sadditive',30), ('context_id',50)  ),
+
+'rules_learned' : (('name',150), ('string',150), ('lang',50), ('weight',50), ('context_id',50)),
+
+'keywords' : (('term',200), ('weight',100), ('search_form',100)),
+
+
+}
 
 
 
@@ -144,13 +181,14 @@ FX_DEF_COLS_NOTES = (1,2,3,4,5,6,7,8,9)
 def f_pack_page(fields:list):
     """ Wrapper for building page of lower notebook widget (preview result) """
     page = Gtk.ScrolledWindow()
-    vbox = Gtk.Box()        
+    page.set_placement(Gtk.CornerType.TOP_LEFT)
+    vbox = Gtk.Box()
     vbox.set_border_width(8)
     vbox.set_orientation(Gtk.Orientation.VERTICAL)
     vbox.set_homogeneous(False) 
     for f in fields:
         vbox.pack_start(f, False, True, 5)
-    page.add_with_viewport(vbox)
+    page.add(vbox)
     return page
 
 
@@ -308,6 +346,7 @@ def f_orientation_combo(**kargs):
     )
     return f_dual_combo(store, **kargs)
 
+
 def f_loc_combo(**kargs):
     """ Construct combo for localisation """
     store = (
@@ -329,18 +368,6 @@ def f_startup_page_combo(**kargs):
     return f_dual_combo(store, **kargs)
 
 
-def f_archive_time_combo(**kargs):
-    """ Build time combo for archiving """
-    now = datetime.now()
-    now = int(now.timestamp())
-    store = [
-    (now-(86400*31*3),_('Older than 3 months') ),
-    (now-(86400*31*6),_('Older than 6 months') ),
-    (now-(86400*31*12),_('Older than 1 year') ),
-    (now-(86400*31*24),_('Older than 2 years') ),
-    (now-(86400*31*36),_('Older than 3 years') )
-    ]
-    return f_dual_combo(store, **kargs)
 
 
 
@@ -355,6 +382,7 @@ def f_time_combo(**kargs):
     ('last_quarter',_('Quarter') ),
     ('last_six_months',_('Six Months') ),
     ('last_year',_('Year') ),
+    ('...-...', _('All times')),
     ('choose_dates',_('Choose dates...') ),
     ]
     # Append additional times
@@ -405,7 +433,7 @@ def f_depth_combo(**kargs):
     (20,_('Top 20') ),
     (30,_('Top 30') ),
     (50,_('Top 50') ),
-    (0,_('All') )
+    (9999,_('All') )
     )
     return f_dual_combo(store, **kargs)
 
@@ -431,18 +459,18 @@ def f_read_combo(**kargs):
 
 
 
-def f_flag_combo(FX, **kargs):
+def f_flag_combo(**kargs):
     """ Constr. combo for flag choosers and search filters """
     if kargs.get('filters',True):
         store = [
         (None, _("Flagged and Unflagged"), None),
         ('no', _("Unflagged"), None),
         ('all_flags', _("All Flags"), None)]
-        for fl in FX.MC.flags.keys(): store.append( (scast(fl,str,'-1'), FX.get_flag_name(fl), FX.get_flag_color(fl) ) )
+        for fl in fdx.flags_cache.keys(): store.append( (scast(fl,str,'-1'), fdx.get_flag_name(fl), fdx.get_flag_color(fl) ) )
 
     else:
         store = [(-1, _("No Flag"), None)]
-        for fl in FX.MC.flags.keys(): store.append( (fl, FX.get_flag_name(fl), FX.get_flag_color(fl) ) )
+        for fl in fdx.flags_cache.keys(): store.append( (fl, fdx.get_flag_name(fl), fdx.get_flag_color(fl) ) )
 
     kargs['color'] = True
     return f_dual_combo(store, **kargs)
@@ -456,10 +484,10 @@ def f_cli_color_combo(**kargs):
     return f_dual_combo(store, tooltip=tooltip, **kargs)
 
 
-def f_feed_combo(FX, **kargs):
+def f_feed_combo(**kargs):
     """ Builds Feed/Category store for combos. This action is often repeated """
     store = []
-    feed = FeedContainerBasic()
+    feed = ResultFeed()
     empty_label = kargs.get('empty_label' , _('-- No Category --'))
     exclude_id = kargs.get('exclude_id')
 
@@ -474,13 +502,13 @@ def f_feed_combo(FX, **kargs):
             store.append( (-k, f"""{v.get('name',f'{_("Template")} {k}')}""", 700) )
 
     if kargs.get('with_categories',True):
-        for c in FX.MC.feeds:
+        for c in fdx.feeds_cache:
             feed.populate(c)
             if feed['is_category'] == 1 and feed['deleted'] != 1 and feed['id'] != exclude_id:
                 store.append((feed['id'], feed.name(), 700,))
 
     if kargs.get('with_feeds',False):
-        for f in FX.MC.feeds:
+        for f in fdx.feeds_cache:
             feed.populate(f)
             if feed['is_category'] != 1 and feed['deleted'] != 1 and feed['id'] != exclude_id:
                 store.append(  (feed['id'], feed.name(), 400,)  )
@@ -580,7 +608,7 @@ def f_query_type_combo(**kargs):
 
 
 
-def f_lang_combo(FX, **kargs):
+def f_lang_combo(**kargs):
     """ Build combo list of languages """
 
     kargs['tooltip'] = kargs.get('tooltip', _('Select language used fort query tokenizing and stemming') )
@@ -588,7 +616,7 @@ def f_lang_combo(FX, **kargs):
     if kargs.get('with_all',True): store = [(None, _("All Languages"),)]
     else: store = []
 
-    for l in FX.LP.MC.lings:
+    for l in fdx.lings:
         if l['names'][0] != 'heuristic':
             store.append( (l['names'][0], l['names'][0].upper()) )
 
@@ -869,7 +897,9 @@ def f_menu_item(item_type:int, label:str, connect, **kargs):
         if connect is not None: item.set_submenu(connect)
         
     elif connect is not None:
-        if kwargs is not None: args.append(kwargs)
+        if kwargs is not None: 
+            args = list(args)
+            args.append(kwargs)
         item.connect('activate', connect, *args)
 
     if tooltip is not None:
@@ -883,33 +913,24 @@ def f_menu_item(item_type:int, label:str, connect, **kargs):
 
 
 ####################################################################################################
-# Utilities
+# General GUI Utilities
 
 
-def sanitize_snippet(snip:tuple):
-    """ Sanitizes snippet string for output with Pango markup """
-    if len(snip) == 3:
-        beg = esc_mu(scast(snip[0], str, ''))
-        phr = esc_mu(scast(snip[1], str, ''))
-        end = esc_mu(scast(snip[2], str, ''))
-        return f'{beg}<b>{phr}</b>{end}'
-    else:
-        return _('<<ERROR>>')    
-
-
-def res(string:str, cache_path:str):
+def process_res_links(string:str, cache_path:str):
     """ Extracts elements and generates resource filename for cache """
     if string.strip() == '': return 0
     if string.startswith('http://') or string.startswith('https://'): url = string
     else: url = slist(re.findall(IM_URL_RE, string), 0, None)
-    # This is to avoid showing icons from feedburner
-    if url is None or url.startswith('http://feeds.feedburner.com'): return 0
+    
+    # This is to avoid showing icons from feedburner etc.
+    if url is None: return 0
+    for i in FEEDEX_GUI_IGNORE_THUMBNAILS:
+        if url.startswith(i): return 0
 
     alt = slist(re.findall(IM_ALT_RE, string), 0, '')
     title = slist(re.findall(IM_TITLE_RE, string), 0, '')
-
-    title = slist( strip_markup(scast(title, str,''), html=True), 0, '')
-    alt = slist( strip_markup(scast(alt, str, ''), html=True), 0, '')
+    alt = slist( fdx.strip_markup(scast(alt, str, ''), html=True), 0, '')
+    title = slist( fdx.strip_markup(scast(title, str,''), html=True), 0, '')
  
     hash_obj = hashlib.sha1(url.encode())
     filename = os.path.join(cache_path, f"""{hash_obj.hexdigest()}.img""")
@@ -923,52 +944,33 @@ def res(string:str, cache_path:str):
 
 
 
-
-
-
-def download_res(url:str, filename:str, **kargs):
-    """ Downloads a resource at URL and creates a cache file from hashed URL """
-    headers = {'User-Agent' : kargs.get('user_agent',FEEDEX_USER_AGENT)}
-    no_thumbnail = kargs.get('no_thumbnail', False)
+def create_thumbnail(url:str, ofile:str, **kargs):
+    """ Save remote resource to a thumbnail file """
+    kargs['verbose'] = False
+    response, res_data = fdx.download_res(url, mimetypes=FEEDEX_IMAGE_MIMES, output_pipe=BytesIO(), **kargs)
+    if response == -3: return -3
     try:
-        req = urllib.request.Request(url, None, headers)
-        response = urllib.request.urlopen(req)
-        
-        if response.status in (200, 201, 202, 203, 204, 205, 206):
+        img = Image.open(res_data)
+        img.thumbnail((150, 150))
+        img.save(ofile, format="PNG")
+        return 0
+    except (OSError, UnidentifiedImageError, Image.DecompressionBombError, FileNotFoundError, AttributeError) as e:
+        return msg(FX_ERROR_HANDLER, f"""{_('Error saving thumbnail from %a: ')}{e}""")
 
-            if response.info().get('Content-Type') not in FEEDEX_IMAGE_MIMES: return 1, None
-            content_size = scast(response.info().get('Content-Length'), int, None)
-            if content_size is not None and content_size > MAX_DOWNLOAD_SIZE: return 1, None
 
-            i = 0
-            if not no_thumbnail:
-                img_data = BytesIO()
-                while True:
-                    i += 1
-                    img_chunk = response.read(FEEDEX_MB)
-                    if not img_chunk: break
-                    if i >= MAX_DOWNLOAD_SIZE: return -1, _('Resource too large! Schould be %a max'), MAX_DOWNLOAD_SIZE
-                    img_data.write(img_chunk)
-                
-                img = Image.open(img_data)
-                img.thumbnail((150, 150))
-                img.save(filename, format="PNG")
-            else:
-                with open(filename, 'wb') as f:
-                    while True:
-                        i += 1
-                        chunk = response.read(FEEDEX_MB)
-                        if not chunk: break
-                        if i >= MAX_DOWNLOAD_SIZE:
-                            f.close()
-                            return -1, _('Resource too large! Schould be %a max'), MAX_DOWNLOAD_SIZE
-                        f.write(chunk)
-            return 0
-        else:
-            return -1, f'{_("Could not download image at %a! HTTP return status:")} {response.status}', f'{url}'
-    
-    except (urllib.error.URLError, ValueError, TypeError, OSError, UnidentifiedImageError, Image.DecompressionBombError, FileNotFoundError, AttributeError) as e:
-        return -1, f'{_("Could not download image at %a! Error:")} {e}', f'{url}'
+
+
+
+
+def sanitize_snippet(snip:tuple):
+    """ Sanitizes snippet string for output with Pango markup """
+    if len(snip) == 3:
+        beg = esc_mu(scast(snip[0], str, ''))
+        phr = esc_mu(scast(snip[1], str, ''))
+        end = esc_mu(scast(snip[2], str, ''))
+        return f'{beg}<b>{phr}</b>{end}'
+    else:
+        return '<???>'    
 
 
 def image2pixbuf(im):
@@ -988,7 +990,10 @@ def get_icons(feeds, ficons):
     icons = {}
     for f,ic in ficons.items():
         try: icons[f] = GdkPixbuf.Pixbuf.new_from_file_at_size(ic, 16, 16)
-        except Exception as e: cli_msg((-7, _('Image error: %a'), e))
+        except Exception as e: 
+            try: os.remove(ic)
+            except OSError as ee: msg(FX_ERROR_IO, f"""_('Error removing %a:'){ee}""", ic)
+            msg(FX_ERROR_IO, _('Image error: %a'), e)
 
     icons['default']  = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 16, 16)
     icons['main']  = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'feedex.png'), 64, 64)
@@ -1014,39 +1019,31 @@ def get_icons(feeds, ficons):
 
 
 
-def gui_msg(msg, **kargs):
-    """ Splits message tuple into a markup """
-    debug = kargs.get('debug')
+def gui_msg(*args, **kargs):
+    """ Converts message tuple into a markup """
+    code = args[0]
+    text = args[1]
+    arg = slist(args, 2, '')
 
-    if type(msg) == str: 
-        if debug: print(msg)        
-        return  esc_mu(msg)
-
-    if type(msg) not in (list, tuple): return ''
-
-    if debug is not None: cli_msg(msg)
-
-    code = msg[0]
-    text = scast(msg[1], str, '')
-    if len(msg) > 2: arg = scast(msg[2], str, '')
-    else: arg = None
-
-    text = text.replace('\n','')
-    text = text.replace('\r','')
+    text = text.replace('\n',' ')
+    text = text.replace('\r',' ')
     text = text.strip()
     text = esc_mu(text)
 
     if arg is not None:
-        arg = arg.replace('\n','')
-        arg = arg.replace('\r','')
+        arg = arg.replace('\n',' ')
+        arg = arg.replace('\r',' ')
         arg =  esc_mu(arg)
 
     if code < 0: text = f'<span foreground="red">{text}</span>'
-    if arg is not None: 
+    if arg is not None:
         arg = f'<b>{arg}</b>'
-        text = text.replace('%a',arg)
+        if '%a' in text: text = text.replace('%a',arg)
+        else: text = f'{text} <b>{arg}</b>'
 
     return text
+
+
 
 
 
@@ -1057,13 +1054,6 @@ def esc_mu(string, **kargs):
     else: return GObject.markup_escape_text(string)
 
 
-def humanize_date(string, today, yesterday, year):
-    """ Format date to be more human readable and context dependent """
-    date_short = string
-    date_short = date_short.replace(today, _("Today") )
-    date_short = date_short.replace(yesterday, _("Yesterday") )
-    date_short = date_short.replace(year,'')
-    return date_short
 
 
 
@@ -1071,8 +1061,13 @@ def humanize_date(string, today, yesterday, year):
 
 
 
-def validate_gui_attrs(gui_attrs):
+
+
+
+def validate_gui_cache(gui_attrs):
     """ Validate GUI attributes in case the config file is not right ( to prevent crashing )"""
+    
+    
     new_gui_attrs = {}
     
     new_gui_attrs['win_width'] = scast(gui_attrs.get('win_width'), int, 1500)
@@ -1087,109 +1082,34 @@ def validate_gui_attrs(gui_attrs):
     for v in new_gui_attrs['feeds_expanded'].values():
         if type(v) is not bool: 
             new_gui_attrs['feeds_expanded'] = {}
-            cli_msg( (-1, _('Expanded feeds invalid. Defaulting ...') ) )
+            msg(FX_ERROR_VAL, _('Expanded feeds invalid. Defaulting...') )
             break
 
-    new_gui_attrs['results'] = scast(gui_attrs.get('results',{}).copy(), dict, {})
-    for v in new_gui_attrs['results'].values():
-        if type(v) is not int: 
-            new_gui_attrs['results'] = {}
-            cli_msg( (-1, _('Result column attributes invalid. Defaulting ...') ) )
-            break
+    new_gui_attrs['layouts'] = scast(gui_attrs.get('layouts'), dict, {})
+    if new_gui_attrs['layouts'] == {}:
+        msg(FX_ERROR_VAL, _('No valid layouts found. Defaulting...'))
+        new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
 
-
-    new_gui_attrs['contexts'] = scast(gui_attrs.get('contexts',{}).copy(), dict, {})
-    for v in new_gui_attrs['contexts'].values():
-        if type(v) is not int:
-            new_gui_attrs['contexts'] = {}
-            cli_msg( (-1, _('Contexts column attributes invalid. Defaulting ...') ) )
-            break
-
-    new_gui_attrs['terms'] = scast(gui_attrs.get('terms',{}).copy(), dict, {})
-    for v in new_gui_attrs['terms'].values():
-        if type(v) is not int: 
-            new_gui_attrs['terms'] = {}
-            cli_msg( (-1,_('Terms column attributes invalid. Defaulting ...')) )
-            break
-
-    new_gui_attrs['time_series'] = scast(gui_attrs.get('time_series',{}).copy(), dict, {})
-    for v in new_gui_attrs['time_series'].values():
-        if type(v) is not int: 
-            new_gui_attrs['time_series'] = {}
-            cli_msg( (-1,_('Time series column attributes invalid. Defaulting ...')) )
-            break
-
-    new_gui_attrs['rules'] = scast(gui_attrs.get('rules',{}).copy(), dict, {})
-    for v in new_gui_attrs['rules'].values():
-        if type(v) is not int: 
-            new_gui_attrs['rules'] = {}
-            cli_msg( (-1,_('Rules column attributes invalid. Defaulting ...')) ) 
-            break
+    if new_gui_attrs['layouts'].keys() != FX_DEF_LAYOUTS.keys(): 
+        msg(FX_ERROR_VAL, _('Invalid layout list. Defaulting...'))
+        new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
     
-    new_gui_attrs['flags'] = scast(gui_attrs.get('flags',{}).copy(), dict, {})
-    for v in new_gui_attrs['flags'].values():
-        if type(v) is not int: 
-            new_gui_attrs['flags'] = {}
-            cli_msg( (-1,_('Flags column attributes invalid. Defaulting ...')) ) 
-            break
+    for k,v in new_gui_attrs['layouts'].items():
+        if type(v) not in (tuple, list) or len(v) == 0:
+            msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
+            new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
+            continue
 
-    new_gui_attrs['notes'] = scast(gui_attrs.get('notes',{}).copy(), dict, {})
-    for v in new_gui_attrs['notes'].values():
-        if type(v) is not int: 
-            new_gui_attrs['notes'] = {}
-            cli_msg( (-1,_('Notes column attributes invalid. Defaulting ...')) ) 
-            break
-
-
-
-    new_gui_attrs['results_order'] = scast(gui_attrs.get('results_order',()), tuple, ())
-    for c in FX_DEF_COLS_RESULTS:
-        if c not in new_gui_attrs['results_order']:
-                new_gui_attrs['results_order'] = FX_DEF_COLS_RESULTS
-                cli_msg( (-1,_('Results column order invalid. Defaulting ...')) )
+        for i,c in enumerate(v):
+            if type(c) not in (tuple, list): 
+                msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
+                new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
+                break
+            if type(slist(c,0,None)) is not str or type(slist(c,1,None)) is not int or slist(c,1,0) <= 0:
+                msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
+                new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
                 break
 
-    new_gui_attrs['contexts_order'] = scast(gui_attrs.get('contexts_order', ()), tuple, ())
-    for c in FX_DEF_COLS_CONTEXTS:
-        if c not in new_gui_attrs['contexts_order']:
-                new_gui_attrs['contexts_order'] = FX_DEF_COLS_CONTEXTS
-                cli_msg( (-1,_('Contexts column order invalid. Defaulting ...')) )
-                break
-
-    new_gui_attrs['terms_order'] = scast(gui_attrs.get('terms_order',()), tuple, ())
-    for c in FX_DEF_COLS_TERM_NET: 
-        if c not in new_gui_attrs['terms_order']:
-                new_gui_attrs['terms_order'] = FX_DEF_COLS_TERM_NET
-                cli_msg( (-1,_('Terms column order invalid. Defaulting ...')) )
-                break
-
-    new_gui_attrs['time_series_order'] = scast(gui_attrs.get('time_series_order',()), tuple, ())
-    for c in FX_DEF_COLS_TIME_SERIES: 
-        if c not in new_gui_attrs['time_series_order']:
-                new_gui_attrs['time_series_order'] = FX_DEF_COLS_TIME_SERIES
-                cli_msg( (-1,_('Time series column order invalid. Defaulting ...')) )
-                break
-
-    new_gui_attrs['rules_order'] = scast(gui_attrs.get('rules_order'), tuple, ())
-    for c in FX_DEF_COLS_RULES: 
-        if c not in new_gui_attrs['rules_order']:
-                new_gui_attrs['rules_order'] = FX_DEF_COLS_RULES
-                cli_msg( (-1,_('Rules column order invalid. Defaulting ...')) )
-                break
-
-    new_gui_attrs['flags_order'] = scast(gui_attrs.get('flags_order'), tuple, ())
-    for c in FX_DEF_COLS_FLAGS: 
-        if c not in new_gui_attrs['flags_order']:
-                new_gui_attrs['flags_order'] = FX_DEF_COLS_FLAGS
-                cli_msg( (-1,_('Flags column order invalid. Defaulting ...')) )
-                break
-
-    new_gui_attrs['notes_order'] = scast(gui_attrs.get('notes_order'), tuple, ())
-    for c in FX_DEF_COLS_FLAGS: 
-        if c not in new_gui_attrs['notes_order']:
-                new_gui_attrs['notes_order'] = FX_DEF_COLS_FLAGS
-                cli_msg( (-1,_('Notes column order invalid. Defaulting ...')) )
-                break
 
     
     new_gui_attrs['default_search_filters'] = scast(gui_attrs.get('default_search_filters',FEEDEX_GUI_DEFAULT_SEARCH_FIELDS).copy(), dict, {})
@@ -1332,11 +1252,10 @@ FEEDEX_REGEX_HTML_TEMPLATES_SHORT = {
 
 
 from feedex_desktop_notifier import DesktopNotifier
+from feedex_gui_tabs import FeedexTab, FeedexGUITable, ResultGUI, ResultGUIEntry, ResultGUINote, ResultGUIContext, ResultGUIRule, ResultGUIFlag, ResultGUITerm, ResultGUITimeSeries, CalendarDialog
+from feedex_gui_feeds import FeedexFeedTab
 from feedex_gui_dialogs_entts import NewFromURL, EditCategory, EditEntry, EditFlag, EditRule, EditFeedRegex, EditFeed
-from feedex_gui_dialogs_utils import InfoDialog, YesNoDialog, DisplayRules, DisplayWindow, AboutDialog, CalendarDialog, PreferencesDialog, DisplayKeywords, DisplayMatchedRules
-from feedex_gui_tabs import FeedexTab
-from feedex_gui_feeds import FeedexFeedWindow
-from feedex_gui_downloader import FeedexResDownloader
+from feedex_gui_dialogs_utils import InfoDialog, YesNoDialog, DisplayRules, DisplayWindow, AboutDialog, PreferencesDialog, DisplayKeywords, DisplayMatchedRules
 
 
 

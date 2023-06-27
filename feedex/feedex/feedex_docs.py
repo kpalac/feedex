@@ -32,14 +32,15 @@ Usage: <b>feedex [parameters|filters] [actions]</b>
         -o, --open-in-browser [ID|URL]          Open link of an entry by ID or URL. Register openning and learn keywords/rules for later ranking
         -F, --read-feed [ID]                    Get all entries from a Channel specified by ID
         -C, --read-category [ID|NAME]           Get all entries for a specified Category
-        -q, --query [Phrase]                    Query entries with search phrase (see -hh option for details)
+        -q, --query [Phrase]                    Query entries with search phrase (see --help-query option for details)
 
         --csv                                   Output in CSV format (no beautifiers)
-        --short                                 Show short output for queries
+        --long                                  Show long output for queries
         --headlines                             Output only date, title and channel
 
 
     <b>!!! See feedex -hh for full manual !!!</b>
+        --help-query                            Manual for Queries
         --help-feeds                            Manual on Feeds and Ctegories 
         --help-entries                          Manual on Entries (articles, notes, hilights etc.)
         --help-rules                            Manual on rules, ranking and flags
@@ -75,8 +76,15 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
     <b>Display parameters:</b>
         --csv                                   Output in CSV format (no interlines and colours/beautifiers)
         --json                                  Output as standard JSON string
-        --short                                 Output shortened version
+        --long                                  Output long version
         --headlines                             Output only date, title and channel
+
+        --display-cols=STR                      Which columns should be displayed in results? A comma separated list consisting of valid field names (entries, feeds, rules etc.)
+                                                You can also add snippets, rank, counk etc. 
+                                                e.g. --display-cols=title,date,rank,snippets
+        
+        --export, --export=FILE                 Export results as JSON string compatibile for later import (query results-entries, feeds, rules, flags)
+        --ofile=FILE                            Output file for export
 
         --html-template=[FILE]                  Output results as HTML using a template from text file
                                                 See --help-html for more information abot displaying results in HTML format
@@ -87,6 +95,9 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --delimiter=STR                         Change field separator (cli/csv), delault |
         --delimiter2=STR                        Change item separator inside field, e.g. for snippets and contexts (cli/csv), delault ;
         --escape=STR                            Escape sequence for delimiters (useful for CSV)
+
+        --note_marker=STR,
+        --read_marker=STR                       Strings to mark read items and notes in CLI output
 
         --bold_beg=STR, --bold_end=STR          Strings to be inserted as bold markup beginning/end. Used for displaying snippets, to hilight
                                                 the search phrase. Defaults are <b>,</b>
@@ -139,7 +150,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         Every Feed or Entry can be assigned to a Category
 
         --list-categories                       List all available categories
-        --show-categories-tree                  List Category/Channel tree
+        --list-feeds-cats                       List Category/Channel tree
         --add-category [Title] [Subtitle]       Add new category with given title and subtitle
         --delete-category [ID]                  Remove category with given ID. If category is already in Trash, it will be removed permanently
         --edit-category [ID] [FIELD] [VALUE]    Edit ID'd category - change field's value to [VALUE].
@@ -155,10 +166,6 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         -r, --read-entry [ID]                   Read entry contents by ID (does not cause learning)
                                                 --summarize=INT    Give summarization level for this entry for display (1..100)
 
-        -S, --find-similar [ID]                 Find similar entries to ID'd (filters like in --query)
-                                                --limit=INT        Limit results to INT-best (inproves performance)
-        --rel-in-time [ID]                      Entry's relevance as a time series - like --term-in -time for entry's keywords (filters like in --query)
-                                                --limit=INT        Limit results to INT-best (inproves performance)
         --mark [ID] [N]                         Mark entry as read N times (increases weight in later ranking) and learn features
                                                 options:
                                                 --learn,--no-learn         Extract patterns from Entry?
@@ -195,113 +202,27 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
     <b>Queries:</b>
         --list-history                          Show search history
         
-        -q, --query [Phrase]                    Query entries with a search phrase:
+        -q, --query [PHRASE]                    Query entries with a search phrase. See --help-query option for detailed manual
                                                 operators:
                                                 
-                                                escape - \\
-                                                
-                                                Full Text Search:
-                                                    
-                                                    Capitalized tokens are treated as unstemmed/exact
-                                                    
-                                                    logical: OR, AND, NOT, (, )
-                                                    proximity: NEAR, ~[NUM_OF_WORDS], ~
-                                                    wildcards: 
-                                                        *          - any character string
-                                                        <DIV>      - divider (period, punctation etc.)
-                                                        <NUM>      - number
-                                                        <CAP>      - capitalized word
-                                                        <ALLCAP>   - word with all capitals
-                                                        <UNCOMM>   - uncommon word
-                                                        <POLYSYL>  - long word (3+ syllables)
-                                                        <CURR>     - currency symbol
-                                                        <MATH>     - math symbol
-                                                        <RNUM>     - Roman numeral
-                                                        <GREEK>    - Greek symbol
-                                                        <UNIT>     - unit marker/symbol
-                                                        
-
-
-                                                String Matching:
-                                                    wildcard: *
-                                                    field beginning/end: ^,$
-                                                        
-
-                                                    
-                                                parameters:
-                                                --lang=         language used in query for tokenizing and stemming
-                                                --case_ins      query is case insensitive
-                                                --case_sens     query is case sensitive
-                                                --field=        field to search. 0 or None for all.
-                                                                Available fields:
-                                                                author, publisher, contributors, title, tags, category, comments
-                                                --type=         type of qery
-                                                                'fts' - full text (default)
-                                                                'string' - simple string matching
-
-                                                --logic=        How should fts terms be connected by default?
-                                                                    'any' - any term matches (OR)
-                                                                    'all' - all terms must match (AND)
-                                                                    'near' - evaluate terms' proximity
-                                                                    'phrase' - treat terms as a phrase
-                                                
-
-                                                --sort=/--rsort=   sort/reverse sort by field (see --read-entry for field names)
-                                                --rev            display in reverse order
-                                                --group=         Display as a tree grouped by this parameter 
-                                                                (category, feed, flag, hourly, daily, monthly, similar)
-                                                --depth=         Integer telling the depth of each node for grouping. If 0, every result is shown
-                                                                 If no grouping was selected, simply first N results will be shown
-
-
-                                                filters: 
-                                                --from=,to=     filter by published dates
-                                                --added_from=, 
-                                                --added_to=     filter by dates when entry was added to database
-                                                --last          limit to only recently added (on last update)
-                                                --last_n=       limit to only last N updates
-                                                --feed=         limit to feed specified by ID
-                                                --category=     limit to category and feeds in category specified by ID
-                                                --today         limit to last 24h
-                                                --last_hour     limit to last 1h
-                                                --last_week, --last_month, --last_quarter, --last_six_months, --last_year   limit to 7, 31, 93 or 365 days ago
-                                                --read/--unread     limit to read/unread only (see --mark)
-                                                --flag=             limit by flag. Possible values:
-                                                                        all - flagged and unflagged entries
-                                                                        no  - only unflagged entries
-                                                                        all_flags - include all flags
-                                                                        [INT] - choose a flag to filter by (by ID)
-                                                --note, --news   limit to only user's Notes/News items 
-                                                --handler=       limit to feed handler (rss, html, script, local)
-                                                --deleted        indlude deleted feeds, categories and entries
-
-                                                
-                                                paging of results:
-                                                --page=INT           page number (default is 1)
-                                                --page_len=INT       page length (default is 3000)
-                                                
-
-                                                misc:
-                                                --json_query            parse query argument as JSON and extract filters/phrase from it. Useful for scripts.
-                                                                        see <b>--help-scripting</b> for details
-    
-                                                --export-to-file=FILE   export query results to JSON file that can be used with --add-entries-from-file option
-                                                                        to move entries between databases (e.g. for archiving)
-                                                                        This option works only with normal queries, so time series, groupings, contexts are excluded   
-
                                                                 
-        --term-context [TEXT]                   Show contexts for given terms (parameters as in query, contexts taken from results)
+        --context [PHRASE]                      Show contexts for given terms (parameters as in query, contexts taken from results)
 
-        --trends [TEXT]                         Show trends (frequent keywords) for filterred entries (filters as for query)
-        --trending [TEXT]                       Show trending entries for given filters (filters as for query)
+        --trends [PHRASE]                       Show trends (frequent keywords) for filterred entries (filters as for query)
+        --trending [PHRASE]                     Show trending entries for given filters (filters as for query)
             
-        --term-net [TERM]                       Show terms connected to a given term by context (parameters:lang)
-        --term-in-time [TERM]                   Show time distribution of a term (filters like in --query) 
+        --term-net [PHRASE]                     Show terms connected to a given term by context (parameters:lang)
+        --term-in-time [PHRASE]                 Show time distribution of a term (filters like in --query) 
                                                 parameters:
                                                 --lang=          language used for query
                                                 --group=         grouping (hourly, daily, monthly)
                                                 --plot           plot data points in CLI
                                                 --term-width=    width of terminal window (for aestetics)
+
+        -S, --find-similar [ID]                 Find similar entries to ID'd (filters like in --query)
+                                                --limit=INT        Limit results to INT-best (inproves performance)
+        --rel-in-time [ID]                      Entry's relevance as a time series - like --term-in -time for entry's keywords (filters like in --query)
+                                                --limit=INT        Limit results to INT-best (inproves performance)
 
                                                 
     <b>Handlers:</b>
@@ -320,7 +241,8 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         Feedex learns rules by extracting important phrases from opened entries using language models.
         See <b>--help-rules</b> for more info
 
-        --list-rules                            Show all non-learned rules (Keywords, REGEX and strings)       
+        --list-rules                            Show all non-learned rules (Keywords, REGEX and strings)
+        --list-rules-learned                    Show all learned rules (might be very long)       
         -K, --add-keyword [TEXT]                Add keyword(s) to rules applied on every news check (simple string matching)
                                                 If a keyword is matched in an incoming news or note, it will be highlighted
                                                 in notifications and queries (see --flag)
@@ -347,9 +269,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
         --delete-rule [ID]                      Delete rule by its ID (see: --show-rules)
 
-        --keywords [ID]                         Show/generate features/keywords for a specified entry/article.
-                                                Those same keywords from read entries are used for ranking new documents.
-        --rules-for-entry [ID]                  Show rules that matched and added to importance of ID'd entry
+        --entry-rank [ID]                       Show rules that matched and added to importance of ID'd entry
 
 
     <b>Flags:</b>
@@ -376,6 +296,8 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
         --export-flags [FILENAME]               Export saved flags to json file
         --import-flags [FILENAME]               Import saved flags from json file to current DB
+
+        --export, --export=FILE                 Export results as JSON string compatibile for later import (query results-entries, feeds, rules, flags)
 
         Exports/imports can be used to move data between DBs. In addition you can export query results with --export-to-file option
         and then import it to new DB with --add-entries-from-file. This way you can archive or trim big databases.
@@ -429,18 +351,18 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         7       Validation error (e.g. invalid data type while editing entry)
         8       Referenced data not found (e.g. entry with a given ID does not exists)
         9       Invalid command line arguments
+        10      Language processing error
         
 
     <b>Debug levels:</b>
-        1       All messages
+        1       All
         2       Database messages
         3       Handler messages
-        4       Linguistic processing messages
+        4       Locks
         5       Query messages
         6       I/O messages
-        7       GUI messages
-        8       Show all fields/columns in CLI queries
-
+        7       Data validation
+        10      Language processing        
 
 
 """)
@@ -457,7 +379,7 @@ FEEDEX_HELP_EXAMPLES=_("""
         <b>feedex --sort=pubdate -F=1 -q</b>
             Show all news for feed 1 and sort them by publication date
 
-        <b>feedex --sort=pubdate -f=2 --unread -q</b>
+        <b>feedex --sort=pubdate --feed=2 --unread -q</b>
             Show all unread news for feed 2 and sort them by publication date
 
         <b>feedex --type=string -q "example"</b>
@@ -490,13 +412,172 @@ FEEDEX_HELP_EXAMPLES=_("""
         <b>feedex --desktop-notify --weight=10 --parent_category=Notes --add-entry 'Title example' 'Description example'</b>
             Add new entry and throw desktop notification about it ( useful e.g. for Cron jobs and background script )
 
-        <b>feedex --desktop-notify --clipboard --weight=10 --add-keyword '%s'</b>
+        <b>feedex --desktop-notify --clipboard --weight=10 --add-rule '%s'</b>
             Add new keyword from selected text and notify about it to desktop
 
         <b>feedex --json_query -q '{"phrase":"test", "last_week":true, "case_sens":true, "read":true}'</b>
             An example usage of JSON query
 
+        <b>feedex --export --ofile=feed_data.json --list-feeds && feedex --database=target.db --import-feeds feed_data.json
+            Moving feed data from one database to the next
+
+
 """)
+
+
+
+
+
+
+
+
+FEEDEX_HELP_QUERY=_("""
+
+<b>Feedex: Query </b>
+
+
+<b>Query Phrase</b> is the text you are searching for. Depending on query type it has certain features:
+
+    Full Text Search:
+        Escape Character: \\
+                                                
+        Capitalized tokens are treated as unstemmed/exact
+                                                    
+        Special operators:
+            logical: OR, AND, NOT, (, )
+            proximity: NEAR, ~[NUM_OF_WORDS], ~
+            
+            wildcards: 
+                *          - any character string
+                <DIV>      - divider (period, punctation etc.)
+                <NUM>      - numeral
+                <CAP>      - capitalized word
+                <ALLCAP>   - word with all capitals
+                <UNCOMM>   - uncommon word
+                <POLYSYL>  - long word (3+ syllables)
+                <CURR>     - currency symbol
+                <MATH>     - math symbol
+                <RNUM>     - Roman numeral
+                <GREEK>    - Greek symbol
+                <UNIT>     - unit marker/symbol
+                                                        
+
+    
+    String Matching:
+        wildcard: *
+        field beginning/end: ^,$
+                                                        
+
+        
+Query is defined by by <b>parameters</b>:
+                                                    
+    --type=         type of qery
+                        'fts' - full text (default)
+                        'string' - simple string matching    --lang=         language used in query for tokenizing and stemming
+    
+    --case_ins      query is case insensitive
+    --case_sens     query is case sensitive
+    --field=        field to search. 0 or None for all.
+                    Available fields: <b>author, publisher, contributors, title, tags, category, comments</b>
+    
+    --logic=        How should fts terms be connected by default?
+                        'any' - any term matches (OR)
+                        'all' - all terms must match (AND)
+                        'near' - evaluate terms' proximity
+                        'phrase' - treat terms as a phrase
+                                                
+    --sort=          sort by comma-separated fields (see --read-entry for field names)
+                        add '-' before field name for reverse sort on it
+                        e.g.: --sort=flag,-importance,readability
+
+    --rev            display in reverse order
+    
+    --group=         Display as a tree grouped by this parameter 
+                     Available groupings: <b>category, feed, flag, hourly, daily, monthly, similar)</b>
+    --depth=         Integer telling the depth of each node for grouping. If 0, every result is shown
+                     If no grouping was selected, simply first N results will be shown
+
+
+Query can also be <b>filtered</b> by parameters:
+                                                 
+    --from=,to=     filter by published dates
+    --added_from=, 
+    --added_to=     filter by dates when entry was added to database
+    --last          limit to only recently added (on last update)
+    --last_n=       limit to only last N updates
+    --feed=         limit to feed specified by ID
+    --category=     limit to category and feeds in category specified by ID
+    --today         limit to last 24h
+    --last_hour     limit to last 1h
+    --last_week, --last_month, --last_quarter, --last_six_months, --last_year   limit to 7, 31, 93 or 365 days ago
+    
+    --read/--unread     limit to read/unread only (see --mark)
+    --flag=             limit by flag. Possible values:
+                            'all' - flagged and unflagged entries (default)
+                            'no'  - only unflagged entries
+                            'all_flags' - include all flags
+                            [INT] - choose a flag to filter by (by ID)
+    --note, --news   limit to only user's Notes/News items 
+    --handler=       limit to feed handler (rss, html, script, local)
+    --deleted        indlude deleted feeds, categories and entries
+
+    Paging of results:
+        --page=INT           page number (default is 1)
+        --page_len=INT       page length (default is 3000)
+                                                
+
+<b>Misc:</b>
+    --json_query            parse query argument as JSON and extract filters/phrase from it. Useful for scripts.
+                            see <b>--help-scripting</b> for details
+ 
+
+
+<b>Fields available for --display_cols output option (apart from database fields):<b>
+
+    <b>Entries/Contexts:</b>                            
+
+        <b>feed_name</b>            Name of the parent feed
+        <b>feed_name_id</b>         Name of the parent feed with ID
+        <b>pubdate_r</b>            Human-friendly pubdate
+        <b>pubdate_short</b>        Short vershion of humanized pubdate
+        <b>flag_name</b>            Name of flag if present
+        <b>user_agent</b>           User agent used to download this resource
+        <b>parent_name</b>          Name of the top parent (feed or category, if present)
+        <b>parent_id</b>            ID of the top parent
+    
+        <b>is_deleted<b>            Marked deletion of parent or present entry
+    
+        <b>sread</b>                Humanized "read" markes (Yes/No)
+        <b>sdeleted</b>             Humanized "deleted"
+        <b>snote</b>                Humanized "note"
+
+        <b>snippets</b>             Snippet list
+        <b>rank<b>,<b>count</b>     Rank/count from query if phrase was present
+
+        <b>is_node</b>              Is this result a node (e.g. in grouped queries)
+        <b>children_no</b>          How many children does this node have?
+
+        <b>context</b>              This is available only for context query
+    
+    
+
+    <b>Term Nets/Keywords/Trends:</b>
+        
+        <b>term</b>                 Basic term form
+        <b>weight</b>               Term's weight
+        <b>search_form</b>          Stemmed term form
+
+
+    <b>Time series:</b> 
+        <b>time</b>                 Time series item
+        <b>from</b>                 Start of grouping interval
+        <b>to</b>                   End of grouping interval
+        <b>freq</b>                 Term/Entry frequency
+
+""")
+
+
+
 
 
 FEEDEX_HELP_FEEDS=_("""
@@ -694,6 +775,9 @@ Fields other than:
 
 ... will be overwritten or ommitted on processing linguistic data, text statistics and database compatibility
 
+
+
+    
 """)
 
 

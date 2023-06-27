@@ -118,87 +118,7 @@ class YesNoDialog(Gtk.Dialog):
 
 
 
-class DisplayRules(Gtk.Dialog):
-    """ Display learned rules dialog """
-    def __init__(self, parent, header, store, **kargs):
 
-        Gtk.Dialog.__init__(self, title=_('Learned Rules'), transient_for=parent, flags=0)
-
-        self.set_default_size(kargs.get('width',1000), kargs.get('height',500))
-        self.set_border_width(10)
-        box = self.get_content_area()
-
-        self.response = 0
-
-        grid = Gtk.Grid()
-        grid.set_column_spacing(10)
-        grid.set_row_spacing(10)
-        grid.set_column_homogeneous(True)
-        grid.set_row_homogeneous(True)
-
-        header_label = f_label(header, justify=FX_ATTR_JUS_LEFT, wrap=True, markup=True)
-
-        scwindow = Gtk.ScrolledWindow()
-
-        self.rule_store = store
-        self.rule_list = Gtk.TreeView(model=self.rule_store)
-        self.rule_list.append_column( f_col(_('Name'),0 , 0, resizable=True, clickable=True, start_width=300) )
-        self.rule_list.append_column( f_col(_('Match string'),0 , 1, resizable=True, clickable=True, start_width=300) )
-        self.rule_list.append_column( f_col(_('Weight'),0 , 2, resizable=True, clickable=True, start_width=200) )
-        self.rule_list.append_column( f_col(_('Context ID'),0 , 3, resizable=True, clickable=True, start_width=200) )
-
-        
-        self.rule_list.set_tooltip_markup(_("""List of Rules learned after <b>adding Entries</b> and <b>reading Articles</b>
-<b>Name</b> - Displayed name, <i>not matched</i>, purely informational
-<b>Match string</b> - String matched against tokenized Entry with prefixes
-<b>Weight</b> - Weight added to Entry when the rule is matched (rule weights are offset by Entry weight to avoid overvaluing very long articles
-<b>Context ID</b> - ID of the Entry the rule was extracted from
-Hit <b>Ctrl-F</b> for interactive search""") )
-
-        self.rule_list.set_enable_search(True)
-        self.rule_list.set_search_equal_func(parent.quick_find_case_ins, 0)        
-
-        scwindow.add(self.rule_list)
-
-        done_button = f_button(_('Done'),'object-select-symbolic', connect=self.on_done)
-        delete_all_button = f_button(_('Delete all'), 'edit-delete-symbolic', connect=self.on_delete_all)
-        delete_all_button.set_tooltip_markup(_("""Delete <b>All</b> learned rules
-<i>This process is PERMANENT</i>
-Rules can be relearned for all read entries by CLI command:
-<i>feedex --relearn</i>""") )
-
-        grid.attach(header_label, 1,1, 12,1)
-        grid.attach(scwindow, 1,2, 12, 10)
-        grid.attach(done_button, 1,12, 2,1)
-        grid.attach(delete_all_button, 10,12, 2,1)
-
-        box.add(grid)
-        self.show_all()
-        self.rule_list.columns_autosize()
-
-
-    def on_delete_all(self, *args):
-        """ Deletes all learned rules after prompt """
-        dialog = YesNoDialog(self, _('Clear All Learned Rules?'), _('Are you sure you want to clear <b>all leraned rules</b>?'), subtitle=f"<i>{_('This action cannot be reversed!')}</i>")           
-        dialog.run()
-        if dialog.response == 1:
-            dialog.destroy()
-            dialog2 = YesNoDialog(self, _('Clear All Learned Rules?'), _('Are you <b>really sure</b>?'))
-            dialog2.run()
-            if dialog2.response == 1:
-                self.response = 1
-                dialog2.destroy()
-                self.close()
-            else: 
-                self.response = 0
-                dialog2.destroy()
-        else: 
-            self.response = 0
-            dialog.destroy()
-
-    def on_done(self, *args):
-        self.response = 0
-        self.close()
 
 
 
@@ -331,116 +251,16 @@ class AboutDialog(Gtk.Dialog):
 
 
 
-class CalendarDialog(Gtk.Dialog):
-    """ Date chooser for queries """
-    def __init__(self, parent, **kargs):
-
-        self.response = 0
-        self.result = {'from_date':None,'to_date':None, 'date_string':None}
-
-        Gtk.Dialog.__init__(self, title=_("Choose date range"), transient_for=parent, flags=0)
-        self.set_default_size(kargs.get('width',400), kargs.get('height',200))
-        box = self.get_content_area()
-
-        from_label = f_label(_('  From:'), justify=FX_ATTR_JUS_LEFT, selectable=False, wrap=False)
-        to_label = f_label(_('    To:'), justify=FX_ATTR_JUS_LEFT, selectable=False, wrap=False)
-
-        self.from_clear_button = Gtk.CheckButton.new_with_label(_('Empty'))
-        self.from_clear_button.connect('toggled', self.clear_from)
-        self.to_clear_button = Gtk.CheckButton.new_with_label(_('Empty'))
-        self.to_clear_button.connect('toggled', self.clear_to)
-
-        accept_button = f_button(_('Accept'),'object-select-symbolic', connect=self.on_accept)
-        cancel_button = f_button(_('Cancel'),'window-close-symbolic', connect=self.on_cancel)
-
-        self.cal_from = Gtk.Calendar()
-        self.cal_to = Gtk.Calendar()
-        self.cal_from.connect('day-selected', self.on_from_selected)
-        self.cal_to.connect('day-selected', self.on_to_selected)
-
-
-
-        top_box = Gtk.HBox(homogeneous = False, spacing = 0)
-        bottom_box = Gtk.HBox(homogeneous = False, spacing = 0)
-
-        left_box = Gtk.VBox(homogeneous = False, spacing = 0)
-        right_box = Gtk.VBox(homogeneous = False, spacing = 0)
-
-        box.pack_start(top_box, False, False, 1)
-        box.pack_start(bottom_box, False, False, 1)
-
-        bottom_box.pack_start(cancel_button, False, False, 1)
-        bottom_box.pack_end(accept_button, False, False, 1)
-
-        top_box.pack_start(left_box, False, False, 1)
-        top_box.pack_start(right_box, False, False, 1)
-
-        left_box.pack_start(from_label, False, False, 1)
-        left_box.pack_start(self.cal_from, False, False, 1)
-        left_box.pack_start(self.from_clear_button, False, False, 1)
-
-        right_box.pack_start(to_label, False, False, 1)
-        right_box.pack_start(self.cal_to, False, False, 1)
-        right_box.pack_start(self.to_clear_button, False, False, 1)
-
-        self.show_all()
-        self.on_to_selected()
-        self.on_from_selected()
-
-    def on_accept(self, *args):
-        self.response = 1
-        if not self.from_clear_button.get_active():
-            (year, month, day) = self.cal_from.get_date()
-            self.result['from_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
-        else: self.result['from_date'] = None
-
-        if not self.to_clear_button.get_active():
-            (year, month, day) = self.cal_to.get_date()
-            self.result['to_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
-        else: self.result['to_date'] = None
-
-        self.result['date_string'] = f"""{coalesce(self.result['from_date'], '...')} --- {coalesce(self.result['to_date'], '...')}"""
-        self.close()
-
-    def on_cancel(self, *args):
-        self.response = 0
-        self.result = {'from_date':None,'to_date':None, 'date_string':None}
-        self.close()
-        
-    def clear_from(self, *args):
-
-        if self.cal_from.get_sensitive():
-            self.cal_from.set_sensitive(False)
-        else:
-            self.cal_from.set_sensitive(True)
-
-    def clear_to(self, *args):
-        if self.cal_to.get_sensitive():
-            self.cal_to.set_sensitive(False)
-        else:
-            self.cal_to.set_sensitive(True)
-
-    def on_from_selected(self, *args):
-        (year, month, day) = self.cal_from.get_date()
-        self.result['from_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
-
-    def on_to_selected(self, *args):
-        (year, month, day) = self.cal_to.get_date()
-        self.result['to_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
-
-
-
-
-
 
 
 
 class PreferencesDialog(Gtk.Dialog):
     """ Edit preferences dialog """
-    def __init__(self, parent, config, **kargs):
+    def __init__(self, parent, **kargs):
 
-        self.config = config
-        self.config_def = config
+        self.parent = parent
+        self.config = parent.config.copy()
+        self.config_def = parent.config.copy()
 
         Gtk.Dialog.__init__(self, title=_('FEEDEX Preferences'), transient_for=parent, flags=0)
         box = self.get_content_area()
@@ -782,13 +602,15 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
             if os.path.isfile(self.config.get('db_path')):
                 start_dir = os.path.dirname(self.config.get('db_path'))
             else: start_dir = os.getcwd()
+            action = Gtk.FileChooserAction.SELECT_FOLDER
         elif target == 'log':
             heading = _('Choose Log File')
             if os.path.isfile(self.config.get('log')):
                 start_dir = os.path.dirname(self.config.get('log'))
             else: start_dir = os.getcwd()
+            action = Gtk.FileChooserAction.OPEN
 
-        dialog = Gtk.FileChooserDialog(heading, parent=self, action=Gtk.FileChooserAction.OPEN)
+        dialog = Gtk.FileChooserDialog(heading, parent=self, action=action)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
         dialog.set_current_folder(start_dir)
         response = dialog.run()
@@ -847,8 +669,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         if self.config.get('gui_desktop_notify',True): self.desktop_notify_button.set_active(True)
         else: self.desktop_notify_button.set_active(False)
 
-        f_set_combo(self.notify_group_combo, self.config.get('gui_notify_group',None))
-        f_set_combo(self.notify_depth_combo, self.config.get('gui_notify_depth',0))
+        f_set_combo(self.notify_group_combo, self.config.get('gui_notify_group','feed'))
+        f_set_combo(self.notify_depth_combo, self.config.get('gui_notify_depth',5))
 
         if self.config.get('gui_fetch_periodically',False): self.fetch_in_background_button.set_active(True)
         else: self.fetch_in_background_button.set_active(False)
@@ -932,9 +754,9 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
     def validate_entries(self, *args):
         self.get_data()
-        err = validate_config(self.result, msg=True, old_config=self.config)
+        err = fdx.validate_config(config=self.result, old_config=self.config, tryout=True)
         if err != 0:
-            self.err_label.set_markup(gui_msg(err))
+            self.err_label.set_markup(gui_msg(*err))
             return False
         else:
             return True
@@ -1047,7 +869,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 class DisplayKeywords(Gtk.Dialog):
     """ Display keywords for an Entry """
 
-    def __init__(self, parent, header, store, **kargs):
+    def __init__(self, parent, item, **kargs):
 
         Gtk.Dialog.__init__(self, title=_('Keywords'), transient_for=parent, flags=0)
 
@@ -1063,22 +885,27 @@ class DisplayKeywords(Gtk.Dialog):
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
 
+        self.parent = parent
+        self.MW = parent
+
+        self.table = FeedexGUITable(self, ResultGUITerm(config=self.parent.config), table='keywords')
+        self.QR = FeedexQueryInterface()
+
+        item.ling(index=False, rank=False, learn=True, save_rules=False)
+        self.QR.results = []
+        for r in item.rules: self.QR.results.append( (r['name'], r['weight'], r['string']) )
+
+        self.QR.result_no = len(self.QR.results)
+
+        self.table.populate(self.QR, to_temp=False)
+        self.table.view.set_tooltip_markup(_("""Keywords extracted from entry
+Hit <b>Ctrl-F</b> for interactive search"""))
+
+        header = f'{_("Keywords for entry ")}<b>{esc_mu(item.name())}</b> ({_("id")}: {item["id"]})'
         header_label = f_label(header, justify=FX_ATTR_JUS_LEFT, wrap=True, markup=True)
 
         scwindow = Gtk.ScrolledWindow()
-
-        self.rule_store = store
-        self.rule_list = Gtk.TreeView(model=self.rule_store)
-        self.rule_list.append_column( f_col(_('Keyword'),0 , 0, resizable=True, clickable=True, start_width=300) )
-        self.rule_list.append_column( f_col(_('Weight'),0 , 1, resizable=True, clickable=True, start_width=300) )
-
-        self.rule_list.set_tooltip_markup(_("""Keywords extracted from entry
-Hit <b>Ctrl-F</b> for interactive search"""))
-
-        self.rule_list.set_enable_search(True)
-        self.rule_list.set_search_equal_func(parent.quick_find_case_ins, 0)
-        
-        scwindow.add(self.rule_list)
+        scwindow.add(self.table.view)
 
         done_button = f_button(_('Done'),'object-select-symbolic', connect=self.on_done)
         grid.attach(header_label, 1,1, 12,1)
@@ -1087,7 +914,6 @@ Hit <b>Ctrl-F</b> for interactive search"""))
 
         box.add(grid)
         self.show_all()
-        self.rule_list.columns_autosize()
 
     def on_done(self, *args):
         self.response = 0
@@ -1097,10 +923,15 @@ Hit <b>Ctrl-F</b> for interactive search"""))
 
 
 
+
+
+
+
+
 class DisplayMatchedRules(Gtk.Dialog):
     """ Display rules matched for Entry """
 
-    def __init__(self, parent, footer, store, **kargs):
+    def __init__(self, parent, item, **kargs):
 
         Gtk.Dialog.__init__(self, title=_('Matched Rules'), transient_for=parent, flags=0)
 
@@ -1116,36 +947,48 @@ class DisplayMatchedRules(Gtk.Dialog):
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
 
-        footer_label = f_label(footer, justify=FX_ATTR_JUS_LEFT, wrap=True, markup=True)
+        self.parent = parent
+        self.MW = parent
+
+        self.table = FeedexGUITable(self, ResultGUIRule(config=self.parent.config), table='rules_rank')
+        self.QR = FeedexQueryInterface()
+
+        importance, flag, best_entries, flag_dist, rules = item.ling(rank=True, index=False, learn=False, to_disp=True)
+        footer = f"""{_('Rules matched')}: <b>{len(rules)}</b>
+{_('Saved Importance')}: <b>{item['importance']:.3f}</b>
+{_('Saved Flag')}: <b>{item['flag']:.0f}</b>
+
+{_('Calculated Importance')}: <b>{importance:.3f}</b>
+{_('Caculated Flag')}: <b>{flag:.0f}</b>
+
+{_('Flag distribution')}:
+"""
+        for f,v in flag_dist.items(): footer =  f"{footer}\n{fdx.get_flag_name(f)} ({f}): <b>{v:.3f}</b>"
+
+        footer = f"""{footer}
+
+
+{_('Most similar read Entries')}:"""
+        for e in best_entries: footer = f"""{footer}{e}, """
+
+        self.QR.results = rules
+        self.QR.result_no = len(rules)
+        self.table.populate(self.QR, to_temp=False)
+
+        footer_label = f_label(footer, justify=FX_ATTR_JUS_FILL, xalign=0, selectable=True, wrap=True, markup=True)
 
         scwindow = Gtk.ScrolledWindow()
         ftwindow = Gtk.ScrolledWindow()
-        ftwindow.add(footer_label)
+        ftbox = Gtk.HBox()
+        ftbox.set_homogeneous(False)
+        ftbox.pack_start(footer_label, False, False, 5)
+        ftwindow.add(ftbox)
 
-        self.rule_store = store
-        self.rule_list = Gtk.TreeView(model=self.rule_store)
-        self.rule_list.append_column( f_col(_('Name'),0 , 0, resizable=True, clickable=True, start_width=300) )
-        self.rule_list.append_column( f_col(_('String'),0 , 1, resizable=True, clickable=True, start_width=300) )
-        self.rule_list.append_column( f_col(_('Matched'),0 , 2, resizable=True, clickable=True, start_width=100) )
-        self.rule_list.append_column( f_col(_('Learned?'),0 , 3, resizable=True, clickable=True, start_width=50) )
-        self.rule_list.append_column( f_col(_('Case insensitive?'),0 , 4, resizable=True, clickable=True, start_width=50) )
-        self.rule_list.append_column( f_col(_('Query type'),0 , 5, resizable=True, clickable=True, start_width=100) )
-        self.rule_list.append_column( f_col(_('Field'),0 , 6, resizable=True, clickable=True, start_width=100) )
-        self.rule_list.append_column( f_col(_('Feed/Category'),0 , 7, resizable=True, clickable=True, start_width=200) )
-        self.rule_list.append_column( f_col(_('Language'),0 , 8, resizable=True, clickable=True, start_width=100) )
-        self.rule_list.append_column( f_col(_('Weight'),0 , 9, resizable=True, clickable=True, start_width=100) )
-        self.rule_list.append_column( f_col(_('Flag ID'),0 , 10, resizable=True, clickable=True, start_width=50) )
-        self.rule_list.append_column( f_col(_('Flag name'),0 , 11, resizable=True, clickable=True, start_width=200) )
-        self.rule_list.append_column( f_col(_('Additive?'),0 , 12, resizable=True, clickable=True, start_width=50) )
-        self.rule_list.append_column( f_col(_('Context ID'),0 , 13, resizable=True, clickable=True, start_width=100) )
-
-        self.rule_list.set_tooltip_markup(_("""Rules matched for this Entry
+        self.table.view.set_tooltip_markup(_("""Rules matched for this Entry
 Hit <b>Ctrl-F</b> for interactive search"""))
 
-        self.rule_list.set_enable_search(True)
-        self.rule_list.set_search_equal_func(parent.quick_find_case_ins, 0)
         
-        scwindow.add(self.rule_list)
+        scwindow.add(self.table.view)
 
         done_button = f_button(_('Done'),'object-select-symbolic', connect=self.on_done)
         grid.attach(scwindow, 1,1, 12, 10)
@@ -1155,7 +998,6 @@ Hit <b>Ctrl-F</b> for interactive search"""))
 
         box.add(grid)
         self.show_all()
-        self.rule_list.columns_autosize()
 
     def on_done(self, *args):
         self.response = 0
@@ -1166,3 +1008,80 @@ Hit <b>Ctrl-F</b> for interactive search"""))
 
 
 
+
+
+
+class DisplayRules(Gtk.Dialog):
+    """ Display learned rules dialog """
+    def __init__(self, parent, **kargs):
+
+        Gtk.Dialog.__init__(self, title=_('Learned Rules'), transient_for=parent, flags=0)
+
+        self.set_default_size(kargs.get('width',1000), kargs.get('height',500))
+        self.set_border_width(10)
+        box = self.get_content_area()
+
+        self.response = 0
+
+        grid = Gtk.Grid()
+        grid.set_column_spacing(10)
+        grid.set_row_spacing(10)
+        grid.set_column_homogeneous(True)
+        grid.set_row_homogeneous(True)
+
+        self.MW = parent
+        self.table = FeedexGUITable(self, ResultGUIRule(config=self.MW.config), table='rules_learned')
+        self.MW.DB.Q.list_rules(learned=True)
+
+        self.table.populate(self.MW.DB.Q, to_temp=False)
+        
+        self.table.view.set_tooltip_markup(_("""List of Rules learned after <b>adding Entries</b> and <b>reading Articles</b>
+<b>Name</b> - Displayed name, <i>not matched</i>, purely informational
+<b>Match string</b> - String matched against tokenized Entry with prefixes
+<b>Weight</b> - Weight added to Entry when the rule is matched (rule weights are offset by Entry weight to avoid overvaluing very long articles
+<b>Context ID</b> - ID of the Entry the rule was extracted from
+Hit <b>Ctrl-F</b> for interactive search""") )
+
+        header = f'{_("Rule count")}: <b>{self.MW.DB.Q.result_no}</b>'
+        header_label = f_label(header, justify=FX_ATTR_JUS_LEFT, wrap=True, markup=True)
+        scwindow = Gtk.ScrolledWindow()
+        scwindow.add(self.table.view)
+
+        done_button = f_button(_('Done'),'object-select-symbolic', connect=self.on_done)
+        delete_all_button = f_button(_('Delete all'), 'edit-delete-symbolic', connect=self.on_delete_all)
+        delete_all_button.set_tooltip_markup(_("""Delete <b>All</b> learned rules
+<i>This process is PERMANENT</i>
+Rules can be relearned for all read entries by CLI command:
+<i>feedex --relearn</i>""") )
+
+        grid.attach(header_label, 1,1, 12,1)
+        grid.attach(scwindow, 1,2, 12, 10)
+        grid.attach(done_button, 1,12, 2,1)
+        grid.attach(delete_all_button, 10,12, 2,1)
+
+        box.add(grid)
+        self.show_all()
+
+
+    def on_delete_all(self, *args):
+        """ Deletes all learned rules after prompt """
+        dialog = YesNoDialog(self, _('Clear All Learned Rules?'), _('Are you sure you want to clear <b>all leraned rules</b>?'), subtitle=f"<i>{_('This action cannot be reversed!')}</i>")           
+        dialog.run()
+        if dialog.response == 1:
+            dialog.destroy()
+            dialog2 = YesNoDialog(self, _('Clear All Learned Rules?'), _('Are you <b>really sure</b>?'))
+            dialog2.run()
+            if dialog2.response == 1:
+                self.response = 1
+                dialog2.destroy()
+                self.close()
+            else: 
+                self.response = 0
+                dialog2.destroy()
+        else: 
+            self.response = 0
+            dialog.destroy()
+
+    def on_done(self, *args):
+        self.response = 0
+        self.close()

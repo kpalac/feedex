@@ -16,22 +16,22 @@ class FeedexLP(SmallSem):
     """ SmallSem and Indexer implementation for Feedex news reader """
 
 
-    def __init__(self, MC, **kargs) -> None:
+    def __init__(self, db, **kargs) -> None:
 
-        self.MC = MC
+        self.DB = db
+
         self.models_path = FEEDEX_MODELS_PATH
 
         # Utilities ...
-        self.config = kargs.get('config', DEFAULT_CONFIG)
-        self.debug = kargs.get('debug', False)
+        self.config = kargs.get('config', fdx.config)
 
        # Initialize model headers...
-        if self.MC.lings is None:
+        if fdx.lings is None:
             self.load_lings()
-            self.MC.lings = self.lings.copy()
-            self.MC.lings.append(HEURISTIC_MODEL)
+            fdx.lings = self.lings.copy()
+            fdx.lings.append(HEURISTIC_MODEL)
         
-        self.lings = self.MC.lings
+        self.lings = fdx.lings
         self.ling = {}
 
         # Init stats and index strings...        
@@ -42,8 +42,6 @@ class FeedexLP(SmallSem):
         # String for ranking
         self.rank_string = ''
 
-        # Ranking rules
-        self.rules = self.MC.rules
 
         # Init Xapian index pointer to connect if needed
         self.ix_db = None
@@ -56,9 +54,6 @@ class FeedexLP(SmallSem):
         # Dictionary of stemming variants
         self.variants = {}
         
-        # Regex string for tokenizing query
-        self.REGEX_xap_query = re.compile('''(OR|AND|NOT|XOR|NEAR\d+|~\d+|~|NEAR|<\w+>|[\\\(]|[\\\)]|\(|\)|\"|\'|\w+|\d+|[^\s]+)''')
-
         self.ranked_sents = [] # List of tokenized and ranked sentences
         self.last_entry_id = 0  # ID of the last processed entry (for caching)
 
@@ -219,7 +214,7 @@ class FeedexLP(SmallSem):
             ix_token_str = f"""{ix_token_str} {tok}"""
             ix_exact_token_str = f""" {ix_exact_token_str} {extok}"""
 
-            if to_rank: 
+            if to_rank:
                 self.rank_string = f'''{self.rank_string}{tok} '''
 
         return (ix_token_str, ix_exact_token_str, sems, field_len)
@@ -302,15 +297,18 @@ class FeedexLP(SmallSem):
         if self.config.get('ranking_scheme','simple') == 'simple': self.ranking_algo = 0
         elif self.config.get('ranking_scheme','simple') == 'similarity': self.ranking_algo = 1
         else: self.ranking_algo = 0
-        
-        # Abort, if already validated ...
-        if self.MC.rules_validated: return 0
 
-        if self.debug in (1,4): print('Validating rules...')
+        self.DB.connect_QP()
+        self.DB.cache_rules()
+
+        # Abort, if already validated ...
+        if fdx.rules_validated: return 0
+
+        debug(10, 'Validating rules...')
         remember_lang = self.get_model()
 
-        if type(self.MC.rules) is not list: self.MC.rules = list(self.MC.rules)
-        for i,r in enumerate(self.MC.rules):
+        if type(fdx.rules_cache) is not list: fdx.rules_cache = list(fdx.rules_cache)
+        for i,r in enumerate(fdx.rules_cache):
             # Stem and prefix all user's FTS rules
             qtype = scast(r[2], int, 0)
             learned = scast(r[10], int, 0) 
@@ -320,13 +318,13 @@ class FeedexLP(SmallSem):
             if learned != 1:
                 if qtype == 1:
                     self.set_model(r[7])
-                    phrase = self.build_phrase(string, str_match_stem=True, sql=False)
+                    phrase = self.DB.Q.parse_query(string, str_match_stem=True, sql=False)
                     string = phrase['str_match_stem']
 
                 elif qtype == 0:
                     if r[6] == 1: case_ins = True
                     else: case_ins = False
-                    phrase = self.build_phrase(string, str_match=True, sql=False, case_ins=case_ins)
+                    phrase = self.DB.Q.parse_query(string, str_match=True, sql=False, case_ins=case_ins)
                     string = phrase.copy()
 
                 elif qtype == 2:
@@ -335,11 +333,9 @@ class FeedexLP(SmallSem):
                     if case_ins: re.compile(string, re.IGNORECASE)
                     else: re.compile(string)
             
-            else:
-                string = f' {string} '
 
             # Validate data types ...
-            self.rules[i] = (
+            fdx.rules_cache[i] = (
                 r[0], 
                 r[1],
                 qtype, 
@@ -357,8 +353,8 @@ class FeedexLP(SmallSem):
 
         self.set_model(remember_lang)
         
-        self.MC.rules_validated = True
-        if self.debug in (1,4): print('Rules validated...')
+        fdx.rules_validated = True
+        debug(10, 'Rules validated...')
 
 
 
@@ -384,7 +380,7 @@ class FeedexLP(SmallSem):
 
         self.validate_rules()
 
-        for r in self.rules:
+        for r in fdx.rules_cache:
             name    = r[1]
             qtype   = r[2]
             feed    = r[3]
@@ -436,7 +432,6 @@ class FeedexLP(SmallSem):
                         f = entry[f]
                         if case_ins: fs = f.lower()
                         else: fs = f
-
                         new_matched = self.str_matcher(string['spl_string'], string['spl_string_len'], string['beg'], string['end'], fs, snippets=False)[0]
                         matched += new_matched
 
@@ -513,156 +508,25 @@ class FeedexLP(SmallSem):
 
     def summarize_entry(self, entry, level=50, **kargs):
         """ Returns of a given entry """
+        level = scast(level, int, 0)
+        if not (level > 0 and level <= 100): return msg(FX_ERROR_VAL, _("Summary level must be between 0..100!") )
+        
+        header = scast(kargs.get('header'), str, '')
+        
         # Check if chunked sentences exist for this entry
-        if self.last_entry_id != entry['id']:
-            summ_str = f"""{scast(entry['desc'],str,'')}
-{scast(entry['text'],str,'')}
+        if self.last_entry_id != entry.get('id'):
+            summ_str = f"""{scast(entry.get('desc'),str,'')}
+{scast(entry.get('text'),str,'')}
 """
             self.ranked_sents = self.chunk_sents(summ_str)
-            self.last_entry_id = entry['id']
+            self.last_entry_id = entry.get('id')
 
         # And execute main summarizing method...
-        return self.summarize(scast(level, int, 0), **kargs)
-
-
-
-
-
-
-
-
-
-    def get_bed_end(self, string):
-        """ Detects beginning/ending markers """
-        beg = False
-        end = False
-
-        if string.startswith('^'):
-            beg = True
-            string = string[1:]
-        elif string.startswith('\^'):
-            string = string[1:]
-        
-        if string.endswith('\$'):
-            string = f'{string[:-2]}$'
-        elif string.endswith('$'):
-            end = True
-            string = string[:-1]
-        
-        if string.startswith('*'): 
-            string = string[1:]
-            beg = False
-        if string.endswith('*'): 
-            string = string[:-1]
-            end = False
-
-        return (beg, end, string)
-
-
-
-
-
-
-
-    def build_phrase(self, string, **kargs):
-        """ Check if string is marked with beginning and end regex markers """
-        case_ins = kargs.get('case_ins',False)
-        stem = kargs.get('stem',False)
-        field = kargs.get('field')
-
-        phrase = {}
-
-        beg = False
-        end = False
-
-        raw = string
-
-        if kargs.get('str_match', False):       
-
-            beg, end, string = self.get_bed_end(string)
-            if case_ins: string = string.lower()
-            rstr = random_str(string=string)
-            string = string.replace('\*',rstr)
-            if '*' in string: has_wc = True
-            else: has_wc = False
-
-            if string.replace(' ','').replace('*','') == '': 
-                return {'empty':True, 'beg':False, 'end':False, 'sql':None, 'fts':None, 'spl_string':[], 'spl_string_len':0, 'has_wc':has_wc}
-
-            while '**' in string: string = string.replace('**','*')
-
-            # Construct SQL phrase
-            if kargs.get('sql',False):
-                sql = self._sqlize(string)
-                sql = sql.replace('*','%')
-                if not beg: sql = f'%{sql}'
-                if not end: sql = f'{sql}%'
-                sql = sql.replace(rstr,'*')
-            else: sql = None
-
-            # Split string for internal string matching
-            spl_string = []
-            for t in self._str_match_split(string):
-                if type(t) is str: t = t.replace(rstr,'*')
-                spl_string.append(t)
-
-            return {'empty':False, 'beg':beg, 'end':end, 'sql':sql, 'fts': None, 'spl_string':spl_string, 'spl_string_len':len(spl_string), 'has_wc':has_wc, 'raw':raw}
-
-
-
-
-
-
-        # This is only for splitting into tokens and stemming for simple learned rule search
-        elif kargs.get('str_match_stem', False):
-
-            beg, end, string = self.get_bed_end(string)
-
-            if string.replace(' ','').replace('*','') == '': 
-                return {'empty':True, 'beg':False, 'end':False, 'sql':None, 'fts': '', 'spl_string':[], 'spl_string_len':0, 'has_wc':has_wc}
-
-            toks = ''
-            for t in self._simple_tokenize(string):
-                t = self.stemmer.stemWord(t.lower())
-                if field is not None: t = f"""{PREFIXES[field]['prefix']}{t}"""
-                toks = f'{toks} {t}'
-            if toks != '': toks = toks[1:]
-            if beg: toks = f'  {toks}'
-            if end: toks = f'{toks}  '
-            
-            return {'empty':False, 'beg':beg, 'end':end, 'sql':None, 'fts': toks, 'spl_string':[], 'spl_string_len':0, 'has_wc':False}
-
-            
-
-
-        # Tokenize and prefix for Xapian
-        elif kargs.get('fts',True):
-            if field is not None: fprefix = PREFIXES[field]['prefix']
-            else: fprefix = ''
-
-            toks = ''
-            empty = True
-            for t in re.findall(self.REGEX_xap_query, string):
-                if t in ('AND','OR','NEAR','(',')','~'): pass
-                elif t.startswith('~') and t.replace('~','').isdigit(): pass
-                elif t.startswith('<') and t.endswith('>'):
-                    tt = t.replace('<','').replace('>','')
-                    if tt in SEM_TERMS: 
-                        empty = False
-                        t = f"""{PREFIXES['sem']}:{tt.lower()}"""
-                else: 
-                    empty = False
-                    prefix = fprefix
-                    if self._case(t) == 0: t = self.stemmer.stemWord(t)
-                    else: prefix = f"""{prefix}{PREFIXES['exact']}""" 
-                    if prefix != '': t = f'''{prefix}:{t.lower()}'''
-                    else: t = t.lower()
-                toks = f'{toks} {t}'
-
-            if toks != '': toks = toks.lstrip()
-
-            if empty: raw = None
-            return {'empty':empty, 'beg':beg, 'end':end, 'sql':None, 'fts': toks, 'spl_string':[], 'spl_string_len':0, 'has_wc':False, 'raw':raw}
+        summary = self.summarize(scast(level, int, 0), **kargs)
+        if scast(summary, str, '').strip() != '':
+            entry['desc'] = f'{header}{summary}'
+            entry['text'] = None
+        return 0
 
 
 
@@ -676,7 +540,8 @@ class FeedexLP(SmallSem):
 
 
 
-    def _str_match_split(self, string):
+
+    def str_match_split(self, string):
         """ A crude routine to match patterns in a list of string """
         sm = []
         for s in string.split('*'):
@@ -835,13 +700,6 @@ class FeedexLP(SmallSem):
     #######################################################################33
     #   Utilities
     #
-
-    def _sqlize(self, string:str, **kargs):
-        """ Escapes SQL wildcards """
-        #   sql = string.replace('\\', '\\\\')
-        sql = string.replace('%', '\%')
-        sql = sql.replace('_', '\_')
-        return sql
 
 
     def _isrnum(self, string, **kargs):

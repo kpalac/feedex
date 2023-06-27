@@ -21,7 +21,7 @@ class DesktopNotifier:
     """ Desktop notification handler for FEEDEX. Displays notifications given a result list """
     def __init__(self, **kargs):
         Notify.init("Feedex")
-        self.entry = SQLContainer('entries', RESULTS_SQL_TABLE + ('sim','cnt','rank',))
+        self.entry = ResultEntry()
         self.notif_list = []
         self.parent = kargs.get('parent')
         self.icons = kargs.get('icons',{})

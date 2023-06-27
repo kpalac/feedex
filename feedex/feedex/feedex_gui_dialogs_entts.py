@@ -11,8 +11,7 @@ class NewFromURL(Gtk.Dialog):
     """ Add from URL dialog with category and handler choice """
     def __init__(self, parent, feed, **kargs):
 
-        if isinstance(feed, FeedContainer): self.feed = feed
-        else: raise TypeError
+        self.feed = feed
 
         Gtk.Dialog.__init__(self, title=_("Add Channel from URL"), transient_for=parent, flags=0)
         self.set_border_width(10)
@@ -20,13 +19,13 @@ class NewFromURL(Gtk.Dialog):
         box = self.get_content_area()
 
         self.url_entry = Gtk.Entry()
-        self.url_entry.set_text( scast(self.feed['url'], str, '')  )
+        self.url_entry.set_text( scast(self.feed.get('url'), str, '')  )
 
-        self.cat_combo = f_feed_combo(parent.FX, tooltip=_("Choose Category to assign this Channel to\nCategories are useful for quick filtering and organizing Channels") )
-        f_set_combo(self.cat_combo, self.feed['parent_id'])
+        self.cat_combo = f_feed_combo(tooltip=_("Choose Category to assign this Channel to\nCategories are useful for quick filtering and organizing Channels") )
+        f_set_combo(self.cat_combo, self.feed.get('parent_id'))
 
         self.handler_combo = f_handler_combo(local=False, connect=self.on_changed )
-        f_set_combo(self.handler_combo, self.feed['handler'])
+        f_set_combo(self.handler_combo, self.feed.get('handler'))
 
         self.add_button = f_button(_('Add'),'list-add-symbolic', connect=self.on_add)
         self.cancel_button = f_button(_('Cancel'),'action-unavailable-symbolic', connect=self.on_cancel)
@@ -57,10 +56,7 @@ class NewFromURL(Gtk.Dialog):
 
     def on_changed(self, *args):
         handler = f_get_combo(self.handler_combo)
-        if handler == 'rss':
-            self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
-        else:
-            self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
+        if handler in ('rss', 'html'): self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
 
     def get_data(self, *args):
         """ Populate result from form contents """
@@ -204,9 +200,10 @@ class EditCategory(Gtk.Dialog):
 
 class EditEntry(Gtk.Dialog):
     """ Edit Entry dialog """
-    def __init__(self, parent, config, entry, **kargs):
+    def __init__(self, parent, entry, **kargs):
 
         self.entry = entry
+        self.parent = parent
 
         self.short = kargs.get('short',False)
 
@@ -218,7 +215,7 @@ class EditEntry(Gtk.Dialog):
             title = _('Edit Entry')
             restore_label = _('Restore')
 
-        self.config = config
+        self.config = self.parent.config
 
         Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
         self.set_default_size(kargs.get('width',800), kargs.get('height',500))
@@ -231,7 +228,7 @@ class EditEntry(Gtk.Dialog):
         self.result = {}
         self.response = 0
         
-        self.cat_combo = f_feed_combo(parent.FX, with_feeds=True, no_empty=True, icons=parent.icons, tooltip=_("""Choose <b>Category</b> or <b>Channel</b> to assign this Entry to.
+        self.cat_combo = f_feed_combo(with_feeds=True, no_empty=True, icons=parent.icons, tooltip=_("""Choose <b>Category</b> or <b>Channel</b> to assign this Entry to.
 It is a good idea to have categories exclusively for manually added entries for quick access to notes, hilights etc.
 <i>Every Entry needs to be assigned to a Category or a Channel</i>"""))
 
@@ -426,8 +423,8 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
 
     def validate(self):
         err = self.entry.validate()
-        if err != 0: 
-            self.err_label.set_markup(gui_msg(err))
+        if err != 0:
+            self.err_label.set_markup(gui_msg(*err))
             return False                    
         return True
 
@@ -449,17 +446,18 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
 
 class EditFlag(Gtk.Dialog):
     """ Rule Edit dialog """
-    def __init__(self, parent, config, flag, **kargs):
+    def __init__(self, parent, flag, **kargs):
 
         self.new = kargs.get('new',True)
 
         if self.new: title = _('Add new Flag')
         else: title = _('Edit Flag')
 
-        self.config = config
+        self.parent = parent
+        self.config = self.parent.config
+
         self.flag = flag
 
-        self.parent = parent
 
         Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
         self.set_default_size(kargs.get('width',500), kargs.get('height',200))
@@ -479,7 +477,7 @@ class EditFlag(Gtk.Dialog):
         self.desc_entry = Gtk.Entry()
 
         color_label = f_label(_('Color:'))
-        color = Gdk.color_parse( coalesce( self.parent.FX.get_flag_color(self.flag['id']), self.config.get('gui_default_flag_color','blue') )  )
+        color = Gdk.color_parse( coalesce( fdx.get_flag_color(self.flag['id']), self.config.get('gui_default_flag_color','blue') )  )
         self.color_button = Gtk.ColorButton(color=color)
 
         color_cli_label = f_label(_('Color (CLI):'))
@@ -548,7 +546,7 @@ class EditFlag(Gtk.Dialog):
     def validate(self):
         err = self.flag.validate()
         if err != 0: 
-            self.err_label.set_markup(gui_msg(err))
+            self.err_label.set_markup(gui_msg(*err))
             return False                    
         return True
 
@@ -588,17 +586,16 @@ class EditFlag(Gtk.Dialog):
 
 class EditRule(Gtk.Dialog):
     """ Rule Edit dialog """
-    def __init__(self, parent, config, rule, **kargs):
+    def __init__(self, parent, rule, **kargs):
 
         self.new = kargs.get('new',True)
 
         if self.new: title = _('Add new Rule')
         else: title = _('Edit Rule')
 
-        self.config = config
+        self.parent = parent
+        self.config = self.parent.config
         self.rule = rule
-
-        self.FX = parent.FX
 
         Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
         self.set_default_size(kargs.get('width',1000), kargs.get('height',400))
@@ -622,11 +619,11 @@ It is used according to <b>Type</b> and should be compatibile with it (e.g. REGE
         type_label = f_label(_('Type:'), wrap=False)
         self.type_combo = f_query_type_combo(connect=self.on_changed, rule=True)
         feed_label = f_label(_('Channel or Category:'), wrap=False)
-        self.feed_combo = f_feed_combo(parent.FX, icons=parent.icons, with_feeds=True, empty_label=_('-- Every Feed --'), tooltip=_("Which Feed/Channel should this Rule filter?") )
+        self.feed_combo = f_feed_combo(icons=parent.icons, with_feeds=True, empty_label=_('-- Every Feed --'), tooltip=_("Which Feed/Channel should this Rule filter?") )
         field_label = f_label(_('Field:'),wrap=False)
         self.field_combo = f_field_combo(connect=self.on_changed)
         lang_label = f_label(_('Language:'), wrap=False)
-        self.lang_combo = f_lang_combo(parent.FX, connect=self.on_changed, tooltip=_("Which language should this rule use for Full Text Search?") )
+        self.lang_combo = f_lang_combo(connect=self.on_changed, tooltip=_("Which language should this rule use for Full Text Search?") )
         case_label = f_label(_('Case:'), wrap=False)
         self.case_combo = f_dual_combo( ((0,_("Case sensitive")),(1,_("Case insensitive"))), connect=self.on_changed, tooltip=_('Should this Rule be case sensitive?') )
 
@@ -636,7 +633,7 @@ It is used according to <b>Type</b> and should be compatibile with it (e.g. REGE
 Articles are then sorted by importance to keep the most important ones on top.
 Weights from leaned rules as well as the ones from manually added ones sum up and position an Article""") )
             
-        self.flag_combo = f_flag_combo(self.FX, filters=False, tooltip=_("""Main reason for manually added rules is to flag interesting incomming articles independently of importance ranking
+        self.flag_combo = f_flag_combo(filters=False, tooltip=_("""Main reason for manually added rules is to flag interesting incomming articles independently of importance ranking
 Sometimes, however, a rule can simply increase importance by its <b>weight</b> without flagging""") ) 
         self.additive_button = Gtk.CheckButton.new_with_label(_('Are matches weights additive?'))
 
@@ -718,7 +715,7 @@ Sometimes, however, a rule can simply increase importance by its <b>weight</b> w
     def validate(self):
         err = self.rule.validate()
         if err != 0: 
-            self.err_label.set_markup(gui_msg(err))
+            self.err_label.set_markup(gui_msg(*err))
             return False                    
         return True
 
@@ -761,27 +758,27 @@ Sometimes, however, a rule can simply increase importance by its <b>weight</b> w
 
 class EditFeedRegex(Gtk.Dialog):
     """ Edit REGEX strings for parsing HTML input """
-    def __init__(self, parent, FX, regexes, ifeed, **kargs):
+    def __init__(self, parent, regexes, ifeed, **kargs):
         
         self.response = 0
         self.result = {}
 
-        self.FX = FX
         self.parent = parent
+        self.DB = self.parent.parent.DB
 
         self.regexes = regexes
-        self.ifeed = FeedContainer(self.FX, replace_nones=True)
+        self.ifeed = FeedexFeed(self.DB, replace_nones=True)
         self.ifeed.merge(ifeed)
         self.ifeed.merge(self.regexes)
 
-        self.short = kargs.get('short',False)       
+        self.short = kargs.get('short',False)
 
         if self.short: 
-            self.handler = FeedexRSSHandler(self.FX)
+            self.handler = FeedexRSSHandler(self.DB)
             title = _('Custom REGEX string for resource link extraction')
             height = 200
         else: 
-            self.handler = FeedexHTMLHandler(self.FX)
+            self.handler = FeedexHTMLHandler(self.DB)
             title = _("REGEX strings for HTML parsing")
             height = 500
 
@@ -902,8 +899,8 @@ Parsing will be done match by match with each REGEX below""" ))
         self.prev_notebook.append_page(self.prev_box_parsed, f_label(_("Parsing Preview")))
 
         self.load_from_button = f_button(_('Load from...'),'object-select-symbolic', connect=self.on_load_from, tooltip=_("Load REGEXes from other Chanel"))
-        if self.short: self.feed_combo = f_feed_combo(self.FX, no_empty=True, with_categories=False, with_feeds=True, with_short_templates=True) 
-        else: self.feed_combo = f_feed_combo(self.FX, no_empty=True, with_categories=False, with_feeds=True, with_templates=True)
+        if self.short: self.feed_combo = f_feed_combo(no_empty=True, with_categories=False, with_feeds=True, with_short_templates=True) 
+        else: self.feed_combo = f_feed_combo(no_empty=True, with_categories=False, with_feeds=True, with_templates=True)
 
         self.err_label = f_label('', markup=True)
 
@@ -963,7 +960,7 @@ Parsing will be done match by match with each REGEX below""" ))
 
     def on_test_regex(self, *args, **kargs):
         if self.ifeed.get('url') in ('',None):
-            self.err_label.set_markup(gui_msg( (-1, _('Link URL is empty. Cannot download resource') ) ))
+            self.err_label.set_markup(gui_msg(-1, _('Link URL is empty. Cannot download resource') ) )
             return -1
 
         self.get_data()
@@ -983,8 +980,8 @@ Parsing will be done match by match with each REGEX below""" ))
 
         if not downloaded:
             err = self.handler.download()
-            if err != 0: 
-                self.err_label.set_markup(gui_msg( (-1, f'{_("Handler error:")} {err}') ))
+            if err != 0:
+                self.err_label.set_markup(gui_msg(*fdx.bus_q[-1]))
                 return -1
 
         prev_str = ''
@@ -999,7 +996,7 @@ Parsing will be done match by match with each REGEX below""" ))
             prev_str = f"""{prev_str}\n\n------------------------------------------------------------\n"""
             feed_prev_str = f"""{feed_prev_str}\n\n------------------------------------------------------------\n"""
             title = e.get('title','')
-            desc, im, ls = strip_markup(e.get('description'), rx_images=rx_images, rx_links=rx_links, test=True)
+            desc, im, ls = self.handler.strip_markup(e.get('description'), rx_images=rx_images, rx_links=rx_links, test=True)
             feed_prev_str = f"""{feed_prev_str}<b>{esc_mu(title)}</b>
 {esc_mu(desc)}"""
             for i in im:
@@ -1011,7 +1008,7 @@ Parsing will be done match by match with each REGEX below""" ))
             content = e.get('content')
             if content is not None:
                 for c in content:
-                    txt, im, ls = strip_markup(c.get('value'), html=True, rx_images=rx_images, rx_links=rx_links, test=True)
+                    txt, im, ls = self.handlerstrip_markup(c.get('value'), html=True, rx_images=rx_images, rx_links=rx_links, test=True)
                     feed_prev_str = f"""{feed_prev_str}\n\n{esc_mu(txt)}\n"""
                     if txt not in (None, ''):
                         for i in im:
@@ -1034,7 +1031,7 @@ Parsing will be done match by match with each REGEX below""" ))
         feed_title, feed_pubdate, feed_img, feed_charset, feed_lang, entry_sample, entries = self.handler.test_download(force=True)
         if not downloaded: self.prev_label_html.set_text(scast(self.handler.feed_raw.get('raw_html'), str, ''))
         if self.handler.error:
-            self.err_label.set_markup(gui_msg( (-1, f'{_("Handler error:")} {self.handler.error_str}') ))
+            self.err_label.set_markup(gui_msg( *fdx.bus_q[-1] ))
             return -1
 
         demo_string = f"""
@@ -1088,8 +1085,8 @@ Parsing will be done match by match with each REGEX below""" ))
             self._do_restore(feed=feed)
             return 0
 
-        feed = FeedContainerBasic()
-        for f in self.FX.MC.feeds:
+        feed = ResultFeed()
+        for f in fdx.feeds_cache:
             feed.populate(f)
             if feed['id'] == feed_id:
                 self._do_restore(feed=feed)
@@ -1158,7 +1155,7 @@ Parsing will be done match by match with each REGEX below""" ))
         if self.short: err = self.ifeed.validate_regexes2()
         else: err = self.ifeed.validate_regexes()
         if err != 0:
-            self.err_label.set_markup(gui_msg(err))
+            self.err_label.set_markup(gui_msg(*err))
             return False
         return True
 
@@ -1187,8 +1184,8 @@ class EditFeed(Gtk.Dialog):
         self.new = kargs.get('new',True)
 
         self.response = 0
-        self.config = kargs.get('config',DEFAULT_CONFIG)
         self.parent = parent
+        self.config = self.parent.config
 
         self.feed = feed
         self.regexes = {}
@@ -1201,7 +1198,7 @@ class EditFeed(Gtk.Dialog):
         self.set_default_size(kargs.get('width',1000), kargs.get('height',500))
         box = self.get_content_area()
 
-        self.cat_combo = f_feed_combo(self.feed.FX, tooltip=_("""Choose <b>Category</b> to assign this Feed to
+        self.cat_combo = f_feed_combo(tooltip=_("""Choose <b>Category</b> to assign this Feed to
 Categories are useful for bulk-filtering and general organizing""") )
 
         self.handler_combo = f_handler_combo(connect=self.on_changed, local=True)
@@ -1388,8 +1385,8 @@ See <b><i>feedex --help-scripting</i></b> for detailed specification"""))
     def _on_define_regex(self, *args, **kargs):
         """ Run new window for defining REGEXes"""
         handler = f_get_combo(self.handler_combo)
-        if handler == 'html': dialog = EditFeedRegex(self, self.parent.FX, self.regexes, self.get_data(for_regex=True))
-        else: dialog = EditFeedRegex(self, self.parent.FX, self.regexes, self.get_data(for_regex=True), short=True)
+        if handler == 'html': dialog = EditFeedRegex(self, self.regexes, self.get_data(for_regex=True))
+        else: dialog = EditFeedRegex(self, self.regexes, self.get_data(for_regex=True), short=True)
         dialog.run()
         if dialog.response == 1: self.regexes = dialog.result.copy()
         dialog.destroy()
@@ -1505,7 +1502,7 @@ Scripted feeds are updated by script defined below during fetching""") )
     def validate_entries(self, *args):
         err = self.feed.validate()
         if err != 0:
-            self.err_label.set_markup(gui_msg(err))
+            self.err_label.set_markup(gui_msg(*err))
             return False
         return True
     

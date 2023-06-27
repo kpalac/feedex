@@ -60,9 +60,6 @@ class SmallSem:
 
     def __init__(self, models_path:str, **kwargs) -> None:
 
-        # Utilities ...
-        self.debug = kwargs.get('debug',False)
-
         # Init Xapian index pointer to connect if needed
         self.ix_db = None
 
@@ -101,7 +98,6 @@ class SmallSem:
 
             try:
                 with open(filename, "rb") as ff: self.lings.append(pickle.load(ff))
-                if self.debug: print(f'Loaded {filename}...')
             except (OSError,) as e:
                 sys.stderr.write(f'Error loading {filename} file: {e}')
                 continue
@@ -133,8 +129,13 @@ class SmallSem:
                 found = True
                 self.ling = h
                 model_id = h['names'][0]
-                self.index_path = os.path.join(self.models_path, f"""{model_id}_index""")
-                self.vocab_path = os.path.join(self.models_path, f"""{model_id}_vocab.pkl""")
+                
+                if h.get('no_index',False):
+                    self.index_path = None
+                    self.vocab_path = None
+                else:
+                    self.index_path = os.path.join(self.models_path, f"""{model_id}_index""")
+                    self.vocab_path = os.path.join(self.models_path, f"""{model_id}_vocab.pkl""")
 
                 # Init model lists
                 self.aliases = h.get('aliases',{})
@@ -166,7 +167,6 @@ class SmallSem:
                     self.ix_db.close()
                     self.ix_db = None
 
-                if self.debug: print(f'Model {model_id} loaded ...')
                 return name
 
         if not found: 
@@ -184,12 +184,14 @@ class SmallSem:
 
     def _xap_connect(self):
         """ Check and connect to xapian """
-        if self.ix_db is None: 
+        if self.ix_db is None and self.index_path is not None: 
             try:
                 self.ix_db = xapian.Database(self.index_path)
-                if self.debug: print(f'Connected to {self.index_path} index...')
             except (OSError, xapian.DatabaseError) as e:
                 self.ix_db = None
+                self.index_path = None
+                for i,h in enumerate(self.lings):
+                    if self._is_in_ling_names(self.get_model(), h['names']): self.lings[i]['no_index'] = True
                 sys.stderr.write(f'Error connecting to {self.index_path} database: {e}')
 
 
@@ -606,7 +608,6 @@ class SmallSem:
                     elif c in l.get('swadesh',()): freq_dist[lname] += 1
                     elif c in l.get('commons',()): freq_dist[lname] += 1
 
-        if self.debug: print(freq_dist)
 
         max_fr = max(freq_dist.values())
         candidates = [key for key, value in freq_dist.items() if value == max_fr]
@@ -633,9 +634,7 @@ class SmallSemTrainer:
 
     def __init__(self, lang:str, models_path:str, **kwargs) -> None:
 
-        self.debug = kwargs.get('debug',False)
-
-        self.ke = SmallSem(models_path, lang=lang, debug=debug)
+        self.ke = SmallSem(models_path, lang=lang)
         self.ke.set_model(lang)
 
         # Init Xapian index
@@ -720,8 +719,6 @@ Options:
     
     --index_dir DIR         Learn vocab and train on all text files in a folder
 
-    --debug                 Debug mode
-
     --help, -h              Show this message
 
 
@@ -748,7 +745,6 @@ if __name__ == '__main__':
     file = None
     models_path = ''
     matrix_file = ''
-    debug = False
 
 
     if  par_len > 1:
@@ -798,8 +794,6 @@ if __name__ == '__main__':
             elif arg.startswith('--separator=') and arg != '--separator=':
                 separator = arg.split('=')[1]
 
-            elif arg == '--debug':
-                debug = True
 
 
             elif arg in ('-h','-help','--help'):
@@ -812,21 +806,21 @@ if __name__ == '__main__':
     if action in ('index_dir', 'term_freq','build','term_context','kw_from_file', 'summarize'):
         
         if action == 'index_dir': 
-            kl = SmallSemTrainer(lang, models_path, debug=debug)
+            kl = SmallSemTrainer(lang, models_path)
             kl.learn_from_dir(index_dir)
 
         elif action == 'term_freq':
-            lp = SmallSem(models_path, ling=lang, debug=debug)
+            lp = SmallSem(models_path, ling=lang)
             term = lp.stemmer.stemWord(term.lower())
             print(f'Stemmed form: {term}')
             print(f'Collection frequency: {lp.ix_db.get_termfreq(term)}')
 
         elif action == 'term_context':
-            lp = SmallSem(models_path, ling=lang, debug=debug)
+            lp = SmallSem(models_path, ling=lang)
             for c in lp.get_contexts(term, depth): print(c)
 
         elif action == 'kw_from_file':
-            lp = SmallSem(models_path, ling=lang, debug=debug)
+            lp = SmallSem(models_path, ling=lang)
             try:
                 # Detect encodng...
                 with open(file, 'rb') as f:
@@ -843,7 +837,7 @@ if __name__ == '__main__':
 
 
         elif action == 'summarize':
-            lp = SmallSem(models_path, ling=lang, debug=debug)
+            lp = SmallSem(models_path, ling=lang)
             try:
                 # Detect encodng...
                 with open(file, 'rb') as f:

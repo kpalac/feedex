@@ -6,10 +6,10 @@ lang =
 
 
 # Path to log file
-log = /home/lolko/.local/share/feedex/feedex.log
+log = ~/.local/share/feedex/feedex.log
 
 # Path to news SQLite3 database
-db_path = /home/lolko/.local/share/feedex/feedex.db
+db_path = ~/.local/share/feedex/feedex.db
 # Database timeout
 timeout = 5
 
@@ -64,8 +64,6 @@ user_agent = UniversalFeedParser/5.0.1 +http://feedparser.org/
 # GUI options
 # Ignore image handling and download for performance
 ignore_images = False
-# Ignore streaming audio/video media for performance
-ignore_media = False
 
 gui_new_color = #0f0fdadacaca
 gui_deleted_color = #bababdbdb6b6
@@ -79,7 +77,7 @@ gui_key_search = s
 gui_key_new_entry = n
 gui_key_new_rule = r
 gui_layout = 0
-gui_orientation = 0
+gui_orientation = 2
 gui_startup_page = 2
 search_engine = https://duckduckgo.com/?t=ffab&q=%Q&ia=web
 gui_clear_cache = 30
@@ -91,8 +89,6 @@ window_name_exclude = Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,
 # Available colors: WHITE, WHITE_BOLD, YELLOW, YELLOW_BOLD, CYAN, CYAN_BOLD, BLUE, BLUE_BOLD, RED, RED_BOLD, GREEN, GREEN_BOLD, PURPLE, PURPLE_BOLD, LIGHT_RED, LIGHT_RED_BOLD
 
 #normal_color = WHITE
-#read_color = WHITE_BOLD
-#flag_color = YELLOW_BOLD
 #bold_color = CYAN_BOLD
 
 # Bold markup (e.g. for snippets and contexts

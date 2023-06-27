@@ -21,20 +21,23 @@ from feedex_headers import *
 
 
 
-
 def main():
-    """Main class for Feedex feed reader. It parses command line and launches actions with given parameters"""
-
+ 
     action = None
     argument = None
     argument2 = None
     argument3 = None
 
-    params = {'print':True}
+    params = {}
+    fdx.cli = True
+    fdx.single_run = True
 
-    config_file = None
-    database_file = None
-    log_file = None
+    config_file = os.getenv('FEEDEX_CONFIG', None)
+    database = os.getenv('FEEDEX_DB_PATH', None)
+    log_file = os.getenv('FEEDEX_LOG', None)
+
+    query = False
+    cli_display = False
 
     # Command line argument parsing...
     if len(sys.argv) > 1:
@@ -45,39 +48,43 @@ def main():
 
             if arg in ('-h', '--help', '--usage'):
                 from feedex_docs import FEEDEX_SHORT_HELP
-                help_print(FEEDEX_SHORT_HELP)
+                mu_print(FEEDEX_SHORT_HELP)
                 sys.exit(0)
             elif arg in ('-hh', '--help-long'):
                 from feedex_docs import FEEDEX_LONG_HELP
-                help_print(FEEDEX_LONG_HELP)
+                mu_print(FEEDEX_LONG_HELP)
                 sys.exit(0)
             elif arg == ('--help-feeds'):
                 from feedex_docs import FEEDEX_HELP_FEEDS
-                help_print(FEEDEX_HELP_FEEDS)
+                mu_print(FEEDEX_HELP_FEEDS)
+                sys.exit(0)
+            elif arg == ('--help-query'):
+                from feedex_docs import FEEDEX_HELP_QUERY
+                mu_print(FEEDEX_HELP_QUERY)
                 sys.exit(0)
             elif arg == ('--help-categories'):
                 from feedex_docs import FEEDEX_HELP_FEEDS
-                help_print(FEEDEX_HELP_FEEDS)
+                mu_print(FEEDEX_HELP_FEEDS)
                 sys.exit(0)
             elif arg == ('--help-entries'):
                 from feedex_docs import FEEDEX_HELP_ENTRIES
-                help_print(FEEDEX_HELP_ENTRIES)
+                mu_print(FEEDEX_HELP_ENTRIES)
                 sys.exit(0)
             elif arg == ('--help-rules'):
                 from feedex_docs import FEEDEX_HELP_RULES
-                help_print(FEEDEX_HELP_RULES)
+                mu_print(FEEDEX_HELP_RULES)
                 sys.exit(0)
             elif arg == ('--help-scripting'):
                 from feedex_docs import FEEDEX_HELP_SCRIPTING
-                help_print(FEEDEX_HELP_SCRIPTING)
+                mu_print(FEEDEX_HELP_SCRIPTING)
                 sys.exit(0)
             elif arg == ('--help-html'):
                 from feedex_docs import FEEDEX_HELP_HTML
-                help_print(FEEDEX_HELP_HTML)
+                mu_print(FEEDEX_HELP_HTML)
                 sys.exit(0)
             elif arg == ('--help-examples'):
                 from feedex_docs import FEEDEX_HELP_EXAMPLES
-                help_print(FEEDEX_HELP_EXAMPLES)
+                mu_print(FEEDEX_HELP_EXAMPLES)
                 sys.exit(0)
                 
 
@@ -86,7 +93,7 @@ def main():
                 sys.exit(0)
 
             elif arg in ('--about',):
-                help_print(FEEDEX_HELP_ABOUT)
+                mu_print(FEEDEX_HELP_ABOUT)
                 sys.exit(0)
 
 
@@ -94,100 +101,119 @@ def main():
 
             #PARAMETERS
             elif arg.startswith('--config='):
-                config_file = sanitize_arg(arg, str, '', stripped=True, is_file=True, exit_fail=True)
+                config_file = fdx.sanitize_arg(arg, str, '', stripped=True, is_file=True, exit_fail=True)
                 continue
             elif arg.startswith('--log='):
-                log_file = sanitize_arg(arg, str, '', stripped=True, exit_fail=False)
+                log_file = fdx.sanitize_arg(arg, str, '', stripped=True, exit_fail=False)
                 continue
             elif arg.startswith('--database='):
-                database_file = sanitize_arg(arg, str, '', stripped=True, exit_fail=True)
+                database = fdx.sanitize_arg(arg, str, '', stripped=True, exit_fail=True)
                 continue
             elif arg == '--debug':
-                params['debug'] = 1
+                fdx.debug_level = 1
                 continue
             elif arg.startswith('--debug='):
-                params['debug'] = sanitize_arg(arg, int, None, stripped=True, exit_fail=True)
+                fdx.debug_level = fdx.sanitize_arg(arg, int, None, stripped=True, exit_fail=True)
                 continue
 
             #DISPLAY 
             elif arg == '--csv':
                 params['output']='csv'
-                params['print']=True
                 continue
             elif arg.startswith('--html-template='):
-                params['html_template'] = sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
+                params['html_template'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
                 params['output']='html'
-                params['print']=True
                 continue
             elif arg.startswith('--to-files-at-dir='):
                 params['to_files'] = True
-                params['to_files_dir'] = sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
+                params['to_files_dir'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--to-files-names='):
-                params['to_files_names'] = sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
+                params['to_files_names'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
                 continue
             elif arg == '--json':
                 params['output']='json'
-                params['print']=True
                 continue
-            elif arg.startswith('--export-to-file='):
-                params['json_file'] = sanitize_arg(arg, str, '', arg_name=_('JSON file to export results to'), stripped=False, exit_fail=False)
+            elif arg == '--export':
+                params['output']='json_dict'
                 continue
-            elif arg == '--short':
-                params['output']='short'
-                params['print']=True
-
+            elif arg == '--long':
+                params['output']='long'
+                continue
             elif arg == '--headlines':
                 params['output']='headlines'
-                params['print']=True
+                continue
+
+            elif arg.startswith('--display-cols='):
+                params['display_cols'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
+                continue
+            
+            elif arg.startswith('--ofile='):
+                params['ofile'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
+                continue
+            elif arg.startswith('--export='):
+                params['output']='json_dict'                
+                params['ofile'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
+                continue
+
 
             elif arg == '--silent':
-                params['print']=False
+                fdx.cli=False
 
             elif arg == '--clipboard':
                 params['clipboard'] = True
 
             elif arg.startswith('--delimiter='):
-                params['delimiter'] = sanitize_arg(arg, str, '|', stripped=False, exit_fail=False)
+                params['delimiter'] = fdx.sanitize_arg(arg, str, '|', stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--delimiter2='):
-                params['delimiter2'] = sanitize_arg(arg, str, ';', stripped=False, exit_fail=False)
+                params['delimiter2'] = fdx.sanitize_arg(arg, str, ';', stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--escape='):
-                params['delim_escape'] = sanitize_arg(arg, str, '\\', stripped=False, exit_fail=False)
+                params['delim_escape'] = fdx.sanitize_arg(arg, str, '\\', stripped=False, exit_fail=False)
                 continue
 
+            elif arg.startswith('--note_marker='):
+                params['note_marker'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
+                continue
+            elif arg.startswith('--read_marker='):
+                params['read_marker'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
+                continue
+
+
             elif arg.startswith('--bold_beg='):
-                params['bold_beg'] = sanitize_arg(arg, str, '<b>', stripped=False, exit_fail=False)
+                params['bold_beg'] = fdx.sanitize_arg(arg, str, '<b>', stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--bold_end='):
-                params['bold_end'] = sanitize_arg(arg, str, '</b>', stripped=False, exit_fail=False)
+                params['bold_end'] = fdx.sanitize_arg(arg, str, '</b>', stripped=False, exit_fail=False)
                 continue
 
 
             elif arg.startswith('--trunc='):
-                params['trunc'] = sanitize_arg(arg, int, 0, stripped=False, exit_fail=False)
+                params['trunc'] = fdx.sanitize_arg(arg, int, 0, stripped=False, exit_fail=False)
                 continue
 
             elif arg == '--desktop-notify':
                 params['desktop_notify'] = True
-                params['print'] = False
+                query = True
+                fdx.cli = False
+
                 continue
 
 	        #NEWS		
             elif arg in ('-g','--get-news'):
                 action = 'get_news'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID'), exit_fail=True, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID'), exit_fail=True, allow_none=True)
                 break
 
             elif arg in ('-c','--check'):
                 action = 'check'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to check'), exit_fail=True, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to check'), exit_fail=True, allow_none=True)
                 break
 
             elif arg in ('-o','--open-in-browser'):
                 action = 'open'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('entry ID or URL to open in browser'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('entry ID or URL to open in browser'), exit_fail=True, allow_none=False)
                 break		
 
 
@@ -195,133 +221,144 @@ def main():
             #FEEDS
             elif arg in ('-L','--list-feeds'):
                 action = 'list_feeds'
+                query = True
+                break
+
+            elif arg == '--list-feeds-cats':
+                action = 'list_feeds_cats'
+                query = True
                 break
 
             elif arg in ('-a','--add-feed'):
                 action = 'add_url'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('feed URL to download'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Handler'), exit_fail=False, allow_none=True, valid_list=['rss','twitter'])
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('feed URL to download'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Handler'), exit_fail=False, allow_none=True, valid_list=['rss','twitter'])
                 break
 
             elif arg in ('-u', '--update-feeds'):
                 action = 'update_feeds'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to update'), exit_fail=True, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to update'), exit_fail=True, allow_none=True)
                 break
 			
             elif arg in ('-D','--delete-feed'):
                 action = 'del_feed'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to delete'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to delete'), exit_fail=True, allow_none=False)
                 break
 
             elif arg in ('-F','--read-feed'):
                 action = 'read_feed'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to browse'), exit_fail=True, allow_none=False)
+                query = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to browse'), exit_fail=True, allow_none=False)
                 break	
             elif arg in ('-C','--read-category'):
                 action = 'read_category'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('category to browse'), exit_fail=True, allow_none=False)
+                query = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('category to browse'), exit_fail=True, allow_none=False)
                 break	
 
             elif arg == '--examine-feed':
                 action = 'examine_feed'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
+                cli_display = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
                 break	
 
             elif arg == '--edit-feed':
                 action = 'edit_feed'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
-                argument3 = sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
+                argument3 = fdx.sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--insert-feed-before':
                 action = 'insert_feed_before'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), int, None, singleton=True, arg_name=_('target feed ID'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), int, None, singleton=True, arg_name=_('target feed ID'), exit_fail=True, allow_none=False)
                 break
 
             elif arg == '--test-regexes':
                 action = 'test_regexes'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('Feed ID'), exit_fail=True, allow_none=False)
+                cli_display = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('Feed ID'), exit_fail=True, allow_none=False)
                 break
 
 
             #ENTRIES			
             elif arg in ('-r','--read-entry'):
                 action = 'read_entry'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to read'), exit_fail=True, allow_none=False)
+                cli_display = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to read'), exit_fail=True, allow_none=False)
                 break
             elif arg in ('-S','--find-similar'):
                 action = 'find_similar'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to analyze'), exit_fail=True, allow_none=False)
+                query = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to analyze'), exit_fail=True, allow_none=False)
                 break
 
             elif arg == '--mark':
                 action = 'mark'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), int, None, singleton=True, arg_name=_('read n times'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), int, None, singleton=True, arg_name=_('read n times'), exit_fail=True, allow_none=False)
                 break	
 
             elif arg == '--mark-unimportant':
                 action = 'mark_unimportant'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
                 break	
 
             elif arg == '--flag':
                 action = 'flag'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('flag name or ID'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('flag name or ID'), exit_fail=True, allow_none=False)
                 break	
 
             elif arg == '--edit-entry':
                 action = 'edit_entry'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
-                argument3 = sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
+                argument3 = fdx.sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
                 break	
 
                 	
             elif arg in ('--add-entry','-N'):
                 action='add_entry'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Title'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Text'), exit_fail=True, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Title'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Text'), exit_fail=True, allow_none=True)
                 break
 
-            elif arg == '--add-entries-from-file':
-                action='add_entries_from_file'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('JSON file with entries'), exit_fail=True, allow_none=False)
+            elif arg == '--import-entries-from-file':
+                action='import_entries_from_file'
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('JSON file with entries'), exit_fail=True, allow_none=False)
                 break
 
-            elif arg == '--add-entries-from-pipe':
-                action='add_entries_from_pipe'
+            elif arg == '--import-entries-from-pipe':
+                action='import_entries_from_pipe'
                 break
-
-
 
             elif arg == '--delete-entry':
                 action = 'del_entry'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to delete'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('additional parameter'), exit_fail=True, allow_none=True, valid_list=['rules_only','not_rules'])
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to delete'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('additional parameter'), exit_fail=True, allow_none=True, valid_list=['rules_only','not_rules'])
                 break
 	
             # ITEM RESTORES
             elif arg == '--restore-feed':
                 action = 'restore_feed'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to restore'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('feed ID to restore'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--restore-category':
                 action = 'restore_category'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('category ID to restore'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('category ID to restore'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--restore-entry':
                 action = 'restore_entry'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to restore'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to restore'), exit_fail=True, allow_none=False)
                 break
 
 
             #QUERIES
             elif arg in ('-q','--query'):
                 action = 'query_entries'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, '', singleton=True, arg_name=_('query phrase'), exit_fail=False, allow_none=True)
+                query = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, '', singleton=True, arg_name=_('query phrase'), exit_fail=False, allow_none=True)
                 if argument is None: argument = ''
                 break
 			
@@ -330,122 +367,129 @@ def main():
             #KEYWORDS, HISTORY AND RULES
             elif arg == '--list-rules':
                 action = 'list_rules'
-                break	
+                query = True
+                break
+            elif arg == '--list-rules-learned':
+                action = 'list_rules_learned'
+                query = True
+                break
 
             elif arg == '--list-history':
                 action = 'list_history'
+                query = True
                 break	
             
 
-            elif arg in ('-K', '--add-keyword'):
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('keyword(s) text'), exit_fail=True, allow_none=False)
-                action = 'add_keyword'
+            elif arg == '--add-rule':
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('keyword(s) text'), exit_fail=True, allow_none=False)
+                action = 'add_rule'
                 break	
             elif arg == '--add-regex':
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('REGEX string'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('REGEX string'), exit_fail=True, allow_none=False)
                 action = 'add_regex'
                 break	
             elif arg == '--add-stemmed':
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('stemmed token string'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('stemmed token string'), exit_fail=True, allow_none=False)
                 action = 'add_stemmed'
                 break	
 
             elif arg == '--edit-rule':
                 action = 'edit_rule'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('rule ID'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
-                argument3 = sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('rule ID'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
+                argument3 = fdx.sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
                 break	
 
             elif arg == '--delete-rule':
                 action = 'del_rule'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('rule ID to delete'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('rule ID to delete'), exit_fail=True, allow_none=False)
                 break	
+
 
             elif arg == '--term-net':
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('searched term'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('searched term'), exit_fail=True, allow_none=False)
                 action = 'term_net'
+                query = True
                 break	
 
-            elif arg == '--term-context':
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('term for context'), exit_fail=True, allow_none=False)
-                action = 'term_context'
+            elif arg == '--context':
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('term for context'), exit_fail=True, allow_none=False)
+                action = 'context'
+                query = True
                 break	
 
             elif arg == '--term-in-time':
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('searched term'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('searched term'), exit_fail=True, allow_none=False)
                 action = 'term_in_time'
+                query = True
                 break	
 
             elif arg == '--trends':
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('searched phrase'), exit_fail=False, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('searched phrase'), exit_fail=False, allow_none=True)
                 action = 'trends'
+                query = True
                 break	
             
             elif arg == '--trending':
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('searched phrase'), exit_fail=False, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('searched phrase'), exit_fail=False, allow_none=True)
                 action = 'trending'
+                query = True
                 break	
 
             elif arg == '--rel-in-time':
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID'), exit_fail=True, allow_none=False)
                 action = 'rel_in_time'
+                query = True
                 break	
 
-
-            elif arg == '--keywords':
-                action = 'keywords'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to extract keywords/features from'), exit_fail=True, allow_none=False)
-                break	
-
-            elif arg == '--rules-for-entry':
-                action = 'rules_for_entry'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to check rules for'), exit_fail=True, allow_none=False)
+            elif arg == '--entry-rank':
+                action = 'entry_rank'
+                cli_display = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), int, None, singleton=True, arg_name=_('entry ID to check rules for'), exit_fail=True, allow_none=False)
                 break	
 
 
             #CATEGORIES
             elif arg == '--list-categories':
                 action = 'list_categories'
-                break
-            elif arg == '--show-categories-tree':
-                action = 'show_categories_tree'
+                query = True
                 break
             elif arg == '--add-category':
                 action = 'add_category'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Category name'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Category subtitle'), exit_fail=False, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Category name'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Category subtitle'), exit_fail=False, allow_none=True)
                 break
             elif arg == '--delete-category':
                 action = 'del_category'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Category name or ID'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Category name or ID'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--edit-category':
                 action = 'edit_category'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Category name or ID'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
-                argument3 = sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Category name or ID'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
+                argument3 = fdx.sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
                 break
 
 
             #FLAGS
             elif arg == '--list-flags':
                 action = 'list_flags'
+                query = True
                 break
             elif arg == '--add-flag':
                 action = 'add_flag'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Flag name'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Flag description'), exit_fail=False, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Flag name'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Flag description'), exit_fail=False, allow_none=True)
                 break
             elif arg == '--delete-flag':
                 action = 'del_flag'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Flag ID'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Flag ID'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--edit-flag':
                 action = 'edit_flag'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Flag ID'), exit_fail=True, allow_none=False)
-                argument2 = sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
-                argument3 = sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('Flag ID'), exit_fail=True, allow_none=False)
+                argument2 = fdx.sanitize_arg(slist(sys.argv, i+2, None), str, None, singleton=True, arg_name=_('Field name'), exit_fail=True, allow_none=False)
+                argument3 = fdx.sanitize_arg(slist(sys.argv, i+3, None), str, None, singleton=True, arg_name=_('New value'), exit_fail=True, allow_none=False)
                 break
             
 
@@ -467,47 +511,51 @@ def main():
 
             elif arg  == '--reindex':
                 action = 'reindex'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('entry ID/range'), exit_fail=True, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('entry ID/range'), exit_fail=True, allow_none=True)
                 break	
             elif arg == '--rerank':
                 action = 'rerank'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('entry ID/range'), exit_fail=True, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('entry ID/range'), exit_fail=True, allow_none=True)
                 break	
             elif arg == '--relearn':
                 action = 'relearn'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('entry ID/range'), exit_fail=True, allow_none=True)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('entry ID/range'), exit_fail=True, allow_none=True)
                 break
 
             elif arg.startswith('--batch-size='):
-                params['batch_size'] = sanitize_arg(arg, int, 1000, stripped=True, exit_fail=False)
+                params['batch_size'] = fdx.sanitize_arg(arg, int, 1000, stripped=True, exit_fail=False)
                 continue
 
 
 
             # Data transfer
-            elif arg == '--export-feeds':
-                action = 'export_feeds'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output file'), exit_fail=True, allow_none=False)
-                break
-            elif arg == '--export-rules':
-                action = 'export_rules'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output file'), exit_fail=True, allow_none=False)
-                break
-            elif arg == '--export-flags':
-                action = 'export_flags'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output file'), exit_fail=True, allow_none=False)
-                break
             elif arg == '--import-feeds':
                 action = 'import_feeds'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--import-rules':
                 action = 'import_rules'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--import-flags':
                 action = 'import_flags'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                break
+
+            elif arg == '--export-feeds':
+                action = 'export_feeds'
+                query = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                break
+            elif arg == '--export-rules':
+                action = 'export_rules'
+                query = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                break
+            elif arg == '--export-flags':
+                action = 'export_flags'
+                query = True
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
                 break
 
 
@@ -523,6 +571,7 @@ def main():
                 action = 'unlock'
             elif arg == '--db-stats':
                 action = 'db_stats'
+                cli_display = True
             elif arg.startswith('--timeout='):
                 params['timeout'] = sanitize_arg(arg, int, 1000, stripped=False, exit_fail=False)
                 continue
@@ -567,62 +616,62 @@ def main():
                 continue
 
             elif arg.startswith('--lang='):
-                params['lang'] = sanitize_arg(arg, str, 'heuristic', stripped=False, exit_fail=False)
+                params['lang'] = fdx.sanitize_arg(arg, str, 'heuristic', stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--weight='):
-                params['weight'] = sanitize_arg(arg, float, 2, stripped=False, exit_fail=False)
+                params['weight'] = fdx.sanitize_arg(arg, float, 2, stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--handler='):
-                params['handler'] = sanitize_arg(arg, str, 'rss', stripped=True, exit_fail=False)
+                params['handler'] = fdx.sanitize_arg(arg, str, 'rss', stripped=True, exit_fail=False)
                 continue
 
             elif arg.startswith('--field='):
-                params['field'] = sanitize_arg(arg, str, None, stripped=True, exit_fail=False)
+                params['field'] = fdx.sanitize_arg(arg, str, None, stripped=True, exit_fail=False)
                 continue
 	
             elif arg.startswith('--type='):
-                params['qtype'] = sanitize_arg(arg, str, 'fts', stripped=True, exit_fail=False)
+                params['qtype'] = fdx.sanitize_arg(arg, str, 'fts', stripped=True, exit_fail=False)
                 continue
 
             elif arg.startswith('--logic='):
-                params['logic'] = sanitize_arg(arg, str, 'any', stripped=True, exit_fail=False)
+                params['logic'] = fdx.sanitize_arg(arg, str, 'any', stripped=True, exit_fail=False)
                 continue
 
 
             elif arg.startswith('--from='):
-                params['date_from'] = sanitize_arg(arg, str, '1899-12-31', stripped=True, exit_fail=False)
+                params['date_from'] = fdx.sanitize_arg(arg, str, '1899-12-31', stripped=True, exit_fail=False)
                 continue
 
             elif arg.startswith('--to='):
-                params['date_to'] = sanitize_arg(arg, str, '2100-01-01', stripped=True, exit_fail=False)
+                params['date_to'] = fdx.sanitize_arg(arg, str, '2100-01-01', stripped=True, exit_fail=False)
                 continue
 
             elif arg.startswith('--added_from='):
-                params['date_add_from'] = sanitize_arg(arg, str, '1899-12-31', stripped=True, exit_fail=False)
+                params['date_add_from'] = fdx.sanitize_arg(arg, str, '1899-12-31', stripped=True, exit_fail=False)
                 continue
 
             elif arg.startswith('--added_to='):
-                params['date_add_to'] = sanitize_arg(arg, str, '2100-01-01', stripped=True, exit_fail=False)
+                params['date_add_to'] = fdx.sanitize_arg(arg, str, '2100-01-01', stripped=True, exit_fail=False)
                 continue
 
             elif arg.startswith('--feed='):
-                params['feed'] = sanitize_arg(arg, int, 0, stripped=False, exit_fail=False)
+                params['feed'] = fdx.sanitize_arg(arg, int, 0, stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--category='):
-                params['category'] = sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
+                params['category'] = fdx.sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--parent_category='):
-                params['parent_category'] = sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
+                params['parent_category'] = fdx.sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--parent_id='):
-                params['parent_id'] = sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
+                params['parent_id'] = fdx.sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--feed_id='):
-                params['feed_id'] = sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
+                params['feed_id'] = fdx.sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
                 continue
 
             elif arg.startswith('--handler='):
-                params['handler'] = sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
+                params['handler'] = fdx.sanitize_arg(arg, str, None, stripped=False, exit_fail=False)
                 continue
 
 
@@ -647,7 +696,7 @@ def main():
                 continue
 
             elif arg.startswith('--last_n='):
-                params['last_n'] = sanitize_arg(arg, int, 1, stripped=False, exit_fail=False)
+                params['last_n'] = fdx.sanitize_arg(arg, int, 1, stripped=False, exit_fail=False)
                 continue
 
             elif arg == '--today':
@@ -676,12 +725,12 @@ def main():
             elif arg == '--read':
                 params['read']=True
                 continue
-
             elif arg == '--unread':
                 params['unread']=True
                 continue
+            
             elif arg.startswith('--flag='):
-                params['flag'] = sanitize_arg(arg, str, 'all', stripped=False, exit_fail=False)
+                params['flag'] = fdx.sanitize_arg(arg, str, 'all', stripped=False, exit_fail=False)
                 continue
 
             elif arg == '--deleted':
@@ -693,17 +742,14 @@ def main():
                 continue
 
             elif arg.startswith('--sort='):
-                params['sort'] = "+" + sanitize_arg(arg, str, None, exit_fail=True)
-                continue
-            elif arg.startswith('--rsort='):
-                params['sort'] = "-" + sanitize_arg(arg, str, None, exit_fail=True)
+                params['sort'] = fdx.sanitize_arg(arg, str, None, exit_fail=True)
                 continue
 
             elif arg.startswith('--page='):
-                params['page'] = sanitize_arg(arg, int, 1, stripped=False, exit_fail=False)
+                params['page'] = fdx.sanitize_arg(arg, int, 1, stripped=False, exit_fail=False)
                 continue
             elif arg.startswith('--page_len='):
-                params['page_len'] = sanitize_arg(arg, int, -1, stripped=False, exit_fail=False)
+                params['page_len'] = fdx.sanitize_arg(arg, int, -1, stripped=False, exit_fail=False)
                 continue
 
         
@@ -714,20 +760,20 @@ def main():
                 continue
 
             elif arg.startswith('--group='):
-                params['group'] = sanitize_arg(arg, str, 0, exit_fail=True, valid_list=['hourly','daily','monthly','category','feed','flag','similar'])
+                params['group'] = fdx.sanitize_arg(arg, str, 0, exit_fail=True, valid_list=['hourly','daily','monthly','category','feed','flag','similar'])
                 continue
 
             elif arg.startswith('--depth='):
-                params['depth'] = sanitize_arg(arg, int, 0, exit_fail=True)
+                params['depth'] = fdx.sanitize_arg(arg, int, 0, exit_fail=True)
                 continue
 
             elif arg.startswith('--summarize='):
-                params['summarize'] = sanitize_arg(arg, int, 0, exit_fail=True)
+                params['summarize'] = fdx.sanitize_arg(arg, int, 0, exit_fail=True)
                 continue
 
 
             elif arg.startswith('--term-width='):
-                params['term_width'] = sanitize_arg(arg, int, 150, exit_fail=False)
+                params['term_width'] = fdx.sanitize_arg(arg, int, 150, exit_fail=False)
                 continue
 
 
@@ -737,11 +783,16 @@ def main():
 
             elif arg in ('--sql'):
                 action = 'execute_SQL'
-                argument = sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name='SQL statement', exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name='SQL statement', exit_fail=True, allow_none=False)
                 break
 
             else:
-                cli_msg( (-1,_("Invalid arguments given...\nMake sure that:\n - parameters are before actions\n - every parameter and action is available\n") ) )
+                msg(FX_ERROR_CL,_("""Invalid arguments given...
+Make sure that:
+ - parameters are before actions
+ - every parameter and action is available
+ 
+ """) )
                 sys.exit(9)
                     
         
@@ -754,102 +805,98 @@ def main():
 
 
     # Config stuff...
-    if config_file is not None:
-        if not os.path.isfile(config_file):
-            cli_msg( (-1,_(f'Configuration file %a not found!'), config_file ) )
-            config_file = os.getenv('FEEDEX_CONFIG', FEEDEX_CONFIG)
-            cli_msg( (-1,_(f'Defaulting to %a'), config_file) )
-    else:
-        config_file = os.getenv('FEEDEX_CONFIG', FEEDEX_CONFIG)
-
-    if not os.path.isfile(config_file):
+    config_file = coalesce(config_file, FEEDEX_CONFIG)
+    if not os.path.isfile(config_file): 
+        msg(_('Config file not found. Using default...'))
         copyfile( FEEDEX_SYS_CONFIG, FEEDEX_CONFIG )
-    
-    config = parse_config(config_file)
-    if config == -1: config = DEFAULT_CONFIG
-    config = validate_config(config)
+        config_file = FEEDEX_CONFIG
+
+    fdx.parse_config(config_file)
+
+    fdx.config['log'] = coalesce(log_file, fdx.config.get('log'), os.path.join(FEEDEX_SHARED_PATH, 'feedex.log') )
+    fdx.config['db_path'] = coalesce(database, fdx.config.get('db_path'), os.path.join(FEEDEX_SHARED_PATH, 'feedex.db') )
 
     # Install locale
-    if config.get('lang') not in (None,'en'):
-        lang = gettext.translation('feedex', languages=[config.get('lang')])
+    if fdx.config.get('lang') not in (None,'en'):
+        lang = gettext.translation('feedex', languages=[fdx.config.get('lang')])
         lang.install(FEEDEX_LOCALE_PATH)
 
-    # Get paths to DB and log from env if provided
-    if database_file is None: database_file = os.getenv('FEEDEX_DB_PATH', None)
-    if log_file is None: log_file = os.getenv('FEEDEX_LOG', None)
- 
-    if database_file is not None: config['db_path'] = database_file
-    if log_file is not None: config['log'] = log_file
- 
-    if config.get('db_path') is None: config['db_path'] = DEFAULT_CONFIG.get('db_path')
-
-    # Check if required user paths are present and if not - create them	
+    # Check and create needed dirs
     check_paths((FEEDEX_SHARED_PATH,))
-
-    # Overwrite config options if given as command line arguments
-    params['config'] = config
-
-    
-    # Init main data container for shared structures
-    FEEDEX_main_container = FeedexMainDataContainer(config=config)
 
     # Lazy load and run GUInterface
     if action == 'GUI':
 
         # GUI display ... 
-        params['print'] = False
+        if fdx.debug_level in (None,0): fdx.cli = False
+        fdx.single_run = False
+        
         from feedex_gui_main import feedex_run_main_win, FeedexMainWin
-        feedex_run_main_win(FEEDEX_main_container, **params)
+        feedex_run_main_win(**params)
         return 0
 
 
 
+
+
+
+
+
     # Init the main workhorse ...
-    params['single_run'] = True
-    params['main_thread'] = True
-    feedex = Feeder(FEEDEX_main_container, **params)
-    if feedex.db_status != 0: sys.exit(2)
-    if feedex.ix_status != 0: sys.exit(2)
+    feedex = FeedexDatabase(db_path=fdx.config['db_path'], config=fdx.config, allow_create=True, **params)
+    try: feedex.connect()
+    except (FeedexDatabaseError, FeedexDataError) as e: sys.exit(e.code)
 
     # Lazy load desktop notification support
-    if params.get('desktop_notify',False) and action in ('get_news','check','query_entries','add_entry','add_keyword','add_regex','add_full_text','add_full_text_exact'):
+    if params.get('desktop_notify',False) and action in ('get_news','check','query_entries','add_entry','add_rule','add_regex','add_stemmed',):
 
         from feedex_desktop_notifier import DesktopNotifier
-        
-        feedex.do_load_icons()
-        desktop_notifier = DesktopNotifier(icons=feedex.MC.icons)
-
+        feedex.load_icons()
+        desktop_notifier = DesktopNotifier(icons=fdx.icons_cache)
 
     # Lazy load clipboard support. Substitute arguments with clipboard selection
-    if params.get('clipboard',False):
-        if action in ('add_entry','add_keyword','add_regex','add_full_text',):
+    if params.get('clipboard',False) and ('add_entry','add_rule','add_regex','add_full_text',):
             
-            feedex.do_load_icons()
-            from feedex_clipper import Clipper
-            clipper = Clipper(config=config)
+        from feedex_clipper import FeedexClipper
+        feedex.load_icons()
+        clipper = FeedexClipper(config=fdx.config)
 
-            argument, argument2 = clipper.process_args(argument, argument2)
+        argument, argument2 = clipper.process_args(argument, argument2)
 
-            if clipper.error is not None:
-                if params.get('desktop_notify',False): desktop_notifier.notify(clipper.error, None, -1)
-                sys.exit(1)
+        if clipper.error is not None:
+            if params.get('desktop_notify',False): desktop_notifier.notify(clipper.error, None, -1)
+            sys.exit(1)
+
+
+    # Init query object
+    if query: 
+        feedex.connect_QP()
+    if query or cli_display:
+        feedex_cli = FeedexCLI(**params)
+        if params.get('desktop_notify',False): feedex_cli.connect_DN(desktop_notifier)
 
 
     # Wrapper for notifications
     def do_notify():
         if feedex.new_items > 0:
-            if params.get('print',False) or params.get('desktop_notify',False): 
+            if params.get('desktop_notify', False): 
                 params['last'] = True
-                feedex.Q.query('', params, rank=True, snippets=False, allow_group=True)
-
+                err = feedex.Q.query('', params, rank=True, snippets=False, allow_group=True)
+                if err == 0: feedex_cli.out_table(feedex.Q)
 
     # Check if query input is a JSON string and parse it
-    if params.get('json_query',False) and action in ('query_entries', 'term_net', 'term_in_time', 'term_context', 'find_similar'):
+    if params.get('json_query',False) and action in ('query_entries', 'term_net', 'term_in_time', 'context', 'find_similar', 'trends', 'trending', 'rel_in_time'):
         argument, filters = feedex.Q.parse_json_query(argument)
         if argument == -1: action = None
         # Replace relevant keys for parameters
         for k,v in filters.items():
             if k != 'phrase': params[k] = v
+
+
+
+
+
+
 
 
     # Execute actions specified on the command line. Looks a bit convoluted, but it is not that complicated, really
@@ -864,34 +911,35 @@ def main():
         do_notify()
 
     elif action == 'open':
-        if argument.isdigit(): entry = EntryContainer(feedex, id=argument)
-        else: entry = EntryContainer(feedex, url=argument)
+        if argument.isdigit(): entry = FeedexEntry(feedex, id=argument)
+        else: entry = FeedexEntry(feedex, url=argument)
         entry.open(background=False)
 
         
 
     elif action == 'list_feeds':
-        feedex.Q.list_feeds()
+        err = feedex.Q.list_feeds(feeds_only=True)
+        if err == 0: feedex_cli.out_table(feedex.Q)
+
     elif action == 'add_url':
-        feed = FeedContainer(feedex)
+        feed = FeedexFeed(feedex)
         params['url'] = argument
 
         if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding Channel from URL ..."), 0)
-
-        feed.add_from_url(new=params, no_fetch=params.get('no_fetch',False))
+        err = feed.add_from_url(new=params, no_fetch=params.get('no_fetch',False))
 
         if params.get('desktop_notify',False):
-            if clipper.error is None and feedex.MC.ret_status == 0: desktop_notifier.notify(_("Channel successfully added!"), None, feed.vals.get('id',-2))
+            if clipper.error is None and err == 0: desktop_notifier.notify(_("Channel successfully added!"), None, feed.vals.get('id',-2))
             else: desktop_notifier.notify(_("Error adding new Channel!"), None, -1)
 
 
     elif action == 'update_feeds':
         feedex.fetch(id=argument, force=True, ignore_interval=True, update_only=True)
     elif action == 'del_feed':
-        feed = FeedContainer(feedex, feed_id=argument)
+        feed = FeedexFeed(feedex, feed_id=argument)
         feed.delete()
     elif action == 'edit_feed':
-        feed = FeedContainer(feedex, feed_id=argument)
+        feed = FeedexFeed(feedex, feed_id=argument)
         idict = {argument2 : argument3}
         # Prompt for auth data
         if argument2 == 'auth' and argument3 not in ('NONE','NULL'):
@@ -903,41 +951,51 @@ def main():
         feed.update(idict)
 
     elif action == 'insert_feed_before':
-        feed = FeedContainer(feedex, feed_id=argument)
+        feed = FeedexFeed(feedex, feed_id=argument)
         feed.order_insert(argument2, with_cat=False)
 
     elif action == 'read_feed':
         params['feed'] = argument
-        params['columns'] = RESULTS_SHORT_PRINT2
-        feedex.Q.query('', params, rank=False, cnt=False, snippets=False)
+        params['fallback_sort'] = 'pubdate'
+        err = feedex.Q.query('', params, rank=False, cnt=False, snippets=False)
+        if err == 0: feedex_cli.out_table(feedex.Q)
+
     elif action == 'read_category':
         params['category'] = argument
-        params['columns'] = RESULTS_SHORT_PRINT2
-        feedex.Q.query('', params, rank=False, cnt=False, snippets=False)
+        params['fallback_sort'] = 'pubdate'
+        err = feedex.Q.query('', params, rank=False, cnt=False, snippets=False)
+        if err == 0: feedex_cli.out_table(feedex.Q)
+    
     elif action == 'examine_feed':
-        feedex.Q.read_feed(argument)
+        feed = FeedexFeed(feedex, feed_id=argument)
+        feedex_cli.out_feed(feed)
+    
     elif action == 'test_regexes':
-        feedex.Q.test_regexes(argument)
+        feed = FeedexFeed(feedex, feed_id=argument)
+        feedex_cli.out_test_regex(feed)
 
 		
     elif action == 'read_entry':
-        feedex.Q.read_entry(argument, summarize=params.get('summarize'))
+        entry = FeedexEntry(feedex, id=argument)
+        feedex_cli.out_entry(entry, **params)
+
     elif action == 'find_similar':
-        feedex.Q.find_similar(argument, **params)
+        err = feedex.Q.find_similar(argument, **params)
+        if err == 0: feedex_cli.out_table(feedex.Q)
     elif action == 'mark':
-        entry = EntryContainer(feedex, id=argument)
+        entry = FeedexEntry(feedex, id=argument)
         entry.update({'read': argument2})
     elif action == 'mark_unimportant':
-        entry = EntryContainer(feedex, id=argument)
+        entry = FeedexEntry(feedex, id=argument)
         entry.update({'read': -1})
     elif action == 'flag':
-        entry = EntryContainer(feedex, id=argument)
+        entry = FeedexEntry(feedex, id=argument)
         entry.update({'flag': argument2})
     elif action == 'edit_entry':
-        entry = EntryContainer(feedex, id=argument)
+        entry = FeedexEntry(feedex, id=argument)
         entry.update({argument2: argument3})
     elif action == 'add_entry':
-        entry = EntryContainer(feedex)
+        entry = FeedexEntry(feedex)
         params['title'] = argument
         params['desc'] = argument2
 
@@ -946,131 +1004,144 @@ def main():
         entry.add(new=params)
 
         if params.get('desktop_notify',False):
-            if clipper.error is None and feedex.MC.ret_status == 0: desktop_notifier.notify(_("Entry successfully added!"), None, entry.vals.get('feed_id',-2))
+            if clipper.error is None and fdx.ret_status == 0: desktop_notifier.notify(_("Entry successfully added!"), None, entry.vals.get('feed_id',-2))
             else: desktop_notifier.notify(_("Error adding new entry!"), None, -1)
 
     elif action == 'del_entry':
-        entry = EntryContainer(feedex, id=argument)
+        entry = FeedexEntry(feedex, id=argument)
         entry.delete()
-
-    elif action == 'add_entries_from_file': feedex.add_entries(efile=argument, learn=params.get('learn',True))
-    elif action == 'add_entries_from_pipe': feedex.add_entries(pipe=True, learn=params.get('learn',True))
 
 
 
     # Main query
     elif action == 'query_entries': 
-        feedex.Q.query(argument, params, json_file=params.get('json_file'), rank=True, snippets=True, allow_group=True)
-
-
-    elif action == 'list_rules': feedex.Q.show_rules()
-    elif action == 'list_history': feedex.Q.show_history()
+        err = feedex.Q.query(argument, params, json_file=params.get('json_file'), rank=True, snippets=True, allow_group=True)
+        if err == 0: feedex_cli.out_table(feedex.Q)
 
 
 
-    elif action == 'add_keyword':
-        rule = RuleContainer(feedex)
+    elif action == 'list_rules': 
+        err = feedex.Q.list_rules()
+        if err == 0: feedex_cli.out_table(feedex.Q)
+    elif action == 'list_rules_learned':
+        if feedex_cli.output in ('cli',None): feedex_cli.output = 'headlines'
+        err = feedex.Q.list_rules(learned=True)
+        if err == 0: feedex_cli.out_table(feedex.Q)
+
+
+    elif action == 'list_history': 
+        err = feedex.Q.list_history()
+        if err == 0: feedex_cli.out_table(feedex.Q)
+
+    elif action == 'add_rule':
+        rule = FeedexRule(feedex)
         params['string'] = argument
         params['type'] = 0
-        if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding new Keyword..."), None, 0)
+        if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding new Rule..."), None, 0)
         rule.add(new=params)
         if params.get('desktop_notify',False):
-            if clipper.error is None and feedex.MC.ret_status == 0: desktop_notifier.notify(_("Keyword successfully added!"), None, -2)
-            else: desktop_notifier.notify(_("Error adding new keyword!"), None, -1)
+            if clipper.error is None and feedex.MC.ret_status == 0: desktop_notifier.notify(_("Rule successfully added!"), None, -2)
+            else: desktop_notifier.notify(_("Error adding new Rule!"), None, -1)
 
     elif action == 'add_regex':
-        rule = RuleContainer(feedex)
+        rule = FeedexRule(feedex)
         params['string'] = argument
         params['type'] = 3
-        if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding new REGEX rule..."), None, 0)
+        if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding new REGEX Rule..."), None, 0)
         rule.add(new=params)
         if params.get('desktop_notify',False):
-            if clipper.error is None and feedex.MC.ret_status == 0: desktop_notifier.notify(_("Keyword successfully added!"), None, -2)
-            else: desktop_notifier.notify(_("Error adding new keyword!"), None, -1)
+            if clipper.error is None and feedex.MC.ret_status == 0: desktop_notifier.notify(_("REGEX successfully added!"), None, -2)
+            else: desktop_notifier.notify(_("Error adding new REGEX!"), None, -1)
 
     elif action == 'add_stemmed':
-        rule = RuleContainer(feedex)
+        rule = FeedexRule(feedex)
         params['string'] = argument
         params['type'] = 1
-        if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding new FTS rule..."), None, 0)
+        if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding new Stemmed Rule..."), None, 0)
         rule.add(new=params)
         if params.get('desktop_notify',False):
-            if clipper.error is None and feedex.MC.ret_status == 0: desktop_notifier.notify(_("FTS rule successfully added!"), None, -2)
-            else: desktop_notifier.notify(_("Error adding new rule!"), None, -1)
+            if clipper.error is None and feedex.MC.ret_status == 0: desktop_notifier.notify(_("Stemmed Rule successfully added!"), None, -2)
+            else: desktop_notifier.notify(_("Error adding new Stemmed Rule!"), None, -1)
 
 
 
 
     elif action == 'edit_rule':
-        rule = RuleContainer(feedex, id=argument)
+        rule = FeedexRule(feedex, id=argument)
         rule.update({argument2: argument3})
     elif action == 'del_rule':
-        rule = RuleContainer(feedex, id=argument)
+        rule = FeedexRule(feedex, id=argument)
         rule.delete()
 
 
     elif action == 'term_net':
-        feedex.Q.term_net(argument, **params)
+        err = feedex.Q.term_net(argument, **params)
+        if err == 0: feedex_cli.out_table(feedex.Q)
     elif action == 'term_in_time':
-        feedex.Q.term_in_time(argument, **params)
+        err = feedex.Q.term_in_time(argument, **params)
+        if err == 0: feedex_cli.out_table(feedex.Q)
     elif action == 'rel_in_time':
-        feedex.Q.relevance_in_time(argument, **params)
-    elif action == 'term_context':
-        feedex.Q.term_context(argument, **params)
-    elif action == 'keywords':
-        feedex.Q.get_keywords(argument)
+        err = feedex.Q.relevance_in_time(argument, **params)
+        if err == 0: feedex_cli.out_table(feedex.Q)
+    elif action == 'context':
+        err = feedex.Q.term_context(argument, **params)
+        if err == 0: feedex_cli.out_table(feedex.Q)
     elif action == 'trends':
-        feedex.Q.get_trends(argument, params)
+        err = feedex.Q.get_trends(argument, params)
+        if err == 0: feedex_cli.out_table(feedex.Q)
     elif action == 'trending':
-        feedex.Q.get_trending(argument, params)
-    elif action == 'rules_for_entry':
-        feedex.Q.rules_for_entry(argument)
+        err = feedex.Q.get_trending(argument, params)
+        if err == 0: feedex_cli.out_table(feedex.Q)
+    elif action == 'entry_rank':
+        entry = FeedexEntry(feedex, id=argument)
+        feedex_cli.out_entry_ranking(entry)
 
     elif action == 'list_categories':
-        feedex.Q.list_feeds(cats=True)
-    elif action == 'show_categories_tree':
-        feedex.Q.cat_tree_print()
+        if feedex_cli.output in ('cli',None): feedex_cli.output = 'notes'
+        err = feedex.Q.list_feeds(cats_only=True)
+        if err == 0: feedex_cli.out_table(feedex.Q)
+    elif action == 'list_feeds_cats':
+        if feedex_cli.output in ('cli',None): feedex_cli.output = 'headlines'
+        err = feedex.Q.feed_tree()
+        if err == 0: feedex_cli.out_table(feedex.Q)    
     elif action == 'add_category':
-        feed = FeedContainer(feedex)
+        feed = FeedexFeed(feedex)
         feed.add(new={'title':argument, 'name': argument, 'subtitle':argument2, 'is_category':True})
     elif action == 'del_category':
-        feed = FeedContainer(feedex, category_id=argument)
+        feed = FeedexFeed(feedex, category_id=argument)
         feed.delete()
     elif action == 'edit_category':
-        feed = FeedContainer(feedex, category_id=argument)
+        feed = FeedexFeed(feedex, category_id=argument)
         feed.update({argument2: argument3})
 
     elif action == 'list_flags':
-        feedex.Q.list_flags()
+        err = feedex.Q.list_flags()
+        if err == 0: feedex_cli.out_table(feedex.Q)
     elif action == 'add_flag':
-        flag = FlagContainer(feedex)
+        flag = FeedexFlag(feedex)
         flag.add(new={'name':argument, 'desc': argument2})
     elif action == 'del_flag':
-        flag = FlagContainer(feedex, id=argument)
+        flag = FeedexFlag(feedex, id=argument)
         flag.delete()
     elif action == 'edit_flag':
-        flag = FlagContainer(feedex, id=argument)
+        flag = FeedexFlag(feedex, id=argument)
         flag.update({argument2: argument3})
 
 
     elif action == 'restore_feed':
-        feed = FeedContainer(feedex, feed_id=argument)
+        feed = FeedexFeed(feedex, feed_id=argument)
         feed.update({'deleted': 0})
     elif action == 'restore_category':
-        feed = FeedContainer(feedex, category_id=argument)
+        feed = FeedexFeed(feedex, category_id=argument)
         feed.update({'deleted': 0})
     elif action == 'restore_entry':
-        entry = EntryContainer(feedex, id=argument)
+        entry = FeedexEntry(feedex, id=argument)
         entry.update({'deleted': 0})
 
-    elif action == 'clear_history':
-        feedex.clear_history()
-    elif action == 'delete_query_rules':
-        feedex.delete_query_rules()
-    elif action == 'delete_learned_rules':
-        feedex.delete_learned_rules()
-    elif action == 'empty_trash':
-        feedex.empty_trash()
+    elif action == 'clear_history': feedex.clear_history()
+    elif action == 'delete_query_rules': feedex.delete_query_rules()
+    elif action == 'delete_learned_rules': feedex.delete_learned_rules()
+    elif action == 'empty_trash': feedex.empty_trash()
         
 
 
@@ -1089,67 +1160,72 @@ def main():
             argument = scast(argument, int, None)
 
 
-        if action == 'reindex':
-            feedex.recalculate(id=argument, batch_size=params.get('batch_size'), start_id=start_id, end_id=end_id, index=True, rank=False, learn=False)
-        elif action == 'rerank':
-            feedex.recalculate(id=argument, batch_size=params.get('batch_size'), start_id=start_id, end_id=end_id, rank=True, learn=False, index=False)
-        elif action == 'relearn':
-            feedex.recalculate(id=argument, batch_size=params.get('batch_size'), start_id=start_id, end_id=end_id, rank=False, learn=True, index=False)
+        if action == 'reindex': feedex.recalculate(id=argument, batch_size=params.get('batch_size'), start_id=start_id, end_id=end_id, index=True, rank=False, learn=False)
+        elif action == 'rerank': feedex.recalculate(id=argument, batch_size=params.get('batch_size'), start_id=start_id, end_id=end_id, rank=True, learn=False, index=False)
+        elif action == 'relearn': feedex.recalculate(id=argument, batch_size=params.get('batch_size'), start_id=start_id, end_id=end_id, rank=False, learn=True, index=False)
 
 
 
 
     elif action == 'export_feeds':
-        feedex.port_data(True, argument, 'feeds')
-    elif action == 'import_feeds':
-        feedex.port_data(False, argument, 'feeds')
+        feedex.Q.list_feeds(all=True)
+        feedex_cli.output = 'json_dict'
+        feedex_cli.ofile = argument
+        feedex_cli.out_table(feedex.Q)
+
     elif action == 'export_rules':
-        feedex.port_data(True, argument, 'rules')
-    elif action == 'import_rules':
-        feedex.port_data(False, argument, 'rules')
+        feedex.Q.list_rules()
+        feedex_cli.output = 'json_dict'
+        feedex_cli.ofile = argument
+        feedex_cli.out_table(feedex.Q)
+
     elif action == 'export_flags':
-        feedex.port_data(True, argument, 'flags')
-    elif action == 'import_flags':
-        feedex.port_data(False, argument, 'flags')
+        feedex.Q.list_flags()
+        feedex_cli.output = 'json_dict'
+        feedex_cli.ofile = argument
+        feedex_cli.out_table(feedex.Q)
+
+
+    elif action == 'import_entries_from_file': feedex.import_entries(efile=argument, learn=params.get('learn',True))
+    elif action == 'import_entries_from_pipe': feedex.import_entries(pipe=True, learn=params.get('learn',True))
+
+    elif action == 'import_feeds': feedex.import_feeds(argument)
+    elif action == 'import_rules': feedex.import_rules(argument)
+    elif action == 'import_flags': feedex.import_flags(argument)
     
 
-    elif action == 'db_maintenance':
-        feedex.db_maintenance()
-
     elif action == 'unlock':
-        feedex.unlock(verbose=True)
-    elif action == 'lock':
-        feedex.lock(verbose=True)
-    elif action == 'db_stats':
-        feedex.db_stats()		
- 
-    elif action == 'unlock_fetching':
-        feedex.unlock_fetching(verbose=True)
-    elif action == 'lock_fetching':
-        feedex.lock_fetching(force=True, verbose=True)
- 
-    elif action == 'execute_SQL' and params.get('debug') is not None:
+        if feedex.unlock() == 0: msg(_('Database unlocked.'))
+    elif action == 'lock': 
+        if feedex.lock() == 0: msg(_('Database locked.'))
+    elif action == 'unlock_fetching': 
+        if feedex.unlock_fetching() == 0: msg(_('Database unlocked for fetching.'))
+    elif action == 'lock_fetching': 
+        if feedex.lock_fetching(force=True) == 0: msg(_('Database locked for fetching.'))
+
+    elif action == 'db_maintenance': feedex.maintenance()
+
+    elif action == 'db_stats': feedex_cli.out_db_stats(feedex.stats())
+
+
+    elif action == 'execute_SQL' and fdx.debug_level not in (None, 0):
         print(_('Executing SQL statement...'))
         feedex.curs.execute(argument)
         feedex.conn.commit()
         print(_('Done.'))
 
 
-    # Desktop notifications after complete query
-    if params.get('desktop_notify',False) and action in ('get_news','check','query_entries'):
-
-        desktop_notifier.clear()
-        desktop_notifier.load(feedex.Q.results)
-        desktop_notifier.show()
-
-
+    # Formalities...
     feedex.close()
-    if feedex.db_error is not None: sys.exit(2)
-    sys.exit( abs(FEEDEX_main_container.ret_status) )
+
+    sys.exit( abs(fdx.ret_status) )
 
 
 
         	
+
+
+
 if __name__ == '__main__':
     main()
 
