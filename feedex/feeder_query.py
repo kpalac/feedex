@@ -950,6 +950,8 @@ class FeedexQuery(FeedexQueryInterface):
                 if count > 0:
                     self.result.clear()
                     self.result['title'] = ts
+                    self.result['pubdate_str'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(beg))
+                    self.result['adddate_str'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end))
                     self.result['flag_name'] = 'calendar'
                     self.result['feed_name'] = group_by
                     self.result['is_node'] = 1

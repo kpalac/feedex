@@ -68,7 +68,7 @@ Hit <b>Ctrl-F</b> for interactive search""") )
         self.feed_tree.connect("row-activated", self._on_activate_feed)
         self.feed_tree.connect("row-expanded", self._on_feed_expanded)
         self.feed_tree.connect("row-collapsed", self._on_feed_collapsed)
-        self.feed_tree.connect("button-press-event", self._on_button_press)
+        self.feed_tree.connect("button-release-event", self._on_button_press)
         self.feed_tree.connect('size-allocate', self._tree_changed)
 
         self.feed_tree.set_enable_search(True)

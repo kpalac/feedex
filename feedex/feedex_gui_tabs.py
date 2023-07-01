@@ -379,7 +379,7 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
 
 
 
-    def add_date_str_to_combo(self, date_string):
+    def _add_date_str_to_combo(self, date_string):
         new_d = (f'_{date_string}', date_string)
         model = self.qtime_combo.get_model()
         for d in model:
@@ -396,7 +396,7 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
             dialog = CalendarDialog(self.MW)
             dialog.run()
             if dialog.response == 1:
-                self.add_date_str_to_combo(dialog.result["date_string"])
+                self._add_date_str_to_combo(dialog.result["date_string"])
                 dialog.destroy()
             else:
                 self.qtime_combo.set_active(0)
@@ -463,11 +463,11 @@ Escape: \ (only if before wildcards and field markers)""") )
         """ Get search filters state and put it into global dictionary """
         self.search_filters = {}
 
-        if hasattr(self, 'qtime_combo'): 
+        if hasattr(self, 'qtime_combo'):
             time = f_get_combo(self.qtime_combo)
             if time.startswith('_') and time != '__dummy':
                 time = time[1:]
-                dts = time.split(' --- ')
+                dts = time.split(' - ')
                 if dts[0] != '...': self.search_filters['date_from'] = dts[0]
                 if dts[1] != '...': self.search_filters['date_to'] = dts[1]
             else:
@@ -505,26 +505,34 @@ Escape: \ (only if before wildcards and field markers)""") )
 
     def on_restore(self, *args, **kargs):
         """ Restore default filters """
-        default_search_filters = kargs.get('filters', self.MW.default_search_filters)
+        search_filters = kargs.get('filters', self.MW.default_search_filters)
 
-        if hasattr(self, 'time_series_combo'): f_set_combo(self.time_series_combo, default_search_filters.get('group'))
-        if hasattr(self, 'qtime_combo'): f_set_combo_from_bools(self.qtime_combo, default_search_filters)
-        if hasattr(self, 'cat_combo'): f_set_combo(self.cat_combo, default_search_filters.get('feed_or_cat'), null_val=-1)
-        if hasattr(self, 'qtime_combo'): f_set_combo_from_bools(self.qtime_combo, default_search_filters)
-        if hasattr(self, 'read_combo'): f_set_combo_from_bools(self.read_combo, default_search_filters)
-        if hasattr(self, 'case_combo'): f_set_combo_from_bools(self.case_combo, default_search_filters)
-        if hasattr(self, 'flag_combo'): f_set_combo(self.flag_combo, default_search_filters.get('flag'))
-        if hasattr(self, 'qhandler_combo'): f_set_combo(self.qhandler_combo, default_search_filters.get('handler'))
-        if hasattr(self, 'notes_combo'): f_set_combo(self.notes_combo, default_search_filters.get('note'), null_val=-1)
-        if hasattr(self, 'qfield_combo'): f_set_combo(self.qfield_combo, default_search_filters.get('field'))
-        if hasattr(self, 'qlang_combo'): f_set_combo(self.qlang_combo, default_search_filters.get('lang'))
-        if hasattr(self, 'qtype_combo'): f_set_combo(self.qtype_combo, default_search_filters.get('qtype'))
-        if hasattr(self, 'qlogic_combo'): f_set_combo(self.qlogic_combo, default_search_filters.get('logic'))
-        if hasattr(self, 'time_series_combo'): f_set_combo(self.time_series_combo, default_search_filters.get('group'))
-        if hasattr(self, 'group_combo'): f_set_combo(self.group_combo, default_search_filters.get('group'))
-        if hasattr(self, 'depth_combo'): f_set_combo(self.depth_combo, default_search_filters.get('depth'))
-        if hasattr(self, 'sort_combo'): f_set_combo(self.sort_combo, default_search_filters.get('fallback_sort'))
-        if hasattr(self, 'page_len_combo'): f_set_combo(self.page_len_combo, default_search_filters.get('page_len'))
+        if hasattr(self, 'qtime_combo'):
+            if search_filters.get('date_from') is not None or search_filters.get('date_to') is not None:
+                date_str = f"""{search_filters.get('date_from','')} - {search_filters.get('date_to','')}"""
+                self._add_date_str_to_combo(date_str)
+                search_filters[f'_{date_str}'] = True
+
+            f_set_combo_from_bools(self.qtime_combo, search_filters)
+                
+
+        if hasattr(self, 'time_series_combo'): f_set_combo(self.time_series_combo, search_filters.get('group'))
+        if hasattr(self, 'qtime_combo'): f_set_combo_from_bools(self.qtime_combo, search_filters)
+        if hasattr(self, 'cat_combo'): f_set_combo(self.cat_combo, search_filters.get('feed_or_cat'), null_val=-1)
+        if hasattr(self, 'read_combo'): f_set_combo_from_bools(self.read_combo, search_filters)
+        if hasattr(self, 'case_combo'): f_set_combo_from_bools(self.case_combo, search_filters)
+        if hasattr(self, 'flag_combo'): f_set_combo(self.flag_combo, scast(search_filters.get('flag'), str, '-1'))
+        if hasattr(self, 'qhandler_combo'): f_set_combo(self.qhandler_combo, search_filters.get('handler'))
+        if hasattr(self, 'notes_combo'): f_set_combo(self.notes_combo, search_filters.get('note'), null_val=-1)
+        if hasattr(self, 'qfield_combo'): f_set_combo(self.qfield_combo, search_filters.get('field'))
+        if hasattr(self, 'qlang_combo'): f_set_combo(self.qlang_combo, search_filters.get('lang'))
+        if hasattr(self, 'qtype_combo'): f_set_combo(self.qtype_combo, search_filters.get('qtype'))
+        if hasattr(self, 'qlogic_combo'): f_set_combo(self.qlogic_combo, search_filters.get('logic'))
+        if hasattr(self, 'time_series_combo'): f_set_combo(self.time_series_combo, search_filters.get('group'))
+        if hasattr(self, 'group_combo'): f_set_combo(self.group_combo, search_filters.get('group'))
+        if hasattr(self, 'depth_combo'): f_set_combo(self.depth_combo, search_filters.get('depth'))
+        if hasattr(self, 'sort_combo'): f_set_combo(self.sort_combo, search_filters.get('fallback_sort'))
+        if hasattr(self, 'page_len_combo'): f_set_combo(self.page_len_combo, search_filters.get('page_len'))
 
         self._on_filters_changed()
 
@@ -1502,7 +1510,37 @@ class FeedexGUITable:
             ix = model[treeiter][self.result.gindex('gui_ix')]
             self.result.clear()
             self.result.populate(self.results[ix])
-            return self.result
+
+
+            # If result is a node, process it accordingly ...
+            if isinstance(self.result, ResultEntry) and self.result.get('id') is None:
+                
+                if self.result.get('feed_id') not in (0,'', None):
+                    item = ResultFeed()
+                    feed = fdx.find_f_o_c(self.result.get('feed_id'), load=True)
+                    if feed != -1:
+                        item.populate(feed)
+                        return item
+                
+                elif self.result.get('flag') not in (0,'', None):
+                    item = ResultFlag()
+                    flag = fdx.flags_cache.get(self.result.get('flag', -1))
+                    if flag != -1:
+                        flag = [self.result.get('flag')] + list(flag)
+                        item.populate(flag)
+                        return item
+
+                elif self.result.get('pubdate_str') not in (0,'', None):
+                    item = ResultTimeSeries()
+                    item['time'] = self.result.get('title')
+                    item['from'] = self.result.get('pubdate_str')
+                    item['to'] = self.result.get('adddate_str')
+                    item['freq'] = 0
+                    return item
+
+            else: return self.result
+
+
 
 
 
@@ -1653,7 +1691,7 @@ class CalendarDialog(Gtk.Dialog):
             self.result['to_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
         else: self.result['to_date'] = None
 
-        self.result['date_string'] = f"""{coalesce(self.result['from_date'], '...')} --- {coalesce(self.result['to_date'], '...')}"""
+        self.result['date_string'] = f"""{coalesce(self.result['from_date'], '...')} - {coalesce(self.result['to_date'], '...')}"""
         self.close()
 
     def on_cancel(self, *args):
