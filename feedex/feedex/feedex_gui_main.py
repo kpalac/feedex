@@ -980,14 +980,14 @@ It will also take some time to perform""") ))
                 text = text.replace(s, f'<span foreground="{col}">{s}</span>')
 
         link_text = ''
-        l_text = esc_mu(scast(result['link'], str, '').replace('<','').replace('>',''))
+        l_text = esc_mu(scast(result.get('link'), str, '').replace('<','').replace('>',''))
         if l_text.endswith('/'): l_label = slist(l_text.split('/'), -2, l_text)
         else: l_label = slist(l_text.split('/'), -1, l_text)
         if l_text != '': link_text=f"""<a href="{l_text}" title="{_('Click to open link')} : {l_text}">{l_label}</a>"""
         self.links = ''
         for l in result.get('links','').splitlines() + result.get('enclosures','').splitlines():
 
-            if l.strip() == '' or l == result['link']: continue
+            if l.strip() == '' or l == result.get('link'): continue
             self.links = f'{self.links}{l}\n'
             l_text = esc_mu(l.replace('<','').replace('>',''))
             if l_text.endswith('/'): l_label = slist(l_text.split('/'), -2, l_text)
