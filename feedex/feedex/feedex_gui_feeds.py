@@ -27,6 +27,8 @@ class FeedexFeedTab(Gtk.ScrolledWindow):
         self.MW = parent
         self.config = self.MW.config
 
+        self.type = FX_TAB_FEEDS
+
         # GUI init
         Gtk.ScrolledWindow.__init__(self)
         

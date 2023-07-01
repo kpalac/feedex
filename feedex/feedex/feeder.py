@@ -142,6 +142,7 @@ class FeedexDatabase:
         # Some technical stuff...
         try:
             with self.conn: self.curs.execute("PRAGMA case_sensitive_like=true")
+            with self.conn: self.curs.execute("PRAGMA automatic_index=false")
             #with self.conn: self.curs.execute("PRAGMA cache_size=5000")
         except sqlite3.Error as e: raise FeedexDatabaseError(FX_ERROR_DB, f'{_("Error setting up PRAGMA")} ({self.sql_path}): %a', e)
 

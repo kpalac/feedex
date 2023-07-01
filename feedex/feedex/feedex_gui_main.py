@@ -210,10 +210,11 @@ It will also take some time to perform""") ))
         
         self.upper_notebook = Gtk.Notebook()
         self.upper_notebook.set_scrollable(True)
-        self.upper_notebook.popup_enable()
+        self.upper_notebook.popup_disable()
         self.upper_nb_last_page = 0
 
         self.upper_notebook.connect('switch-page', self._on_unb_changed)
+        self.upper_notebook.connect('button-release-event', self.tab_menu)
 
 
 
@@ -464,26 +465,24 @@ It will also take some time to perform""") ))
                 self.preview_box.set_sensitive(True)
 
             elif code == FX_ACTION_FINISHED_SEARCH:
-                self.status_bar.set_markup('')
+                if not self.busy: self.status_bar.set_markup('')
                 uid = m[1]
                 for i in range(self.upper_notebook.get_n_pages()):
                     tb = self.upper_notebook.get_nth_page(i)
                     if tb is None: continue
                     if tb.uid == uid:
                         tb.finish_search()
-                        self.upper_notebook.set_menu_label_text( tb, tb.header.get_text() )
                         if hasattr(tb, 'query_combo'): self.reload_history_all()
                         break
 
             elif code == FX_ACTION_FINISHED_FILTERING:
-                self.status_bar.set_markup('')
+                if not self.busy: self.status_bar.set_markup('')
                 uid = m[1]
                 for i in range(self.upper_notebook.get_n_pages()):
                     tb = self.upper_notebook.get_nth_page(i)
                     if tb is None: continue
                     if tb.uid == uid:
                         tb.finish_filtering()
-                        self.upper_notebook.set_menu_label_text( tb, tb.header.get_text() )
                         break
 
             elif code == FX_ACTION_HANDLE_IMAGES:
@@ -544,6 +543,20 @@ It will also take some time to perform""") ))
 
 
 
+    def tab_menu(self, widget, event, *args):
+        """ Menu to quick choose tabs """
+        if event.button == 3:
+            menu = Gtk.Menu()
+            for i in range(self.upper_notebook.get_n_pages()):
+                tb = self.upper_notebook.get_nth_page(i)
+                if tb is None: continue
+                title = tb.header.get_text()
+                menu.append( f_menu_item(1, title, self._on_go_to_upr_page, args=(i,) ) )
+            menu.show_all()
+            menu.popup(None, None, None, None, event.button, event.time)
+
+    def _on_go_to_upr_page(self, *args): self.upper_notebook.set_current_page(args[-1])
+
 
 
 
@@ -571,7 +584,7 @@ It will also take some time to perform""") ))
                     if fl_name in (None, ''): fl_name = f'{_("Flag")} {fl}'
                     flag_menu.append( f_menu_item(1, fl_name, self.on_mark, args=(fl, item,), color=fl_color, icon='marker-symbolic') )
                 flag_menu.append( f_menu_item(1, _('Unflag Entry'), self.on_mark, args=('unflag', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Remove Flags from Entry") ) )
-                menu.append( f_menu_item(3, _('Flag...'), flag_menu, icon='marker-symbolic', tooltip=f"""{_("Flag is a user's marker/bookmark for a given article independent of ranking")}\n<i>{_("You can setup different flag colors in Preferences")}</i>""") )
+                menu.append( f_menu_item(3, _('Flag as...'), flag_menu, icon='marker-symbolic', tooltip=f"""{_("Flag is a user's marker/bookmark for a given article independent of ranking")}\n<i>{_("You can setup different flag colors in Preferences")}</i>""") )
                 
                 menu.append( f_menu_item(1, _('Edit Entry'), self.on_edit_entry, args=(item,), icon='edit-symbolic') )
                 menu.append( f_menu_item(1, _('Delete'), self.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
@@ -613,24 +626,13 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Save results to CSV'), self.export_results, args=('csv',), icon='x-office-spreadsheet-symbolic', tooltip=_('Save results from current tab') ))  
                 menu.append( f_menu_item(1, _('Export results to JSON'), self.export_results, args=('json_dict',), icon='document-export-symbolic', tooltip=_('Export results from current tab') ))  
 
-            if hasattr(tab, 'query_combo'):
-                menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                menu.append( f_menu_item(1, _('Clear Search History'), self.on_clear_history, icon='edit-clear-symbolic') )
-
-            if hasattr(tab, 'qtime_combo'):
-                menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                menu.append( f_menu_item(1, _('Save filters'), tab.save_filters, icon='view-column-symbolic', tooltip=_('Save current search filters as defaults for future') ) )
-
-
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Save layout'), tab.table.save_layout, icon='document-page-setup-symbolic', tooltip=_('Save column layout and sizing for current tab.\nIt will be used as default in the future') ) )
             
 
 
 
 
         elif isinstance(item, ResultRule):
-
+            
             menu = Gtk.Menu()
             menu.append( f_menu_item(1, _('Add Rule'), self.on_edit_rule, args=(None,), icon='list-add-symbolic') )
             if item['id'] is not None:
@@ -643,11 +645,7 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['string'], 'filters': {'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='office-calendar-symbolic'))  
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
-            menu.append( f_menu_item(1, _('Clear Search History'), self.on_clear_history, icon='edit-clear-symbolic') )
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
             menu.append( f_menu_item(1, _('Show Learned Rules'), self.show_learned_rules, icon='zoom-in-symbolic', tooltip=_('Display rules learned from User\'s habits along with weights') ) )
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Save layout'), tab.table.save_layout, icon='view-column-symbolic', tooltip=_('Save column layout and sizing for current tab.\nIt will be used as default in the future') ) )
 
 
 
@@ -663,10 +661,6 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 
             menu.append( f_menu_item(1, _('Save results to CSV'), self.export_results, args=('csv',), icon='x-office-spreadsheet-symbolic', tooltip=_('Save results from current tab') ))  
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Clear Search History'), self.on_clear_history, icon='edit-clear-symbolic') )
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Save layout'), tab.table.save_layout, icon='view-column-symbolic', tooltip=_('Save column layout and sizing for current tab.\nIt will be used as default in the future') ) )
 
 
 
@@ -679,12 +673,6 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )  
 
             menu.append( f_menu_item(1, _('Save results to CSV'), self.export_results, args=('csv',), icon='x-office-spreadsheet-symbolic', tooltip=_('Save results from current tab') ))  
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Clear Search History'), self.on_clear_history, icon='edit-clear-symbolic') )
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Save layout'), tab.table.save_layout, icon='view-column-symbolic', tooltip=_('Save column layout and sizing for current tab.\nIt will be used as default in the future') ) )
-            menu.append( f_menu_item(1, _('Save filters'), tab.save_filters, icon='gtk-find-and-replace', tooltip=_('Save current search filters as defaults for future') ) )
-
 
 
 
@@ -701,8 +689,6 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Time Series search for this Flag'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'flag':item['id']}}, icon='office-calendar-symbolic'))  
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
-            menu.append( f_menu_item(1, _('Clear Search History'), self.on_clear_history, icon='edit-clear-symbolic') )
-            menu.append( f_menu_item(1, _('Save layout'), tab.table.save_layout, icon='view-column-symbolic', tooltip=_('Save column layout and sizing for current tab.\nIt will be used as default in the future') ) )
 
 
 
@@ -761,16 +747,30 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Remove Category'), self.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
                     
 
-        if (coalesce(item['deleted'],0) > 0 or (self.curr_place == FX_PLACE_TRASH_BIN and self.curr_upper.type == FX_TAB_PLACES)) and not fdx.busy:
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        if ( (isinstance(item, SQLContainer) and coalesce(item['deleted'],0) > 0 ) or \
+            (self.curr_place == FX_PLACE_TRASH_BIN and self.curr_upper.type == FX_TAB_PLACES)) and not fdx.busy:
+            
+            if menu is None: menu = Gtk.Menu()
+            else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
             menu.append( f_menu_item(1, _('Empty Trash'), self.on_empty_trash, icon='edit-delete-symbolic') )
 
 
+        if hasattr(tab, 'search_filter_box'):
+            if menu is None: menu = Gtk.Menu()
+            else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
+            menu.append( f_menu_item(1, _('Save filters'), tab.save_filters, icon='gtk-find-and-replace', tooltip=_('Save current search filters as defaults for future') ) )
+        if tab.type not in (FX_TAB_FEEDS,):
+            if menu is None: menu = Gtk.Menu()
+            else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
+            menu.append( f_menu_item(1, _('Save layout'), tab.table.save_layout, icon='view-column-symbolic', tooltip=_('Save column layout and sizing for current tab.\nIt will be used as default in the future') ) )
 
 
         if menu is not None:
             menu.show_all()
             menu.popup(None, None, None, None, event.button, event.time)
+
+
+
 
 
 
@@ -844,33 +844,35 @@ It will also take some time to perform""") ))
         do_search = kargs.get('do_search', False)
         top_entry = kargs.get('top_entry')
 
-        tab = FeedexTab(self, type=tp, title=kargs.get('title',''), top_entry=top_entry)
-        if filters is not None: tab.on_restore(filters=filters)
-        if query is not None and type(query) is str and hasattr(tab, 'query_entry'): tab.query_entry.set_text(query)
-        
-        # Keep track of which tab contains rules
+        # Keep track of which tab contains rules and just show the tab if exists
         if tp == FX_TAB_RULES and self.rules_tab != -1:
             self._show_upn_page(self.rules_tab)
             return 0
-        elif tp == FX_TAB_RULES and self.rules_tab == -1:
-            self.rules_tab = tab.uid
-            do_search = True
 
         # ... and Flags ...
         if tp == FX_TAB_FLAGS and self.flags_tab != -1:
             self._show_upn_page(self.flags_tab)
             return 0
-        elif tp == FX_TAB_FLAGS and self.flags_tab == -1:
+
+
+        tab = FeedexTab(self, type=tp, title=kargs.get('title',''), top_entry=top_entry)
+        if filters is not None: tab.on_restore(filters=filters)
+        if query is not None and type(query) is str and hasattr(tab, 'query_entry'): tab.query_entry.set_text(query)
+        
+        self.upper_notebook.append_page(tab, tab.header_box)
+        self.upper_notebook.set_tab_reorderable(tab, True)        
+        tab.header_box.show_all()
+
+        # Save rule and flag tab IDs
+        if tp == FX_TAB_RULES: 
+            self.rules_tab = tab.uid
+            do_search = True
+
+        if tp == FX_TAB_FLAGS:
             self.flags_tab = tab.uid
             do_search = True
 
-
-        self.upper_notebook.append_page(tab, tab.header_box)
-        self.upper_notebook.set_tab_reorderable(tab, True) 
-        
-        tab.header_box.show_all()
-
-        # Lunching search directly upon creation
+        # Launching search directly upon creation
         if do_search: 
             if type(query) is int: tab.query(query, filters)
             else: tab.on_query()
@@ -882,7 +884,7 @@ It will also take some time to perform""") ))
 
         if tp in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_TERM_NET, FX_TAB_TIME_SERIES, FX_TAB_NOTES): tab.query_entry.grab_focus()
 
-        self.upper_notebook.set_menu_label_text( tab, tab.header.get_text() )
+
 
 
 

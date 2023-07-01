@@ -766,6 +766,8 @@ class FeedexQuery(FeedexQueryInterface):
             feeds = fdx.feeds_cache.copy()
             feeds.sort(key=lambda x: coalesce(x[feed.get_index('display_order')],0), reverse=False)
 
+
+
         if group_by == 'category':
             parent_id_ix = self.result.get_index('parent_id')
             for f in feeds:

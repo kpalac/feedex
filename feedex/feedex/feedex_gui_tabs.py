@@ -17,7 +17,6 @@ class FeedexTab(Gtk.VBox):
     def __init__(self, parent, **kargs):
 
         # Maint. stuff
-        self.lock = threading.Lock()
         self.MW = parent
         self.config = self.MW.config
 
@@ -192,7 +191,6 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
             self.header_box.pack_end(close_button, False, False, 1)
 
 
-
         # Search bar
         if self.type not in (FX_TAB_PLACES, FX_TAB_RULES, FX_TAB_FLAGS,):
 
@@ -204,12 +202,14 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
 
             if self.type not in (FX_TAB_REL_TIME, FX_TAB_SIMILAR,):
                 (self.query_combo, self.query_entry) = f_combo_entry(self.history, connect=self.on_query, connect_button=self._clear_query_entry, tooltip_button=_('Clear search phrase'))
-            
+                self.query_entry.connect("populate-popup", self._on_query_entry_menu)
+
             self.search_button      = f_button(None,'edit-find-symbolic', connect=self.on_query)
             
             if self.type in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TIME_SERIES, FX_TAB_REL_TIME, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDS, FX_TAB_TRENDING):
 
                 self.search_filter_box = Gtk.HBox(homogeneous = False, spacing = 0)
+                self.search_filter_box.connect('button-press-event', self._on_button_press_filters)
 
                 self.restore_button     = f_button(None,'edit-redo-rtl-symbolic', connect=self.on_restore, tooltip=_("Restore filters to defaults")) 
 
@@ -327,9 +327,14 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
 
     def _on_button_press(self, widget, event):
         """ Click signal handler """
-        result = self.table.get_selection()
-        if event.button == 3 and result is not None: self.MW.action_menu(result, self, event)
-                
+        if event.button == 3:
+            result = self.table.get_selection()
+            self.MW.action_menu(result, self, event)
+
+    def _on_button_press_filters(self, widget, event):
+        if event.button == 3: self.MW.action_menu(None, self, event)
+    
+
     def _on_changed_selection(self, *args, **kargs):
         """ Selection change handler"""
         if isinstance(self.table.result, (ResultEntry, ResultContext,)): 
@@ -349,7 +354,11 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
     def _clear_query_entry(self, *args, **kargs): self.query_entry.set_text('')
     def _on_close(self, *args, **kargs): self.MW.remove_tab(self.uid, self.type)
 
-
+    def _on_query_entry_menu(self, widget, menu, *args, **kargs):
+        """ Basically adds "Clear History" option to menu """
+        menu.append( f_menu_item(0, 'SEPARATOR', None) ) 
+        menu.append( f_menu_item(1, _('Clear Search History'), self.MW.on_clear_history, icon='edit-clear-symbolic'))
+        menu.show_all()
 
 
     def save_filters(self, *args, **kargs):
@@ -825,7 +834,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         """ Updates local table from events from other widgets (e.g. delete, edit, new)"""
         if self.busy: return 0
         if action == FX_ACTION_EDIT: self.table.replace(item['id'], item)
-        elif action == FX_ACTION_ADD: self.table.append(item)
+        elif action == FX_ACTION_ADD and self.type not in (FX_TAB_SIMILAR, FX_TAB_TREE,): self.table.append(item)
         elif action == FX_ACTION_DELETE: self.table.delete(item['id'], item.get('deleted'))
 
 
@@ -1008,7 +1017,7 @@ class ResultGUINote(ResultGUIEntry):
         title = scast(self.vals['title'], str, '').replace('\n',' ').replace('\r',' ').replace('\t', ' ')
 
         self.gui_vals['entry'] = f"""---------------------------------------------------------------------------------
-{flag_str}<b>{title}</b>
+{flag_str}<b>{esc_mu(title)}</b>
 {esc_mu(desc)}"""
 
         if coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
@@ -1394,17 +1403,17 @@ class FeedexGUITable:
         self.lock.acquire()
         if not self.is_tree:
             if top: 
-                self.store.prepend( self.gen_store_item(ix, new_col=new_col) )
+                if self.store is not None: self.store.prepend( self.gen_store_item(ix, new_col=new_col) )
                 if self.filtered_store is not None: self.filtered_store.prepend( self.gen_store_item(ix, new_col=new_col) )
             else: 
-                self.store.append( self.gen_store_item(ix, new_col=new_col) )
+                if self.store is not None: self.store.append( self.gen_store_item(ix, new_col=new_col) )
                 if self.filtered_store is not None: self.filtered_store.append( self.gen_store_item(ix, new_col=new_col) )
         else:
             if top: 
-                self.store.prepend(None, self.gen_store_item(ix, new_col=new_col))
+                if self.store is not None: self.store.prepend(None, self.gen_store_item(ix, new_col=new_col))
                 if self.filtered_store is not None: self.filtered_store.prepend(None, self.gen_store_item(ix, new_col=new_col))
             else: 
-                self.store.append(None, self.gen_store_item(ix, new_col=new_col))
+                if self.store is not None: self.store.append(None, self.gen_store_item(ix, new_col=new_col))
                 if self.filtered_store is not None: self.filtered_store.append(None, self.gen_store_item(ix, new_col=new_col))
 
         self.lock.release()
@@ -1423,7 +1432,7 @@ class FeedexGUITable:
 
     def remove(self, id, **kargs):
         """ Wrapper for removing item with a certain field value """
-        self.store.foreach(self._for_each_remove, id)
+        if self.store is not None: self.store.foreach(self._for_each_remove, id)
         if self.filtered_store is not None: self.filtered_store.foreach(self._for_each_remove, id)
 
 
@@ -1482,7 +1491,7 @@ class FeedexGUITable:
 
     def replace(self, id, changes, **kargs):
         """ Wrapper for editting only one value in a result """
-        self.store.foreach(self._for_each_replace, id, changes)
+        if self.store is not None: self.store.foreach(self._for_each_replace, id, changes)
 
 
 
@@ -1526,7 +1535,7 @@ class FeedexGUITable:
             if self.is_tree: self.filtered_store = Gtk.TreeStore(*self.result.gui_types)
             else: self.filtered_store = Gtk.ListStore(*self.result.gui_types)
 
-            self.store.foreach(self._for_each_filter_by_feed, ids)
+            if self.store is not None: self.store.foreach(self._for_each_filter_by_feed, ids)
             
             self.curr_feed_filters = ids
             if commit: self.commit_filter_by_feed()
