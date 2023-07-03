@@ -37,11 +37,13 @@ FEEDEX_LOCALE_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','locales')
 
 gettext.install('feedex', FEEDEX_LOCALE_PATH)
 
-FEEDEX_DESC=_("Personal News and Notes organizer")
+FEEDEX_DESC=_("""Personal News and Notes organizer.""")
+FEEDEX_SUBDESC=_("""Take control of your bubble.""")
 
 FEEDEX_HELP_ABOUT=f"""
 <b>Feedex v. {FEEDEX_VERSION}</b>
 {FEEDEX_DESC}
+{FEEDEX_SUBDESC}
 
 {_("Release")}: {FEEDEX_RELEASE}
 

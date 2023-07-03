@@ -440,7 +440,8 @@ def f_depth_combo(**kargs):
 def f_sort_combo(**kargs):
     """ Sorting for tree grouping """
     store = (
-    ('+importance',_('Sort by Importance') ),
+    ('+importance',_('Rank by Importance') ),
+    ('trends',_('Rank by Trends') ),
     ('+pubdate',_('Sort by Date') ),
     ('-importance',_('"Debubble"') ),
     )

@@ -217,9 +217,9 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
                     self.time_series_combo = f_time_series_combo(ellipsize=False, tooltip=_('Select time series grouping') )
                 
                 elif self.type == FX_TAB_TREE:
-                    self.group_combo = f_group_combo(ellipsize=False, with_times=True, tooltip=_('Select grouping field\n<b>Note that grouping by similarity will be very time consuming for large date ranges</b>') )
+                    self.group_combo = f_group_combo(ellipsize=False, with_times=True, tooltip=_('Select grouping field\n<b>Grouping by Similarity will collapse similar entries into most important node</b>\n<i>Note that grouping by similarity will be very time consuming for large date ranges</i>') )
                     self.depth_combo = f_depth_combo(ellipsize=False, tooltip=_('Select how many top results to show for each grouping') )
-                    self.sort_combo = f_sort_combo(ellipsize=False, tooltip=_('Default sorting field for empty queries\nUse <b>Debubble</b> to show news with the least importance for each grouping') )                    
+                    self.sort_combo = f_sort_combo(ellipsize=False, tooltip=_('Default ranking/sorting\nUse <b>Importance</b> to rank by most interesting entries for you based on previously read articles\nUse <b>Trending</b> to rank by most talked about subjects (<i>time consming for large time ranges</i>)\nUse <b>Debubble</b> to show news with the least importance for each grouping') )                    
 
                 self.qtime_combo        = f_time_combo(connect=self.on_date_changed, ellipsize=False, tooltip=f"""{_('Filter by date')}\n<i>{_('Searching whole database can be time consuming for large datasets')}</i>""")
                 self.cat_combo          = f_feed_combo(connect=self._on_filters_changed, ellipsize=False, with_feeds=True, tooltip="Choose Feed or Category to search")
@@ -723,32 +723,23 @@ Escape: \ (only if before wildcards and field markers)""") )
         elif self.type == FX_TAB_TREE:
 
             group = filters.get('group','category')
+
+            if filters.get('fallback_sort') == 'trends': 
+                filters['fallback_sort'] = None
+                trends = True
+            else: trends = False
+
+            if group == 'category': self.final_status = f'{_("Summary by Category")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'feed': self.final_status = f'{_("Summary by Channel")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'flag': self.final_status = f'{_("Summary by Flag")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'similar': self.final_status = f'{_("Summary by Sim.")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'monthly': self.final_status = f'{_("Summary by Month")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'daily': self.final_status = f'{_("Summary by Day")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'hourly': self.final_status = f'{_("Summary by Hour")} <b>{esc_mu(qr, ell=50)}</b>'
+
             filters['rev'] = False
-
-
-            if qr == FX_PLACE_STARTUP:
-                
-                filters['rev'] = False
-                self.final_status = f'{_("Summary - latest")}'
-                err = QP.query('', {'last':True, 'sort':'importance', 'group':group}, allow_group=True)
-                if err == 0 and QP.result_no <= 5:
-                    err = QP.query('', {'last_hour':True, 'sort':'importance', 'group':group}, allow_group=True)
-                    if err == 0 and QP.result_no <= 5:
-                        err = QP.query('', {'today':True, 'sort':'importance', 'group':group}, allow_group=True)
-                        if err == 0 and QP.result_no <= 6:
-                            err = QP.query('', {'last_n':2, 'sort':'importance', 'group':group}, allow_group=True)
-            else:
-                if group == 'category': self.final_status = f'{_("Summary by Category")} <b>{esc_mu(qr, ell=50)}</b>'
-                elif group == 'feed': self.final_status = f'{_("Summary by Channel")} <b>{esc_mu(qr, ell=50)}</b>'
-                elif group == 'flag': self.final_status = f'{_("Summary by Flag")} <b>{esc_mu(qr, ell=50)}</b>'
-                elif group == 'similar': self.final_status = f'{_("Summary by Sim.")} <b>{esc_mu(qr, ell=50)}</b>'
-                elif group == 'monthly': self.final_status = f'{_("Summary by Month")} <b>{esc_mu(qr, ell=50)}</b>'
-                elif group == 'daily': self.final_status = f'{_("Summary by Day")} <b>{esc_mu(qr, ell=50)}</b>'
-                elif group == 'hourly': self.final_status = f'{_("Summary by Hour")} <b>{esc_mu(qr, ell=50)}</b>'
-
-                filters['rev'] = False
-                err = QP.query(qr, filters, allow_group=True)
-        
+            if not trends: err = QP.query(qr, filters, allow_group=True)
+            else: err = QP.get_trending(qr, filters,  allow_group=True)
 
 
         elif self.type == FX_TAB_RULES:

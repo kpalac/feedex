@@ -154,22 +154,8 @@ It will also take some time to perform""") ))
         self.add_menu.append( f_menu_item(1, _('Add Flag'), self.on_edit_flag, args=(None,), icon='marker-symbolic', tooltip=_('Add new Flag') ))  
 
         # Search Menu
-        self.search_menu = Gtk.Menu()
-        self.search_menu.append( f_menu_item(1, _('Summary'), self.add_tab, kargs={'type':FX_TAB_TREE, 'do_search':True}, icon='view-filter-symbolic', tooltip=_('Search entries grouping them in a tree summary') ))  
-        self.search_menu.append( f_menu_item(1, _('Search'), self.add_tab, kargs={'type':FX_TAB_SEARCH}, icon='edit-find-symbolic', tooltip=_('Search entries') ))  
-        self.search_menu.append( f_menu_item(1, _('Search (wide view)'), self.add_tab, kargs={'type':FX_TAB_NOTES}, icon='edit-find-symbolic', tooltip=_('Search entries in extended view') ))  
-
-        self.search_menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        self.search_menu.append( f_menu_item(1, _('Trending'), self.add_tab, kargs={'type':FX_TAB_TRENDING}, icon='gtk-network', tooltip=_('Show trending Articles') ))  
-        self.search_menu.append( f_menu_item(1, _('Trends'), self.add_tab, kargs={'type':FX_TAB_TRENDS}, icon='emblem-shared-symbolic', tooltip=_('Show most talked about terms for Articles') ))  
-
-        self.search_menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        self.search_menu.append( f_menu_item(1, _('Show Contexts for a Term'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS}, icon='view-list-symbolic', tooltip=_('Search for Term Contexts') ))  
-        self.search_menu.append( f_menu_item(1, _('Show Time Series for a Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES}, icon='office-calendar-symbolic', tooltip=_('Generate time series plot') ))  
-        self.search_menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        self.search_menu.append( f_menu_item(1, _('Search for Related Terms'), self.add_tab, kargs={'type':FX_TAB_TERM_NET}, icon='emblem-shared-symbolic', tooltip=_('Search for Related Terms from read/opened entries') ))  
+        self.search_menu = self.new_tab_menu()
         
-
         self.search_menu.show_all()
         self.add_menu.show_all()
 
@@ -333,18 +319,14 @@ It will also take some time to perform""") ))
         self.connect("destroy", self._on_close)
         self.connect("key-press-event", self._on_key_press)
 
+        # Launch startup tabs
         self.add_tab({'type':FX_TAB_PLACES, 'query':FX_PLACE_STARTUP, 'do_search':True})
 
-        startup_page = self.config.get('gui_startup_page',0)
-        if startup_page == 1: self.add_tab({'type':FX_TAB_TREE, 'query':FX_PLACE_STARTUP, 'filters':{'group': 'category'}, 'do_search':True})
-        elif startup_page == 2: self.add_tab({'type':FX_TAB_TREE, 'query':FX_PLACE_STARTUP, 'filters':{'group': 'feed'}, 'do_search':True})
-        elif startup_page == 3: self.add_tab({'type':FX_TAB_TREE, 'query':FX_PLACE_STARTUP, 'filters':{'group': 'flag'}, 'do_search':True})
-        elif startup_page == 4:
-            for i, tb in enumerate(self.gui_cache.get('tabs',[])):
-                if tb.get('type') in (FX_TAB_SIMILAR, FX_TAB_REL_TIME, FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_TERM_NET,): continue
-                self.add_tab({'type':tb.get('type',FX_TAB_SEARCH), 'query':tb.get('phrase',''), 'filters':tb.get('filters',{}), 'title':tb.get('title')})
+        for i, tb in enumerate(self.gui_cache.get('tabs',[])):
+            if tb.get('type') in (FX_TAB_SIMILAR, FX_TAB_REL_TIME, FX_TAB_RULES, FX_TAB_FLAGS,): continue
+            self.add_tab({'type':tb.get('type',FX_TAB_SEARCH), 'query':tb.get('phrase',''), 'filters':tb.get('filters',{}), 'title':tb.get('title')})
 
-            self.upper_notebook.set_current_page(0)
+        self.upper_notebook.set_current_page(0)
 
 
         self.set_default_size(self.gui_cache.get('win_width'), self.gui_cache.get('win_height'))
@@ -542,11 +524,36 @@ It will also take some time to perform""") ))
 
 
 
+    def new_tab_menu(self, *args, **kargs):
+        """ Construct a new tab menu """
+        menu = Gtk.Menu()
+        menu.append( f_menu_item(1, _('Summary'), self.add_tab, kargs={'type':FX_TAB_TREE}, icon='view-filter-symbolic', tooltip=_('Generate ranked Summary grouped by Category/Channel/Similarity or Dates') ))  
+        
+        menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        menu.append( f_menu_item(1, _('Search'), self.add_tab, kargs={'type':FX_TAB_SEARCH}, icon='edit-find-symbolic', tooltip=_('Search entries') ))  
+        menu.append( f_menu_item(1, _('Search (wide view)'), self.add_tab, kargs={'type':FX_TAB_NOTES}, icon='edit-find-symbolic', tooltip=_('Search entries in extended view') ))  
+
+        menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        menu.append( f_menu_item(1, _('Trending'), self.add_tab, kargs={'type':FX_TAB_TRENDING}, icon='gtk-network', tooltip=_('Show trending Articles') ))  
+        menu.append( f_menu_item(1, _('Trends'), self.add_tab, kargs={'type':FX_TAB_TRENDS}, icon='emblem-shared-symbolic', tooltip=_('Show most talked about terms for Articles') ))  
+
+        menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        menu.append( f_menu_item(1, _('Show Contexts for a Term'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS}, icon='view-list-symbolic', tooltip=_('Search for Term Contexts') ))  
+        menu.append( f_menu_item(1, _('Show Time Series for a Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES}, icon='office-calendar-symbolic', tooltip=_('Generate time series plot') ))  
+        menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        menu.append( f_menu_item(1, _('Search for Related Terms'), self.add_tab, kargs={'type':FX_TAB_TERM_NET}, icon='emblem-shared-symbolic', tooltip=_('Search for Related Terms from read/opened entries') ))  
+
+        return menu
+    
+
 
     def tab_menu(self, widget, event, *args):
         """ Menu to quick choose tabs """
         if event.button == 3:
             menu = Gtk.Menu()
+            new_tab_menu = self.new_tab_menu()
+            menu.append( f_menu_item(3, _('New Tab...'), new_tab_menu, icon='list-add-symbolic') )
+            menu.append( f_menu_item(0, 'SEPARATOR', None) )
             for i in range(self.upper_notebook.get_n_pages()):
                 tb = self.upper_notebook.get_nth_page(i)
                 if tb is None: continue
@@ -2141,6 +2148,8 @@ Click to open in image viewer""")
             {FEEDEX_AUTHOR}
 
             {FEEDEX_DESC}
+            <i>{FEEDEX_SUBDESC}</i>
+
                                                                                 """
         self.preview_label.set_markup(startup_text)
 

@@ -227,6 +227,8 @@ class AboutDialog(Gtk.Dialog):
 
         main_label.set_markup(f"<b>FEEDEX v. {FEEDEX_VERSION}</b>")
         secondary_label.set_markup(f"""{FEEDEX_DESC}
+<i>{FEEDEX_SUBDESC}</i>
+
 {_('Release')}: {FEEDEX_RELEASE}""")
         author_label.set_markup(f"""<i>{_('Author')}: {FEEDEX_AUTHOR}
 {FEEDEX_CONTACT}</i>""")
@@ -362,9 +364,6 @@ If no grouping is selected, it will simply show top results"""))
         lang_label = f_label(_('Language:'))
         self.lang_combo = f_loc_combo()
 
-        startup_page_label = f_label(_('Startup Page(s):'))
-        self.startup_page_combo = f_startup_page_combo(tooltip=_('This option will open (or not) a summary page on startup'))
-
         self.ignore_images_button = Gtk.CheckButton.new_with_label(_('Ignore Images?'))
         self.ignore_images_button.set_tooltip_markup(_('Should images and icons be ignored alltogether? Ueful for better performance'))
 
@@ -488,8 +487,6 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         interface_grid.attach(self.key_new_entry_entry, 10, 6, 1,1)
         interface_grid.attach(key_new_rule_label, 7, 7, 3, 1)
         interface_grid.attach(self.key_new_rule_entry, 10, 7, 1,1)        
-        interface_grid.attach(startup_page_label, 1,9, 3,1)
-        interface_grid.attach(self.startup_page_combo, 4,9, 5,1)
 
         fetching_grid = create_grid()
         fetching_grid.attach(self.desktop_notify_button, 1,1, 4,1)
@@ -714,7 +711,6 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         f_set_combo(self.layout_combo, self.config.get('gui_layout',0))        
         f_set_combo(self.orientation_combo, self.config.get('gui_orientation',0))        
         f_set_combo(self.lang_combo, self.config.get('lang'))
-        f_set_combo(self.startup_page_combo, self.config.get('gui_startup_page',0))
         
         if self.config.get('ignore_images',False): self.ignore_images_button.set_active(True)
         else: self.ignore_images_button.set_active(False)
@@ -818,7 +814,6 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         self.result['gui_layout'] = f_get_combo(self.layout_combo)
         self.result['gui_orientation'] = f_get_combo(self.orientation_combo)
         self.result['lang'] = f_get_combo(self.lang_combo)
-        self.result['gui_startup_page'] = f_get_combo(self.startup_page_combo)
 
         self.result['browser'] = nullif(self.browser_entry.get_text(),'')
         self.result['image_viewer'] = nullif(self.external_iv_entry.get_text(),'')
