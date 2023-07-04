@@ -319,7 +319,7 @@ class FeedexLP(SmallSem):
                 if qtype == 1:
                     self.set_model(r[7])
                     phrase = self.DB.Q.parse_query(string, str_match_stem=True, sql=False)
-                    string = phrase['str_match_stem']
+                    string = phrase['fts']
 
                 elif qtype == 0:
                     if r[6] == 1: case_ins = True
