@@ -206,7 +206,7 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
 
             self.search_button      = f_button(None,'edit-find-symbolic', connect=self.on_query)
             
-            if self.type in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TIME_SERIES, FX_TAB_REL_TIME, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDS, FX_TAB_TRENDING):
+            if self.type in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TIME_SERIES, FX_TAB_REL_TIME, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDS, FX_TAB_TRENDING, FX_TAB_TERM_NET,):
 
                 self.search_filter_box = Gtk.HBox(homogeneous = False, spacing = 0)
                 self.search_filter_box.connect('button-press-event', self._on_button_press_filters)

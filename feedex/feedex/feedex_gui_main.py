@@ -539,9 +539,9 @@ It will also take some time to perform""") ))
 
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Show Contexts for a Term'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS}, icon='view-list-symbolic', tooltip=_('Search for Term Contexts') ))  
-        menu.append( f_menu_item(1, _('Show Time Series for a Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES}, icon='office-calendar-symbolic', tooltip=_('Generate time series plot') ))  
+        menu.append( f_menu_item(1, _('Show Time Series for a Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'...-...':True, 'logic':'phrase', 'group':'monthly'}}, icon='office-calendar-symbolic', tooltip=_('Generate time series plot') ))  
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Search for Related Terms'), self.add_tab, kargs={'type':FX_TAB_TERM_NET}, icon='emblem-shared-symbolic', tooltip=_('Search for Related Terms from read/opened entries') ))  
+        menu.append( f_menu_item(1, _('Search for Related Terms'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'filters':{'...-...':True, 'logic':'phrase'}}, icon='emblem-shared-symbolic', tooltip=_('Search for Related Terms from read/opened entries') ))  
 
         return menu
     
@@ -648,8 +648,8 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Search for this Rule'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'query':item['string'], 'filters':{'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Show this Term\'s Contexts'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS, 'query':item['string'], 'filters':{'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='view-list-symbolic'))  
-                menu.append( f_menu_item(1, _('Show Terms related to this Term'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'query':item['string']}, icon='emblem-shared-symbolic'))  
-                menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['string'], 'filters': {'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='office-calendar-symbolic'))  
+                menu.append( f_menu_item(1, _('Show Terms related to this Term'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'query':item['string'], 'filters':{'...-...':True, 'logic':'phrase'} }, icon='emblem-shared-symbolic'))  
+                menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['string'], 'filters': {'qtype':item['type'], 'case_ins':item['case_insensitive'], '...-...':True, 'group':'monthly'}}, icon='office-calendar-symbolic'))  
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             menu.append( f_menu_item(1, _('Show Learned Rules'), self.show_learned_rules, icon='zoom-in-symbolic', tooltip=_('Display rules learned from User\'s habits along with weights') ) )
@@ -663,8 +663,8 @@ It will also take some time to perform""") ))
             if item['term'] not in (None, ''):
                 menu.append( f_menu_item(1, _('Search for this Term'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'query':item['term']}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Show this Term\'s Contexts'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS, 'query':item['term']}, icon='view-list-symbolic'))  
-                menu.append( f_menu_item(1, _('Show Terms related to this Term'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'query':item['term']}, icon='emblem-shared-symbolic'))  
-                menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['term']}, icon='office-calendar-symbolic'))  
+                menu.append( f_menu_item(1, _('Show Terms related to this Term'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'query':item['term'], 'filters':{'...-...':True, 'logic':'phrase'}}, icon='emblem-shared-symbolic'))  
+                menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['term'], 'filters':{'...-...':True, 'logic':'phrase', 'group':'monthly'}}, icon='office-calendar-symbolic'))  
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 
             menu.append( f_menu_item(1, _('Save results to CSV'), self.export_results, args=('csv',), icon='x-office-spreadsheet-symbolic', tooltip=_('Save results from current tab') ))  
