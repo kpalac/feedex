@@ -54,134 +54,286 @@ class FeedexTab(Gtk.VBox):
         # GUI init stuff
         Gtk.VBox.__init__(self, homogeneous = False, spacing = 0)
         
-        # Tab label
-        self.header_box = Gtk.HBox(homogeneous = False, spacing = 0)
+        self.header = f_label('', markup=True, wrap=False)        
+        
+        self.prev_footer = '' # Preview footer
+        self.top_entry_prev = False # Is top entry in preview window?
 
-        self.header = f_label('', markup=True, wrap=False)
-        self.spinner = Gtk.Spinner()
+        self.save_to_cache = True # Should this tab type be savet to cache?
 
-        self.header_box.pack_start(self.spinner, False, True, 1)
-        self.header_box.pack_start(self.header, False, False, 1)
-
-
-
+        self.mutable = True # Is this tab mutable?
+        self.prependable = True # Can new item be prepended to the top?
 
 
         # Setup main result table
         if self.type == FX_TAB_SEARCH:
+            self.header_icon_name = 'edit-find-symbolic'
             self.table = FeedexGUITable(self, ResultGUIEntry(main_win=self.MW))
             self.table.view.set_tooltip_markup(_("""Double-click to open in browser. 
 Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search by Title"""))                
+Hit <b>Ctrl-F</b> for interactive search by Title
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))                
             self.header.set_markup(_('Search') )
 
 
 
         elif self.type == FX_TAB_PLACES:
+            self.header_icon_name = 'folder-open-symbolic'
             self.table = FeedexGUITable(self, ResultGUIEntry(main_win=self.MW))
             self.table.view.set_tooltip_markup(_("""Double-click to open in browser. 
 Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search by Title"""))
+Hit <b>Ctrl-F</b> for interactive search by Title
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('News') )
+            self.save_to_cache = False
 
 
 
         elif self.type == FX_TAB_CONTEXTS:
+            self.header_icon_name = 'view-list-symbolic'
             self.table = FeedexGUITable(self, ResultGUIContext(main_win=self.MW))
             self.table.view.set_tooltip_markup(_("""Search phrase in context is shown here.
 Double-click to open the entry containing a context.
 Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search by Title"""))
+Hit <b>Ctrl-F</b> for interactive search by Title
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('Search Contexts') )
+            self.prependable = False
+
 
         elif self.type == FX_TAB_SIMILAR:
+            self.header_icon_name = 'emblem-shared-symbolic'
             self.table = FeedexGUITable(self, ResultGUIEntry(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""Search items similar to top entry.
+            self.table.view.set_tooltip_markup(_("""Search items similar to Entry.
 Double-click to open the entry.
 Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search by Title"""))
+Hit <b>Ctrl-F</b> for interactive search by Title
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('Find Similar') )
+            self.save_to_cache = False
+            self.prependable = False
 
 
 
         elif self.type == FX_TAB_TERM_NET:
+            self.header_icon_name = 'emblem-shared-symbolic'
             self.table = FeedexGUITable(self, ResultGUITerm(main_win=self.MW))
             self.table.view.set_tooltip_markup(_("""These are terms related to the one queried for. 
 Right-click for more options            
-Hit <b>Ctrl-F</b> for interactive search""") )
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
             self.header.set_markup(_('Term Net') )
+            self.prependable = False
+            self.mutable = False
 
 
         elif self.type == FX_TAB_TIME_SERIES:
+            self.header_icon_name = 'histogram-symbolic'
             self.table = FeedexGUITable(self, ResultGUITimeSeries(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""Time series for term(s). Right-click for more options""") )
+            self.table.view.set_tooltip_markup(_("""Time series for Term(s). 
+Right-click for more options
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
             self.header.set_markup(_('Time Series') )
+            self.prependable = False
+            self.mutable = False
 
 
         elif self.type == FX_TAB_RULES:
-            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""These are manually added rules used for ranking and flagging. 
+            self.header_icon_name = 'view-list-compact-symbolic'
+            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True)
+            self.table.view.set_tooltip_markup(_("""These are manually added rules used for ranking and flagging.
+Each time articles are fetched or notes added, they are ranked according to these rules and flagged accordingly.
+Additionally, if learning is enabled, new items are also checked against learned rules and ranked accordingly.
+Both those types of rules contribute to Item's importance and flag.                                                  
 Double-click to edit. 
 Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search"""))
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('Rules') )
+            self.save_to_cache = False
 
 
         elif self.type == FX_TAB_FLAGS:
-            self.table = FeedexGUITable(self, ResultGUIFlag(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""Flags used in rules and for manual marking of Entries
-Right-click for more options"""))
+            self.header_icon_name = 'marker-symbolic'
+            self.table = FeedexGUITable(self, ResultGUIFlag(main_win=self.MW), grid=True)
+            self.table.view.set_tooltip_markup(_("""Flags used in rules and for manual marking of Entries.
+Their names, descriptions and colors are completely arbitrary and up to user.
+Right-click for more options
+Hit <b>Ctrl-F</b> for interactive search by Name
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('Flags') )
+            self.save_to_cache = False
+
+
+        elif self.type == FX_TAB_PLUGINS:
+            self.header_icon_name = 'extension-symbolic'
+            self.table = FeedexGUITable(self, ResultGUIPlugin(main_win=self.MW), grid=True)
+            self.table.view.set_tooltip_markup(_("""Plugins available in context menus allowing user to run custom shell commands and scripts on items
+Right-click for more options
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
+            self.header.set_markup(_('Plugins') )
+            self.save_to_cache = False
 
 
         elif self.type == FX_TAB_REL_TIME:
+            self.header_icon_name = 'histogram-symbolic'
             self.table = FeedexGUITable(self, ResultGUITimeSeries(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""Time distribution for similar documents. 
+            self.table.view.set_tooltip_markup(_("""Time distribution for similar documents.
+It shows how subjects prominent in a Document were relevant in a time period. 
 Right-click for more options            
-Hit <b>Ctrl-F</b> for interactive search""") )
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
             self.header.set_markup(_('Entry Relevance in Time') )
+            self.save_to_cache = False
+            self.prependable = False
+            self.mutable = False
+            self.top_entry_prev = True
 
 
         elif self.type == FX_TAB_TREE:
+            self.header_icon_name = 'view-filter-symbolic'
             self.table = FeedexGUITable(self, ResultGUITree(main_win=self.MW), tree=True)
             self.table.view.set_tooltip_markup(_("""Double-click to open in browser. 
 Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search by Title"""))
+Hit <b>Ctrl-F</b> for interactive search by Title
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('Summary') )
+            self.prependable = False
 
 
         elif self.type == FX_TAB_NOTES:
+            self.header_icon_name = 'format-unordered-list-symbolic'
             self.table = FeedexGUITable(self, ResultGUINote(main_win=self.MW), notes=True)
             self.table.view.set_tooltip_markup(_("""Double-click to edit. 
 Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search by Title"""))
-            self.header.set_markup(_('* Search'))
+Hit <b>Ctrl-F</b> for interactive search by Title
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
+            self.header.set_markup(_('Search'))
 
 
         elif self.type == FX_TAB_TRENDS:
+            self.header_icon_name = 'comment-symbolic'
             self.table = FeedexGUITable(self, ResultGUITerm(main_win=self.MW))
             self.table.view.set_tooltip_markup(_("""Strongest trending terms from filtered documents
-Right-click for more options"""))
+Right-click for more options
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('Trends'))
+            self.prependable = False
+            self.mutable = False
 
 
         elif self.type == FX_TAB_TRENDING:
+            self.header_icon_name = 'globe-symbolic'
             self.table = FeedexGUITable(self, ResultGUIEntry(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""Double-click to open in browser. 
+            self.table.view.set_tooltip_markup(_("""These are the 'most talked about' terms in filtered documents
+Double-click to open in browser. 
 Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search by Title"""))
+Hit <b>Ctrl-F</b> for interactive search by Title
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('Trending'))
 
 
+        elif self.type == FX_TAB_CATALOG:
+            self.header_icon_name = 'rss-symbolic'
+            self.table = FeedexGUITable(self, ResultGUICatItem(main_win=self.MW), tree=True)
+            self.table.view.set_tooltip_markup(_("""Mark Channels/Categories to Import.
+If Channel's parent category is selected, it will be imported as well (if a category of the same name does not exist)
+<i> Sorry about this catalog being in English only :( </i> 
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
+            self.header.set_markup(_('Find Feeds...'))
+            self.save_to_cache = False
+            self.prependable = False
+            self.mutable = False
+
+
+        elif self.type == FX_TAB_KEYWORDS:
+            self.header_icon_name = 'system-run-symbolic'
+            self.table = FeedexGUITable(self, ResultGUITerm(main_win=self.MW))
+            self.table.result.table = 'keywords'
+            self.table.view.set_tooltip_markup(_("""Keywords for a Document.
+Those are extracted using heuristic learning algo and used to create rules for ranking incomming items.
+Right-click for more options
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
+            self.header.set_markup(_('Keywords for...'))
+            self.save_to_cache = False
+            self.prependable = False
+            self.mutable = False
+            self.top_entry_prev = True
+
+
+        elif self.type == FX_TAB_RANK:
+            self.header_icon_name = 'applications-engineering-symbolic'
+            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True)
+            self.table.result.table = 'rules_rank'
+            self.table.view.set_tooltip_markup(_("""Ranking for a Document using Rules learned after <b>adding Entries</b> and <b>reading Articles</b>
+<i>Ranking summary can be found at Document's footer in preview window</i>
+Right-click for more options
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
+            self.header.set_markup(_('Ranking for...'))
+            self.save_to_cache = False
+            self.prependable = False
+            self.mutable = False
+            self.top_entry_prev = True
+
+
+        elif self.type == FX_TAB_LEARNED:
+            self.header_icon_name = 'applications-engineering-symbolic'
+            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True)
+            self.table.result.table = 'rules_learned'
+            self.table.view.set_tooltip_markup(_("""List of Rules learned after <b>adding Entries</b> and <b>reading Articles</b>
+<b>Name</b> - Displayed name, <i>not matched</i>, purely informational
+<b>Match string</b> - String matched against tokenized Entry with prefixes
+<b>Weight</b> - Weight added to Entry when the rule is matched (rule weights are offset by Entry weight to avoid overvaluing very long articles
+<b>Context ID</b> - ID of the Entry the rule was extracted from
+Right-click for more options
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
+            self.header.set_markup(_('Learned Rules'))
+            self.save_to_cache = False
+            self.mutable = False
+            self.prependable = False
 
 
 
 
-
+        # Value for scrollbar state of preview window
+        self.prev_vadj_val = 0
 
         # Insert custom title
         if self.title not in (None,''):
             self.header.set_markup(self.title)
+
+        # Tab header
+        self.header_box = Gtk.HBox(homogeneous = False, spacing = 0)
+
+        self.spinner = Gtk.Spinner()
+        self.header_icon = Gtk.Image.new_from_icon_name(self.header_icon_name, Gtk.IconSize.BUTTON)
+
+        self.header_box.pack_start(self.header_icon, False, True, 5)
+        self.header_box.pack_start(self.spinner, False, True, 1)
+        self.header_box.pack_start(self.header, False, False, 1)
 
 
         # Close button
@@ -189,121 +341,135 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
             close_button = f_button(None,'window-close-symbolic', connect=self._on_close, size=Gtk.IconSize.MENU)
             close_button.set_relief(Gtk.ReliefStyle.NONE)
             self.header_box.pack_end(close_button, False, False, 1)
+            self.header_box.set_tooltip_markup(_("""Right-click on tab headers to quickly switch tabs
+Right-click on columns or search filters for layout and filters options
+Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
 
-        # Search bar
-        if self.type not in (FX_TAB_PLACES, FX_TAB_RULES, FX_TAB_FLAGS,):
 
-            self.search_filters = {}
-            
+        self.search_filters = {}
+
+
+        if FEEDEX_FILTERS_PER_TABS[self.type] != {}:
+            self.search_box = Gtk.HBox(homogeneous = False, spacing = 0)
             self.search_entry_box = Gtk.HBox(homogeneous = False, spacing = 0)
-            self.history = Gtk.ListStore(str)
-            self.reload_history()
 
-            if self.type not in (FX_TAB_REL_TIME, FX_TAB_SIMILAR,):
+
+
+            if FEEDEX_FILTERS_PER_TABS[self.type].get('search') in ('combo','catalog_combo',):
+            
+                self.history = Gtk.ListStore(str)
+                self.reload_history()
+            
                 (self.query_combo, self.query_entry) = f_combo_entry(self.history, connect=self.on_query, connect_button=self._clear_query_entry, tooltip_button=_('Clear search phrase'))
                 self.query_entry.connect("populate-popup", self._on_query_entry_menu)
+                self.query_combo.connect('button-press-event', self._on_button_press_header)
 
-            self.search_button      = f_button(None,'edit-find-symbolic', connect=self.on_query)
-            
-            if self.type in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_SIMILAR, FX_TAB_TIME_SERIES, FX_TAB_REL_TIME, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDS, FX_TAB_TRENDING, FX_TAB_TERM_NET,):
-
-                self.search_filter_box = Gtk.HBox(homogeneous = False, spacing = 0)
-                self.search_filter_box.connect('button-press-event', self._on_button_press_filters)
-
-                self.restore_button     = f_button(None,'edit-redo-rtl-symbolic', connect=self.on_restore, tooltip=_("Restore filters to defaults")) 
-
-                if self.type in (FX_TAB_TIME_SERIES, FX_TAB_REL_TIME):
-                    self.time_series_combo = f_time_series_combo(ellipsize=False, tooltip=_('Select time series grouping') )
+                self.search_button      = f_button(None,'edit-find-symbolic', connect=self.on_query)
+                self.search_button.connect('button-press-event', self._on_button_press_header)
                 
-                elif self.type == FX_TAB_TREE:
-                    self.group_combo = f_group_combo(ellipsize=False, with_times=True, tooltip=_('Select grouping field\n<b>Grouping by Similarity will collapse similar entries into most important node</b>\n<i>Note that grouping by similarity will be very time consuming for large date ranges</i>') )
-                    self.depth_combo = f_depth_combo(ellipsize=False, tooltip=_('Select how many top results to show for each grouping') )
-                    self.sort_combo = f_sort_combo(ellipsize=False, tooltip=_('Default ranking/sorting\nUse <b>Importance</b> to rank by most interesting entries for you based on previously read articles\nUse <b>Trending</b> to rank by most talked about subjects (<i>time consming for large time ranges</i>)\nUse <b>Debubble</b> to show news with the least importance for each grouping') )                    
+                if FEEDEX_FILTERS_PER_TABS[self.type].get('search') == 'catalog_combo':
+                    self.cat_import_button = f_button(_('Subscribe to Selected'), 'rss-symbolic', connect=self.MW.import_catalog, args=(self.table.result,), tooltip=_('Import selected Channels for subscription')  )
 
-                self.qtime_combo        = f_time_combo(connect=self.on_date_changed, ellipsize=False, tooltip=f"""{_('Filter by date')}\n<i>{_('Searching whole database can be time consuming for large datasets')}</i>""")
-                self.cat_combo          = f_feed_combo(connect=self._on_filters_changed, ellipsize=False, with_feeds=True, tooltip="Choose Feed or Category to search")
 
-                self.read_combo         = f_read_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Filter for Read/Unread news. Manually added entries are marked as read by default') )
-                self.flag_combo         = f_flag_combo(connect=self._on_filters_changed, ellipsize=False, filters=True, tooltip=_('Filter by Flag or lack thereof') )
+            elif FEEDEX_FILTERS_PER_TABS[self.type].get('search') == 'button':
 
-                self.notes_combo        = f_note_combo(search=True, ellipsize=False, tooltip=_("""Chose which item type to filter (Notes, News Items or both)"""))
-                self.qhandler_combo     = f_handler_combo(connect=self._on_filters_changed, ellipsize=False, local=True, all=True, tooltip=_('Which handler protocols should be taken into account?') )
+                self.search_button      = f_button(None,'edit-find-symbolic', connect=self.on_query)
+                self.search_button.connect('button-press-event', self._on_button_press_header)
 
-                if self.type != FX_TAB_REL_TIME:
 
-                    self.qtype_combo        = f_query_type_combo(connect=self._on_filters_changed, ellipsize=False, rule=False)
-                    self.qlogic_combo       = f_query_logic_combo(connect=self._on_filters_changed, ellipsize=False)
-                    self.qlang_combo        = f_lang_combo(connect=self._on_filters_changed, ellipsize=False, with_all=True)
-                    self.qfield_combo       = f_field_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Search in All or a specific field'), all_label=_('-- No Field --') )
 
-                    self.case_combo         = f_dual_combo( (('___dummy',_("Detect case")),('case_sens', _("Case sensitive")),('case_ins',_("Case insensitive"))), ellipsize=False, tooltip=_('Set query case sensitivity'), connect=self._on_filters_changed)
+            if len(FEEDEX_FILTERS_PER_TABS[self.type]['filters']) > 0:
+            
+                self.restore_button     = f_button(None,'edit-redo-rtl-symbolic', connect=self.on_restore, tooltip=_("Restore filters to defaults")) 
+                self.restore_button.connect('button-press-event', self._on_button_press_header)
+                self.search_filter_box = Gtk.HBox(homogeneous = False, spacing = 0)
+                self.search_filter_box.connect('button-press-event', self._on_button_press_header)
 
-                if self.type in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_NOTES):
-                    self.page_len_combo     = f_page_len_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_("Choose page length for query"), default=self.config.get('page_length',3000))
-                    self.page_no_label      = f_label('Page: <b>1</b>', markup=True, wrap=False, char_wrap=False)
-                    self.page_prev_button   = f_button(None, 'previous', connect=self._on_page_prev)
-                    self.page_next_button   = f_button(None, 'next', connect=self._on_page_next)
+                for f in FEEDEX_FILTERS_PER_TABS[self.type]['filters']:
+                    curr_widget = None
+                    if f == 'time_series': 
+                        curr_widget = self.time_series_combo = f_time_series_combo(ellipsize=False, tooltip=_('Select time series grouping') )
+                    elif f == 'group': 
+                        curr_widget = self.group_combo = f_group_combo(ellipsize=False, with_times=True, tooltip=_('Select grouping field\n<b>Grouping by Similarity will collapse similar entries into most important node</b>\n<i>Note that grouping by similarity will be very time consuming for large date ranges</i>') )
+                    elif f == 'depth':
+                        curr_widget = self.depth_combo = f_depth_combo(ellipsize=False, tooltip=_('Select how many top results to show for each grouping') )
+                    elif f == 'sort':
+                        curr_widget = self.sort_combo = f_sort_combo(ellipsize=False, tooltip=_('Default ranking/sorting\nUse <b>Importance</b> to rank by most interesting entries for you based on previously read articles\nUse <b>Trending</b> to rank by most talked about subjects (<i>time consming for large time ranges</i>)\nUse <b>Debubble</b> to show news with the least importance for each grouping') )
+                    elif f == 'time':
+                        curr_widget = self.qtime_combo = f_time_combo(connect=self.on_date_changed, ellipsize=False, tooltip=f"""{_('Filter by date')}\n<i>{_('Searching whole database can be time consuming for large datasets')}</i>""")
+                    elif f == 'cat':
+                        curr_widget = self.cat_combo = f_feed_combo(connect=self._on_filters_changed, ellipsize=False, with_feeds=True, tooltip="Choose Feed or Category to search")
+                    elif f == 'read':
+                        curr_widget = self.read_combo = f_read_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Filter for Read/Unread news. Manually added entries are marked as read by default') )
+                    elif f == 'flag':
+                        curr_widget = self.flag_combo = f_flag_combo(connect=self._on_filters_changed, ellipsize=False, filters=True, tooltip=_('Filter by Flag or lack thereof') )
+                    elif f == 'notes':
+                        curr_widget = self.notes_combo = f_note_combo(search=True, ellipsize=False, tooltip=_("""Chose which item type to filter (Notes, News Items or both)"""))
+                    elif f == 'handler':
+                        curr_widget = self.qhandler_combo = f_handler_combo(connect=self._on_filters_changed, ellipsize=False, local=True, all=True, tooltip=_('Which handler protocols should be taken into account?') )
+                    elif f == 'type':
+                        curr_widget = self.qtype_combo = f_query_type_combo(connect=self._on_filters_changed, ellipsize=False, rule=False)
+                    elif f == 'logic':
+                        curr_widget = self.qlogic_combo = f_query_logic_combo(connect=self._on_filters_changed, ellipsize=False)
+                    elif f == 'lang':
+                        curr_widget = self.qlang_combo = f_lang_combo(connect=self._on_filters_changed, ellipsize=False, with_all=True)
+                    elif f == 'field':
+                        curr_widget = self.qfield_combo = f_field_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Search in All or a specific field'), all_label=_('-- No Field --') )
+                    elif f == 'case':
+                        curr_widget = self.case_combo = f_dual_combo( (('___dummy',_("Detect case")),('case_sens', _("Case sensitive")),('case_ins',_("Case insensitive"))), ellipsize=False, tooltip=_('Set query case sensitivity'), connect=self._on_filters_changed)
+                    elif f == 'catalog_field':
+                        curr_widget = self.catalog_field_combo = f_catalog_field_combo()
+                    elif f == 'page':
+                        self.page_len_combo     = f_page_len_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_("Choose page length for query"), default=self.config.get('page_length',3000))
+                        self.page_no_label      = f_label('Page: <b>1</b>', markup=True, wrap=False, char_wrap=False)
+                        self.page_prev_button   = f_button(None, 'previous', connect=self._on_page_prev)
+                        self.page_next_button   = f_button(None, 'next', connect=self._on_page_next)
+
+                        self.search_filter_box.pack_start(self.page_prev_button, False, False, 1)
+                        self.search_filter_box.pack_start(self.page_no_label, False, False, 1)
+                        self.search_filter_box.pack_start(self.page_next_button, False, False, 1)
+                        self.search_filter_box.pack_start(self.page_len_combo, False, False, 1)
+                
+                    if curr_widget is not None: self.search_filter_box.pack_start(curr_widget, False, False, 1)
+
 
                 self.on_restore()
                 self._on_filters_changed()
 
 
 
-            if hasattr(self, 'search_entry_box'):
-                if hasattr(self, 'search_button'): self.search_entry_box.pack_start(self.search_button, False, False, 1)
-                if hasattr(self, 'query_combo'): self.search_entry_box.pack_start(self.query_combo, False, False, 1)
-                if hasattr(self, 'restore_button'): self.search_entry_box.pack_start(self.restore_button, False, False, 1)
+        if hasattr(self, 'search_entry_box'):
+            if hasattr(self, 'cat_import_button'): self.search_entry_box.pack_start(self.cat_import_button, False, False, 1) 
+            if hasattr(self, 'search_button'): self.search_entry_box.pack_start(self.search_button, False, False, 1)
+            if hasattr(self, 'query_combo'): self.search_entry_box.pack_start(self.query_combo, False, False, 1)
+            if hasattr(self, 'restore_button'): self.search_entry_box.pack_start(self.restore_button, False, False, 1)
 
-            if hasattr(self, 'qtime_combo'): self.search_filter_box.pack_start(self.qtime_combo, False, False, 1)
-            if hasattr(self, 'time_series_combo'): self.search_filter_box.pack_start(self.time_series_combo, False, False, 1)
-            if hasattr(self, 'group_combo'): self.search_filter_box.pack_start(self.group_combo, False, False, 1)
-            if hasattr(self, 'depth_combo'): self.search_filter_box.pack_start(self.depth_combo, False, False, 1)
-            if hasattr(self, 'sort_combo'): self.search_filter_box.pack_start(self.sort_combo, False, False, 1)
-            if hasattr(self, 'read_combo'): self.search_filter_box.pack_start(self.read_combo, False, False, 1)
-            if hasattr(self, 'flag_combo'): self.search_filter_box.pack_start(self.flag_combo, False, False, 1)
-            if hasattr(self, 'notes_combo'): self.search_filter_box.pack_start(self.notes_combo, False, False, 1)
-            if hasattr(self, 'case_combo'): self.search_filter_box.pack_start(self.case_combo, False, False, 1)
-            if hasattr(self, 'qfield_combo'): self.search_filter_box.pack_start(self.qfield_combo, False, False, 1)
-            if hasattr(self, 'qlogic_combo'): self.search_filter_box.pack_start(self.qlogic_combo, False, False, 1)
-            if hasattr(self, 'qtype_combo'): self.search_filter_box.pack_start(self.qtype_combo, False, False, 1)
-            if hasattr(self, 'qlang_combo'): self.search_filter_box.pack_start(self.qlang_combo, False, False, 1)
-            if hasattr(self, 'qhandler_combo'): self.search_filter_box.pack_start(self.qhandler_combo, False, False, 1)
-            if hasattr(self, 'cat_combo'): self.search_filter_box.pack_start(self.cat_combo, False, False, 1)
-            if hasattr(self, 'page_prev_button'): self.search_filter_box.pack_start(self.page_prev_button, False, False, 1)
-            if hasattr(self, 'page_no_label'): self.search_filter_box.pack_start(self.page_no_label, False, False, 1)
-            if hasattr(self, 'page_next_button'): self.search_filter_box.pack_start(self.page_next_button, False, False, 1)
-            if hasattr(self, 'page_len_combo'): self.search_filter_box.pack_start(self.page_len_combo, False, False, 1)
+            search_main_entry_box = Gtk.VBox(homogeneous = False, spacing = 0)
+            search_padding_box2 = Gtk.HBox(homogeneous = False, spacing = 0) 
+            search_main_entry_box.pack_start(self.search_entry_box, False, False, 0)
+            search_main_entry_box.pack_start(search_padding_box2, False, False, 7)
+            self.search_box.pack_start(search_main_entry_box, False, False, 0)
 
 
-            search_box = Gtk.HBox(homogeneous = False, spacing = 0)
+        if hasattr(self, 'search_filter_box'):
+            search_filter_scrolled = Gtk.ScrolledWindow()
+            search_filter_scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)           
 
-            if hasattr(self, 'search_entry_box'):
-                search_main_entry_box = Gtk.VBox(homogeneous = False, spacing = 0)
-                search_padding_box2 = Gtk.HBox(homogeneous = False, spacing = 0) 
-                search_main_entry_box.pack_start(self.search_entry_box, False, False, 0)
-                search_main_entry_box.pack_start(search_padding_box2, False, False, 7)
-                search_box.pack_start(search_main_entry_box, False, False, 0)
+            # This is needed to prevent scrollbar from obscuring search bar for certain themes :(
+            search_main_filter_box = Gtk.VBox(homogeneous = False, spacing = 0)
+            search_padding_box1 = Gtk.HBox(homogeneous = False, spacing = 0) 
 
-            if hasattr(self, 'search_filter_box'):
-                search_filter_scrolled = Gtk.ScrolledWindow()
-                search_filter_scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)           
+            search_main_filter_box.pack_start(self.search_filter_box, False, False, 0)
+            search_main_filter_box.pack_start(search_padding_box1, False, False, 7)
 
-                # This is needed to prevent scrollbar from obscuring search bar for certain themes :(
-                search_main_filter_box = Gtk.VBox(homogeneous = False, spacing = 0)
-                search_padding_box1 = Gtk.HBox(homogeneous = False, spacing = 0) 
+            search_filter_scrolled.add(search_main_filter_box)
 
-                search_main_filter_box.pack_start(self.search_filter_box, False, False, 0)
-                search_main_filter_box.pack_start(search_padding_box1, False, False, 7)
 
-                search_filter_scrolled.add(search_main_filter_box)
+        if hasattr(self, 'search_box'):
+            self.search_box.pack_start(search_filter_scrolled, True, True, 0)
+            self.pack_start(self.search_box, False, False, 0)
 
-                search_box.pack_start(search_filter_scrolled, True, True, 0)
-
-            self.pack_start(search_box, False, False, 0)
-
-            
-            
 
 
         table_box = Gtk.ScrolledWindow()
@@ -313,12 +479,12 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
         self.table.view.connect("cursor-changed", self._on_changed_selection)
         self.table.view.connect("row-activated", self._on_activate)
         self.table.view.connect("button-press-event", self._on_button_press)
-        
+        self.connect("key-press-event", self._on_key_press)
+
         debug(7, f'Tab created (id: {self.uid}, type:{self.type})')
 
 
-
-
+        
 
 
 
@@ -330,15 +496,90 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
         if event.button == 3:
             result = self.table.get_selection()
             self.MW.action_menu(result, self, event)
+            
 
-    def _on_button_press_filters(self, widget, event):
-        if event.button == 3: self.MW.action_menu(None, self, event)
-    
+    def _on_button_press_header(self, widget, event):
+        """ Header right-click menu """
+        if event.button == 3 and self.type not in (FX_TAB_FEEDS,): 
+            menu = None
+            if hasattr(self, 'search_filter_box'):
+                if menu is None: menu = Gtk.Menu()
+                else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Save filters'), self.save_filters, icon='filter-symbolic', tooltip=_('Save current search filters as defaults for future') ) )
+            
+            if menu is None: menu = Gtk.Menu()
+            else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
+            menu.append( f_menu_item(1, _('Save layout'), self.table.save_layout, icon='view-column-symbolic', tooltip=_('Save column layout and sizing for current tab.\nIt will be used as default in the future') ) )
+
+            if menu is not None:
+                menu.show_all()
+                menu.popup(None, None, None, None, event.button, event.time)
+
+
+
+    def _on_key_press(self, widget, event):
+        """ When keyboard is used ... """
+        key = event.keyval
+        key_name = Gdk.keyval_name(key)
+        state = event.state
+        ctrl = (state & Gdk.ModifierType.CONTROL_MASK)
+
+        if key_name == 'Delete':
+            result = self.table.get_selection()
+            if isinstance(result, (ResultEntry, ResultContext,)): self.MW.on_del_entry(result)
+            elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_del_rule(result)
+            elif isinstance(result, ResultFlag): self.MW.on_del_flag(result)
+            elif isinstance(result, FeedexPlugin): self.MW.on_del_plugin(result)
+
+
+        elif ctrl and key_name == self.config.get('gui_key_add','a'):
+            if isinstance(self.table.result, (ResultEntry, ResultContext,)): self.MW.on_edit_entry(None)
+            elif isinstance(self.table.result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_edit_rule(None)
+            elif isinstance(self.table.result, ResultFlag): self.MW.on_edit_flag(None)
+            elif isinstance(self.table.result, FeedexPlugin): self.MW.on_edit_plugin(None)
+
+        elif ctrl and key_name == self.config.get('gui_key_edit','e'):
+            result = self.table.get_selection()
+            if isinstance(result, (ResultEntry, ResultContext,)): self.MW.on_edit_entry(result)
+            elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_edit_rule(result)
+            elif isinstance(result, ResultFlag): self.MW.on_edit_flag(result)
+            elif isinstance(result, FeedexPlugin): self.MW.on_edit_plugin(result)
+
+        elif ctrl and key_name in ('F2',): pass
+        
+        elif key_name in ('F2',):
+            event.button = 3
+            result = self.table.get_selection()
+            self.MW.action_menu(result, self, event)
+
+        #debug(9, f"""{key_name}; {key}; {state}""")
+
+
+
+
 
     def _on_changed_selection(self, *args, **kargs):
         """ Selection change handler"""
         if isinstance(self.table.result, (ResultEntry, ResultContext,)): 
-            self.MW.load_preview(self.table.get_selection())
+            sel = self.table.get_selection()
+            if sel is not None: self.MW.load_preview(sel)
+            else: self.MW.startup_decor()
+
+        elif isinstance(self.table.result, ResultRule) and self.type in (FX_TAB_RULES, FX_TAB_LEARNED,): 
+            sel = self.table.get_selection()
+            if sel is not None: self.MW.load_preview_rule(sel)
+            else: self.MW.startup_decor()
+        
+        elif isinstance(self.table.result, FeedexCatItem): 
+            sel = self.table.get_selection()
+            if sel is not None: 
+                if not sel.get('is_node',False): self.MW.load_preview_catalog(sel)
+                else: self.MW.startup_decor(from_catalog=True)
+            else: self.MW.startup_decor(from_catalog=True)
+
+
+
+
 
     def _on_activate(self, widget, event, *args, **kargs):
         """ Result activation handler """
@@ -346,8 +587,9 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
         if isinstance(result, (ResultEntry, ResultContext,)):
             if scast(result['link'],str,'').strip() != '': self.MW.on_open_entry(result) 
             else: self.MW.on_edit_entry(False, result)
-        elif isinstance(result, ResultRule): self.MW.on_edit_rule(result)
+        elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_edit_rule(result)
         elif isinstance(result, ResultFlag): self.MW.on_edit_flag(result)
+        elif isinstance(result, FeedexPlugin): self.MW.on_edit_plugin(result)
 
 
 
@@ -357,7 +599,7 @@ Hit <b>Ctrl-F</b> for interactive search by Title"""))
     def _on_query_entry_menu(self, widget, menu, *args, **kargs):
         """ Basically adds "Clear History" option to menu """
         menu.append( f_menu_item(0, 'SEPARATOR', None) ) 
-        menu.append( f_menu_item(1, _('Clear Search History'), self.MW.on_clear_history, icon='edit-clear-symbolic'))
+        menu.append( f_menu_item(1, _('Clear Search History'), self.MW.on_clear_history, icon='edit-clear-all-symbolic'))
         menu.show_all()
 
 
@@ -497,6 +739,10 @@ Escape: \ (only if before wildcards and field markers)""") )
             self.search_filters['page_len'] = self.config.get('page_length',3000)
             self.search_filters['page'] = 1
 
+        if hasattr(self, 'catalog_field_combo'): self.search_filters['catalog_field'] = f_get_combo(self.catalog_field_combo)       
+        if hasattr(self, 'catalog_handler_combo'): self.search_filters['catalog_handler'] = f_get_combo(self.catalog_handler_combo)
+
+
         debug(7, f'Search filters updated: {self.search_filters}')
         return 0
         
@@ -553,6 +799,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         if hasattr(self, 'page_prev_button'): self.page_prev_button.set_sensitive(False) 
         if hasattr(self, 'page_next_button'): self.page_next_button.set_sensitive(False) 
 
+        self.header_icon.hide()
         self.spinner.show()
         self.spinner.start()
         self.header.set_markup(tab_text)
@@ -581,21 +828,42 @@ Escape: \ (only if before wildcards and field markers)""") )
         self.unblock_search()
 
         self.table.commit_populate()
-        if self.top_entry is not None: self.table.append(self.top_entry)
+
+        if self.top_entry is not None and isinstance(self.top_entry, (ResultEntry, FeedexEntry,)):
+            if self.top_entry_prev:
+                if self.prev_footer not in ('', None): self.top_entry.vals['prev_footer'] = self.prev_footer
+                self.MW.load_preview(self.top_entry)
+            if isinstance(self.table.result, (ResultEntry,)): self.table.append(self.top_entry)
+
 
         if self.type == FX_TAB_TREE:
             if self.search_filters.get('group',None) == 'similar': self.table.collapse_all()
             else: self.table.expand_all()
+        elif self.type == FX_TAB_CATALOG:
+            if self.query_entry.get_text().strip() != '': self.table.expand_all()
+            else: self.table.collapse_all()  
 
         self.spinner.hide()
         self.spinner.stop()
+        self.header_icon.show()
         
         if self.table.result_no2 != 0: len_str = f'{self.table.result_no} {_("of")} {self.table.result_no2}'
         else: len_str = f'{self.table.result_no}'
         self.header.set_markup( f'{self.final_status} ({len_str})' )
 
-        if self.MW.curr_upper.uid == self.uid and self.table.feed_sums is not None: 
+        if self.MW.curr_upper.uid == self.uid and self.table.feed_sums is not None:
             self.MW.feed_tab.redecorate(self.table.curr_feed_filters, self.table.feed_sums)
+        
+        if self.type == FX_TAB_PLACES and self.MW.curr_place in (FX_PLACE_LAST, FX_PLACE_PREV_LAST,): 
+            self.MW.new_items = 0
+            self.MW.new_n = 1
+            self.MW.feed_tab.redecorate_new()
+
+
+
+
+
+
 
 
 
@@ -606,9 +874,18 @@ Escape: \ (only if before wildcards and field markers)""") )
     def query_thr(self, qr, filters, **kargs):
         """ Wrapper for sending queries """
         # DB interface for queries
-        DB = FeedexDatabase(connect=True)
-        DB.connect_QP()
-        QP = DB.Q
+        if self.type in (FX_TAB_PLUGINS,):
+            DB = None
+            QP = FeedexQueryInterface()
+        elif self.type in (FX_TAB_CATALOG,):
+            DB = None
+            QP = FeedexCatalogQuery(main_win=self.MW)
+        else:
+            DB = FeedexDatabase(connect=True)
+            DB.connect_QP()
+            QP = DB.Q
+
+        err = 0
 
         # Do query ...
         if self.type in (FX_TAB_SEARCH, FX_TAB_NOTES):
@@ -618,46 +895,32 @@ Escape: \ (only if before wildcards and field markers)""") )
             filters['rev'] = False
             err = QP.query(qr, filters)
 
-            if self.type == FX_TAB_NOTES: marker = '*'
-            else: marker = ''
-
             if QP.phrase.get('empty',False):
-                if feed_name is None: self.final_status = f"""{marker}{_('Results')}"""
-                else: self.final_status = f'<b>{marker}{esc_mu(feed_name, ell=50)}</b>'
+                if feed_name is None: self.final_status = _('Results')
+                else: self.final_status = f'<b>{esc_mu(feed_name, ell=50)}</b>'
             else: 
-                if feed_name is None: self.final_status = f'{marker}{_("Search for ")}<b>{esc_mu(qr, ell=50)}</b>'
-                else: self.final_status = f'{marker}{_("Search for ")}<b>{esc_mu(qr, ell=50)}</b> {_("in")} <b><i>{esc_mu(feed_name, ell=50)}</i></b>'
+                if feed_name is None: self.final_status = f'{_("Search for ")}<b>{esc_mu(qr, ell=50)}</b>'
+                else: self.final_status = f'{_("Search for ")}<b>{esc_mu(qr, ell=50)}</b> {_("in")} <b><i>{esc_mu(feed_name, ell=50)}</i></b>'
 
 
 
 
         elif self.type == FX_TAB_PLACES:
  
-            if qr == FX_PLACE_STARTUP:
-                err = QP.query('', {'last':True, 'sort':'importance'})
-                if err == 0 and QP.result_no <= 2:
-                    err = QP.query('', {'last_hour':True, 'sort':'importance'})
-                    if err == 0 and QP.result_no <= 2:
-                        err = QP.query('', {'today':True, 'sort':'importance'})
-                        if err == 0 and QP.result_no <= 2:
-                            err = QP.query('', {'last_n':2, 'sort':'importance'})
-
-                self.final_status = _('News')
-
-
-            elif qr == FX_PLACE_TRASH_BIN:
+            if qr == FX_PLACE_TRASH_BIN:
 
                 err = QP.query('', {'deleted':True, 'sort':'adddate'}, no_history=True)
                 self.final_status = _('Trash bin')
 
             else:
                 filters = {'sort':'importance'}
-                if qr == FX_PLACE_LAST: 
-                    filters['last'] = True
-                    self.final_status = _('New Entries')
-                elif qr == FX_PLACE_PREV_LAST: 
-                    filters['last_n'] = 2
-                    self.final_status = _('New Entries')
+                if qr == FX_PLACE_LAST:
+                    if self.MW.new_n <= 1: filters['last'] = True
+                    else: filters['last_n'] = self.MW.new_n
+                    self.final_status = _('News')
+                elif qr == FX_PLACE_PREV_LAST:
+                    filters['last_n'] = self.MW.new_n + 1
+                    self.final_status = _('News')
                 elif qr == FX_PLACE_LAST_HOUR: 
                     filters['last_hour'] = True
                     self.final_status = _('Last Hour')
@@ -688,6 +951,55 @@ Escape: \ (only if before wildcards and field markers)""") )
             self.final_status = _('Similar to ...')            
             filters['rev'] = False
             err = QP.find_similar(self.top_entry['id'], **filters)
+
+
+        elif self.type == FX_TAB_KEYWORDS and self.top_entry is not None:
+            self.final_status = _('Keywords for...')            
+            filters['rev'] = False
+            if not isinstance(self.top_entry, FeedexEntry): self.top_entry = self.top_entry.convert(FeedexEntry, DB, id=self.top_entry.get('id'))
+            err = self.top_entry.ling(index=False, rank=False, learn=True, save_rules=False, learning_depth=filters.get('depth', MAX_FEATURES_PER_ENTRY))
+            if err == 0:
+                QP.results = []
+                for r in self.top_entry.rules: QP.results.append( (r['name'], r['weight'], r['string']) )
+                QP.result_no = len(QP.results)
+
+
+        elif self.type == FX_TAB_RANK and self.top_entry is not None:
+            self.final_status = _('Ranking for...')            
+            filters['rev'] = False
+            if not isinstance(self.top_entry, FeedexEntry): self.top_entry = self.top_entry.convert(FeedexEntry, DB, id=self.top_entry.get('id'))
+            importance, flag, best_entries, flag_dist, rules = self.top_entry.ling(rank=True, index=False, learn=False, to_disp=True)
+            footer = f"""{_('Rules matched')}: <b>{len(rules)}</b>
+{_('Saved Importance')}: <b>{self.top_entry['importance']:.3f}</b>
+{_('Saved Flag')}: <b>{self.top_entry['flag']:.0f}</b>
+
+{_('Calculated Importance')}: <b>{importance:.3f}</b>
+{_('Caculated Flag')}: <b>{flag:.0f}</b>
+
+"""
+            flag_dist_str = ''
+            for f,v in flag_dist.items(): flag_dist_str =  f"{flag_dist_str}\n{fdx.get_flag_name(f)} ({f}): <b>{v:.3f}</b>"
+
+            if flag_dist_str != '': footer = f"""{footer}
+{_('Flag distribution')}: 
+{flag_dist_str}
+"""
+
+
+
+            footer = f"""{footer}
+
+
+{_('Most similar read Entries')}: <b>"""
+            for e in best_entries: 
+                if e not in (0, self.top_entry.get('id')): footer = f"""{footer}{e}, """
+            footer = f"""{footer}</b>"""
+            self.prev_footer = footer
+
+            QP.results = rules
+            QP.result_no = len(rules)
+            err = 0
+
 
         elif self.type == FX_TAB_REL_TIME and self.top_entry is not None:
             filters['rev'] = False
@@ -720,6 +1032,7 @@ Escape: \ (only if before wildcards and field markers)""") )
             self.final_status = f'{_("Time Series for ")}<b>{esc_mu(qr, ell=50)}</b>'
             err = QP.term_in_time(qr, **filters)
 
+
         elif self.type == FX_TAB_TREE:
 
             group = filters.get('group','category')
@@ -729,13 +1042,27 @@ Escape: \ (only if before wildcards and field markers)""") )
                 trends = True
             else: trends = False
 
-            if group == 'category': self.final_status = f'{_("Summary by Category")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'feed': self.final_status = f'{_("Summary by Channel")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'flag': self.final_status = f'{_("Summary by Flag")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'similar': self.final_status = f'{_("Summary by Sim.")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'monthly': self.final_status = f'{_("Summary by Month")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'daily': self.final_status = f'{_("Summary by Day")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'hourly': self.final_status = f'{_("Summary by Hour")} <b>{esc_mu(qr, ell=50)}</b>'
+            if group == 'category': 
+                if not trends: self.final_status = f'{_("Summary by Category")} <b>{esc_mu(qr, ell=50)}</b>'
+                else: self.final_status = f'{_("Trending Summary by Category")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'feed': 
+                if not trends: self.final_status = f'{_("Summary by Channel")} <b>{esc_mu(qr, ell=50)}</b>'
+                else: self.final_status = f'{_("Trending Summary by Channel")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'flag': 
+                if not trends: self.final_status = f'{_("Summary by Flag")} <b>{esc_mu(qr, ell=50)}</b>'
+                else: self.final_status = f'{_("Trending Summary by Flag")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'similar': 
+                if not trends: self.final_status = f'{_("Summary by Sim.")} <b>{esc_mu(qr, ell=50)}</b>'
+                else: self.final_status = f'{_("Trending Summary by Sim.")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'monthly': 
+                if not trends: self.final_status = f'{_("Summary by Month")} <b>{esc_mu(qr, ell=50)}</b>'
+                else: self.final_status = f'{_("Trending Summary by Month")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'daily': 
+                if not trends: self.final_status = f'{_("Summary by Day")} <b>{esc_mu(qr, ell=50)}</b>'
+                else: self.final_status = f'{_("Trending Summary by Day")} <b>{esc_mu(qr, ell=50)}</b>'
+            elif group == 'hourly': 
+                if not trends: self.final_status = f'{_("Summary by Hour")} <b>{esc_mu(qr, ell=50)}</b>'
+                else: self.final_status = f'{_("Trending Summary by Hour")} <b>{esc_mu(qr, ell=50)}</b>'
 
             filters['rev'] = False
             if not trends: err = QP.query(qr, filters, allow_group=True)
@@ -746,6 +1073,9 @@ Escape: \ (only if before wildcards and field markers)""") )
             self.final_status = _('Rules')
             err = QP.list_rules()
 
+        elif self.type == FX_TAB_LEARNED:
+            self.final_status = _('Learned Rules')
+            err = QP.list_rules(learned=True)
 
 
         elif self.type == FX_TAB_FLAGS:
@@ -753,10 +1083,23 @@ Escape: \ (only if before wildcards and field markers)""") )
             err = QP.list_flags()
 
 
+        elif self.type == FX_TAB_PLUGINS:
+            self.final_status = _('Plugins')
+            QP.results = self.MW.gui_plugins.copy()
+            QP.result_no = len(QP.results)
+            err = 0
+
+        elif self.type == FX_TAB_CATALOG:
+            self.final_status = _('Find Feeds...')
+            err = QP.query(qr, filters)
+
+
+
         if err == 0: self.table.populate(QP)
         
-        DB.close()
+        if DB is not None: DB.close()
         fdx.bus_append((FX_ACTION_FINISHED_SEARCH, self.uid,))
+
 
 
 
@@ -768,6 +1111,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         self.busy = True
         
         if self.type in (FX_TAB_TREE, FX_TAB_TRENDS): self.block_search(_("Generating summary...") )
+        elif self.type in (FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS, FX_TAB_LEARNED, FX_TAB_KEYWORDS, FX_TAB_RANK,): self.block_search(_("Getting data...") )
         else: self.block_search(_("Searching...") )
 
         self.search_thread = threading.Thread(target=self.query_thr, args=(phrase, filters)   )
@@ -803,6 +1147,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         
         self.spinner.hide()
         self.spinner.stop()
+        self.header_icon.show()
 
         if self.type == FX_TAB_TREE:
             if self.search_filters.get('group',None) == 'similar': self.table.collapse_all()
@@ -832,9 +1177,15 @@ Escape: \ (only if before wildcards and field markers)""") )
     def apply(self, action, item, **kargs):
         """ Updates local table from events from other widgets (e.g. delete, edit, new)"""
         if self.busy: return 0
-        if action == FX_ACTION_EDIT: self.table.replace(item['id'], item)
-        elif action == FX_ACTION_ADD and self.type not in (FX_TAB_SIMILAR, FX_TAB_TREE,): self.table.append(item)
-        elif action == FX_ACTION_DELETE: self.table.delete(item['id'], item.get('deleted'))
+        if action == FX_ACTION_EDIT and self.mutable: 
+            self.table.replace(item['id'], item)
+            self._on_changed_selection()
+        elif action == FX_ACTION_ADD and self.mutable and self.prependable: 
+            self.table.append(item)
+            self._on_changed_selection()
+        elif action == FX_ACTION_DELETE and self.mutable: 
+            self.table.delete(item['id'], item.get('deleted'))
+            self._on_changed_selection()
 
 
 
@@ -848,49 +1199,7 @@ Escape: \ (only if before wildcards and field markers)""") )
 
 
 
-class ResultGUI:
-    """ Template for GUI result"""
-    def __init__(self, **kargs) -> None:
-        self.MW = kargs.get('main_win', None)
-        self.config = kargs.get('config')
-        if self.config is None:
-            if self.MW is None: self.config = fdx.config
-            else: self.config = self.MW.config
-        self.gui_fields = ()
-        self.gui_types = ()
-        self.gui_vals = {}
-        self.gui_markup_fields = ()
-        self.search_col = None
 
-    def gindex(self, field):
-        """ Returns a GUI field index """
-        return self.gui_fields.index(field)
-
-    def gget(self, field, *args):
-        """ Get GUI value """
-        if len(args) > 1: default = args[0]
-        else: default = None
-        return self.gui_vals.get(field, default)
-
-    def gadd(self, field, type):
-        """ Add typed field to store template """
-        self.gui_fields, self.gui_types = list(self.gui_fields), list(self.gui_types)
-        self.gui_fields.append(field)
-        self.gui_types.append(type)
-        self.gui_fields, self.gui_types = tuple(self.gui_fields), tuple(self.gui_types)
-
-    def gpopulate(self, ilist):
-        for i,f in enumerate(self.gui_fields): self.gui_vals[f] = ilist[i]
-
-    def gclear(self): self.gui_vals.clear()
-
-    def glistify(self):
-        """ Return GUI fields as ordered list"""
-        out_list = []
-        for f in self.gui_fields: out_list.append(self.gui_vals.get(f))
-        return out_list
-
-    def gtuplify(self): return tuple(self.glistify())
 
 
 
@@ -914,7 +1223,6 @@ class ResultGUIEntry(ResultGUI, ResultEntry):
     def pre_prep_gui_vals(self, ix, **kargs):
         self.gui_vals.clear()
         self.gui_vals['gui_ix'] = ix
-        self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
         self.gui_vals['id'] = self.vals['id']
         if self.vals['pubdate_short'] not in (None, ''):
             self.gui_vals['pubdate_short'] = humanize_date(self.vals['pubdate_short'], self.MW.today, self.MW.yesterday, self.MW.year)
@@ -943,6 +1251,7 @@ class ResultGUIEntry(ResultGUI, ResultEntry):
     def prep_gui_vals(self, ix, **kargs):        
         """ Prepares values for display and generates icon and style fields """
         self.pre_prep_gui_vals(ix, **kargs)
+        self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
         self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
 
         if coalesce(self.vals['read'],0) > 0: self.gui_vals['gui_bold'] = 700
@@ -963,23 +1272,42 @@ class ResultGUITree(ResultGUIEntry):
         self.table = 'tree'
         self.gui_markup_fields = ('title',)
 
+
     def prep_gui_vals(self, ix, **kargs):
-        self.pre_prep_gui_vals(ix, **kargs)
-        if self.vals['is_node'] == 1:
+
+        if self.vals['is_node'] == 1 and self.vals['id'] is None:
+
+            self.gui_vals.clear()
+            self.gui_vals['gui_ix'] = ix  
+            self.gui_vals['title'] = self.vals['title']
+            self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
+            self.gui_vals['is_node'] = 1
+
+            if self.vals['feed_id'] is not None: self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
+            elif self.vals['flag'] is not None: self.gui_vals['gui_icon'] = self.MW.icons['flag']
+            elif self.vals['pubdate_str'] is not None: self.gui_vals['gui_icon'] = self.MW.icons['calendar']
+
             self.gui_vals['gui_bold'] = 800
             self.gui_vals['title'] = f"""<b><u>{esc_mu(self.gui_vals['title'])} ({esc_mu(self.vals['children_no'])})</u></b>"""
 
         else:
+            self.pre_prep_gui_vals(ix, **kargs)
+            self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
             self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
             self.gui_vals['title'] = esc_mu(self.gui_vals['title'])
 
-            if coalesce(self.vals['read'],0) > 0: self.gui_vals['gui_bold'] = 700
-            else: self.gui_vals['gui_bold'] = 400
+            if self.vals['is_node'] == 1:
+                self.gui_vals['gui_bold'] = 800
+                self.gui_vals['title'] = f"""<b><u>{esc_mu(self.gui_vals['title'])} ({esc_mu(self.vals['children_no'])})</u></b>"""
+            else:
+                if coalesce(self.vals['read'],0) > 0: self.gui_vals['gui_bold'] = 700
+                else: self.gui_vals['gui_bold'] = 400
 
-            if kargs.get('new_col',False): self.gui_vals['gui_color'] = self.config.get('gui_new_color','#0FDACA')
-            elif coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-                self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
-            elif coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
+                if kargs.get('new_col',False): self.gui_vals['gui_color'] = self.config.get('gui_new_color','#0FDACA')
+                elif coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
+                    self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
+                elif coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
+
 
 
 
@@ -1006,6 +1334,8 @@ class ResultGUINote(ResultGUIEntry):
     def prep_gui_vals(self, ix, **kargs):        
         """ Prepares values for display and generates icon and style fields """
         self.pre_prep_gui_vals(ix, **kargs)
+
+        self.gui_vals['gui_icon'] = self.MW.icons['large'].get(self.vals["feed_id"], self.MW.icons['large']['default'])
         
         if self.vals.get('flag',0) > 0:
             color = fdx.get_flag_color(self.vals.get('flag',0)) 
@@ -1189,6 +1519,73 @@ class ResultGUITimeSeries(ResultGUI, ResultTimeSeries):
 
 
 
+class ResultGUIPlugin(ResultGUI, FeedexPlugin):
+    """ GUI representation for plugin """
+    def __init__(self, **kargs) -> None:
+        FeedexPlugin.__init__(self, **kargs)
+        ResultGUI.__init__(self, **kargs)
+        self.gui_fields = self.fields + ('gui_ix',)
+        self.gui_types = (int, str, str, str, str, int,)
+        self.search_col = self.gindex('name')
+
+
+
+    def prep_gui_vals(self, ix, **kargs):
+        self.gui_vals.clear()
+        self.gui_vals['gui_ix'] = ix
+        self.gui_vals['id'] = self.vals['id']
+
+        self.gui_vals['type'] = self.vals.get('stype','?')
+
+        self.gui_vals['name'] = scast(self.vals['name'], str, '')
+        self.gui_vals['command'] = scast(self.vals['command'], str, '')
+        self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, '').replace('\n',' ').replace('\r',' ').replace('\t',' '), 200)
+
+
+
+
+class ResultGUICatItem(ResultGUI, FeedexCatItem):
+    """ GUI representation for plugin """
+    def __init__(self, **kargs) -> None:
+        FeedexCatItem.__init__(self, **kargs)
+        ResultGUI.__init__(self, **kargs)
+        self.gui_fields = ('id', 'gui_icon', 'gui_toggle',  'name', 'desc', 'tags', 'location', 'popularity', 'freq', 'link_res', 'link_home',  'gui_bold', 'gui_ix', 'is_node', 'parent_id')
+        self.gui_types = (int,  GdkPixbuf.Pixbuf, bool,    str, str, str, str, int, str, str, str,   int,   int,   bool, int )
+        self.gui_markup_fields = ('name',)
+        self.toggled_field = self.get_index('toggled')
+
+
+    def prep_gui_vals(self, ix, **kargs):
+        self.gui_vals.clear()
+        self.gui_vals['gui_ix'] = ix
+        self.gui_vals['id'] = self.vals['id']
+        self.gui_vals['desc'] = self.vals['desc']
+        self.gui_vals['gui_toggle'] = self.vals['is_toggled']
+        self.gui_vals['name'] = esc_mu(self.vals['name'])
+        self.gui_vals['is_node'] = self.vals['is_node']
+
+        if self.vals['is_node']:
+            self.gui_vals['name'] = f"""<u>{self.gui_vals['name']}</u>"""
+            self.gui_vals['gui_bold'] = 800
+            self.gui_vals['gui_icon'] = self.MW.icons.get('doc')
+            self.gui_vals['parent_id'] = -1
+        else:
+            self.gui_vals['parent_id'] = self.vals['parent_id']
+            self.gui_vals['gui_bold'] = 400
+            if self.MW.catalog_icons.get(self.vals['thumbnail']) is None: 
+                if os.path.isfile(self.vals['thumbnail']):
+                    self.MW.catalog_icons[self.vals['thumbnail']] = GdkPixbuf.Pixbuf.new_from_file_at_size(self.vals['thumbnail'] , 16, 16)
+                else:
+                    self.MW.catalog_icons[self.vals['thumbnail']] = self.MW.icons['rss']
+            self.gui_vals['gui_icon'] = self.MW.catalog_icons.get(self.vals['thumbnail'])
+            self.gui_vals['tags'] = self.vals['tags']
+            self.gui_vals['location'] = self.vals['location']
+            self.gui_vals['popularity'] = self.vals['popularity']
+            self.gui_vals['freq'] = self.vals['freq']
+            self.gui_vals['link_res'] = self.vals['link_res']
+            self.gui_vals['link_home'] = self.vals['link_home']
+
+        
 
 
 
@@ -1198,15 +1595,19 @@ class FeedexGUITable:
     """ Table display for entries tab """
     def __init__(self, parent, result, **kargs):
 
-        self.MW = parent.MW
+        self.parent = parent
+        self.MW = self.parent.MW
         self.config = self.MW.config
         self.icons = self.MW.icons
+
+        #if 'catalog' in self.MW.gui_cache['layouts'].keys(): del self.MW.gui_cache['layouts']['catalog']
 
         self.lock = threading.Lock()
 
         # Flags for different diplay types
         self.is_tree = kargs.get('tree', False)
         self.is_notes = kargs.get('notes', False)
+        self.is_grid = kargs.get('grid', False)
 
         # Metadata from query processor interface
         self.result = result
@@ -1246,14 +1647,17 @@ class FeedexGUITable:
         if self.is_tree: 
             self.view.set_enable_tree_lines(True)
             self.view.set_level_indentation(20)
-        if self.is_notes:
+        if self.is_notes or self.is_grid:
             self.view.set_grid_lines(True)
 
         # Generate columns
+        if 'gui_toggle' in self.result.gui_fields:
+            self.view.append_column( f_col('', 4, self.result.gindex('gui_toggle'), resizable=False, clickable=True, width=16, reorderable=False, connect=self._on_toggled) )
         if 'gui_icon' in self.result.gui_fields:
             self.view.append_column( f_col('', 3, self.result.gindex('gui_icon'), resizable=False, clickable=False, width=16, reorderable=False) )
         if 'gui_color' in self.result.gui_fields: self.color_col = self.result.gindex('gui_color')
         if 'gui_bold' in self.result.gui_fields: self.weight_col = self.result.gindex('gui_bold')
+
 
         # Try twice to build layout - second run is with default layout for this table type
         # If that fails - give up, the code is faulty 
@@ -1305,7 +1709,7 @@ class FeedexGUITable:
             if field == 'pubdate_short': sort_col = self.result.gindex('pubdate')
             else: sort_col = None
 
-            self.view.append_column( f_col( col_name, ctype, ix , sort_col=sort_col, note=note, yalign=yalign, color_col=self.color_col, attr_col=self.weight_col, start_width=width, name=field) )
+            self.view.append_column( f_col( col_name, ctype, ix, sort_col=sort_col, note=note, yalign=yalign, color_col=self.color_col, attr_col=self.weight_col, start_width=width, name=field) )
 
         return 0
 
@@ -1318,7 +1722,8 @@ class FeedexGUITable:
         
         if update_sums:
             self.feed_sums[self.result['feed_id']] = self.feed_sums.get(self.result['feed_id'],0) + 1
-            if coalesce(self.result['parent_id'],0) > 0: 
+            parent_id = coalesce(self.result['parent_id'],0)
+            if parent_id > 0 and parent_id != self.result['feed_id']: 
                 self.feed_sums[self.result['parent_id']] = self.feed_sums.get(self.result['parent_id'],0) + 1
 
         return self.result.gtuplify()
@@ -1592,6 +1997,49 @@ class FeedexGUITable:
 
 
 
+    def _untoggle_all_foreach(self, model, path, iter):
+        model[iter][self.result.gindex('gui_toggle')] = False 
+        return False
+
+    def _on_toggle_foreach_catalog(self, model, path, iter, parent_id, btoggle, id_ix):
+        if coalesce(model[iter][self.result.gindex('parent_id')],0) == parent_id:
+            model[iter][self.result.gindex('gui_toggle')] = btoggle
+            ix = model[iter][self.result.gindex('gui_ix')]
+            id = model[iter][self.result.gindex('id')]
+            self.results[ix][self.result.toggled_field] = btoggle
+            for i,r in enumerate(self.result.MW.catalog): 
+                if r[id_ix] == id: self.result.MW.catalog[i][self.result.toggled_field] = btoggle
+        return False
+    
+
+    def _on_toggled(self, widget, path, *args):
+        """ Handle toggled signal and pass results to catalog store """
+        ix = self.store[path][self.result.gindex('gui_ix')]
+        id_ix = self.result.get_index('id')
+        item = self.results[ix]
+        id = item[id_ix]
+        btoggle = not self.store[path][self.result.gindex('gui_toggle')]
+        self.store[path][self.result.gindex('gui_toggle')] = btoggle
+        self.results[ix][self.result.toggled_field] = btoggle
+        
+        if isinstance(self.result, FeedexCatItem): 
+            for i,r in enumerate(self.result.MW.catalog):
+                if self.result.MW.catalog[id_ix] == id:
+                    self.result.MW.catalog[i][self.result.toggled_field] = btoggle
+                    break
+
+            if item[self.result.get_index('is_node')]: self.store.foreach(self._on_toggle_foreach_catalog, id, btoggle, id_ix)
+
+
+    def untoggle_all(self, *args, **kargs):
+        """ Untoggle all checkboxes """
+        self.store.foreach(self._untoggle_all_foreach)
+        if type(self.results) is not list: list(self.results)
+        for i,r in enumerate(self.results): self.results[i][self.result.toggled_field] = False
+        if isinstance(self.result, FeedexCatItem): 
+            for i, r in enumerate(self.result.MW.catalog):
+                self.result.MW.catalog[i][self.result.toggled_field] = False
+
 
 
     def save_layout(self, *args, **kargs):
@@ -1710,4 +2158,5 @@ class CalendarDialog(Gtk.Dialog):
     def on_to_selected(self, *args):
         (year, month, day) = self.cal_to.get_date()
         self.result['to_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
+
 

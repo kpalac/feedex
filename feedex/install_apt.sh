@@ -30,10 +30,12 @@ fi
 
 sudo chmod 655 /etc/feedex.conf
 sudo chmod 755 /usr/bin/feedex
+sudo chmod 755 /usr/share/feedex/data/examples/plugins/*.py
 sudo find /usr/share/feedex/ -type d -exec chmod 755 {} +
 sudo find /usr/share/feedex/ -type f -exec chmod 644 {} +
 
 sudo chmod 755 /usr/share/feedex/data/examples/scripts/*
+sudo chmod 755 /usr/share/feedex/data/examples/plugins/*
 
 
 

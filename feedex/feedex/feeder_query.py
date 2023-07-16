@@ -359,7 +359,7 @@ class FeedexQuery(FeedexQueryInterface):
                 raw_text = f"""{raw_text}
 {scast(r[self.result.get_index(f)], str, '')}"""
 
-            kwds = self.LP.extract_features(raw_text, filters.get('depth',100))
+            kwds = self.LP.extract_features(raw_text, MAX_FEATURES_PER_ENTRY)
             for kw in kwds:
                 weight = keywords.get(kw[0],(0,0))[0]
                 keywords[kw[0]] = (weight + kw[1], kw[2])
@@ -417,7 +417,7 @@ class FeedexQuery(FeedexQueryInterface):
             self._empty(result=ResultEntry())
             return -7
 
-        limit = kargs.get('limit',self.config.get('default_similarity_limit',20)) # Limit results
+        depth = kargs.get('depth',self.config.get('default_similarity_limit',30)) # Limit results
 
         # Get or generate rules
         if self.config.get('use_keyword_learning', True): 
@@ -452,14 +452,14 @@ class FeedexQuery(FeedexQueryInterface):
         filters['case_ins'] = True
         filters['qtype'] = 1
         filters['page'] = 1
-        filters['page_len'] = limit
+        filters['page_len'] = depth
         filters['exclude_id'] = id
         doc_cnt = self.DB.get_doc_count()
 
         # ... and to do this construct a single query string from rules
         qr_string = ''
         for i,r in enumerate(rules):
-            if i >= limit: break
+            if i >= depth: break
             
             if type(r) in (list, tuple): rule.populate(r)
             elif type(r) is dict:
@@ -597,7 +597,7 @@ class FeedexQuery(FeedexQueryInterface):
 
         # Get similar items
         filters = kargs.copy()
-        filters['limit'] = 500
+        filters['depth'] = 500
         filters['allow_group'] = False
         
         self.find_similar(id, **filters)
@@ -785,7 +785,6 @@ class FeedexQuery(FeedexQueryInterface):
                         self.result.clear()
                         self.result['title'] = f'{fdx.get_feed_name(feed["id"], with_id=False)}'
                         self.result['desc'] = f[feed.get_index('subtitle')]
-                        self.result['flag_name'] = f[feed.get_index('icon_name')]
                         self.result['feed_id'] = f[feed.get_index('id')]
                         self.result['is_node'] = 1
                         self.result['children_no'] = count
@@ -809,7 +808,6 @@ class FeedexQuery(FeedexQueryInterface):
                         self.result.clear()
                         self.result['title'] = f'{fdx.get_feed_name(feed["id"], with_id=False)}'
                         self.result['desc'] = f[feed.get_index('subtitle')]
-                        self.result['flag_name'] = f[feed.get_index('icon_name')]
                         self.result['feed_id'] = f[feed.get_index('id')]
                         self.result['is_node'] = 1
                         self.result['children_no'] = count
@@ -860,7 +858,7 @@ class FeedexQuery(FeedexQueryInterface):
             filters['rev'] = False
             filters['sort'] = None
             filters['fallback_sort'] = 'id'
-            filters['limit'] = int(len(self.results) / depth)
+            filters['depth'] = int(len(self.results) / depth)
 
             node_count = 0
 
@@ -1120,8 +1118,10 @@ class FeedexQuery(FeedexQueryInterface):
             if filters['feed_or_cat'] == -1: return msg(FX_ERROR_QUERY, _('Category or Channel not found!'))
             elif filters['feed_or_cat'][0] == -1:
                 filters['category'] = filters['feed_or_cat'][1]
+                filters['feed_or_cat'] = None
             elif filters['feed_or_cat'][1] == -1:
                 filters['feed'] = filters['feed_or_cat'][0]
+                filters['feed_or_cat'] = None
         
         case_ins = None
         if filters.get('case_ins') is True:

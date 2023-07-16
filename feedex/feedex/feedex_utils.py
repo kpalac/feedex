@@ -8,8 +8,8 @@ from feedex_headers import *
 
 class FeedexError(Exception):
     """ Generic Feedex exception"""
-    def __init__(self, *args): 
-        self.code = abs(msg(*args))
+    def __init__(self, *args):
+        self.code = abs(msg(*args, log=True))
 
 
 class FeedexTypeError(FeedexError):
@@ -97,10 +97,14 @@ class FeedexMainBus:
         self.lock.release()
 
     def bus_del(self, index):
-        """ Append to bus queue with locking """
+        """ Delete from bus queue with locking """
         self.lock.acquire()
         del self.bus_q[int(index)]
         self.lock.release()
+
+    def get_last_bus(self):
+        """ Fetch last message from the bus """
+        if len(self.bus_q) > 0: return self.bus_q[-1]
 
     def add_error(self, err):
         """ Append to download error list """
@@ -162,7 +166,7 @@ class FeedexMainBus:
         
         code, text, arg = self.parse_msg_args(*args, **kargs)
 
-        if code < 0: self.ret_status = code
+        if code < 0: self.ret_status = abs(code)
         else: self.ret_status = 0
         if do_print or log:
             if code < 0:
@@ -453,9 +457,6 @@ class FeedexMainBus:
         return end_val
     
     
-
-
-
 
     def ext_open(self, command_id, main_arg, **kargs):
         """ Wrapper for executing external commands """
@@ -1016,10 +1017,11 @@ def check_url(string:str):
 
 
 
-def load_json(infile, default):
+def load_json(infile, default, **kargs):
     """ Loads JSON file and returns default if failed  """
-    if not os.path.isfile(infile): 
+    if not os.path.isfile(infile):
         msg(FX_ERROR_IO, _('JSON file %a does not exist!'), infile)
+        if kargs.get('create_file',False) and not os.path.exists(infile): save_json(infile, default)         
         return default
     out = default
     try:

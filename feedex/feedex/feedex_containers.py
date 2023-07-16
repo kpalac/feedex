@@ -73,10 +73,12 @@ class SQLContainer:
 
     def get_index(self, field:str):
         """ Get field index - useful for processing SQL result lists without populating the class """
-        for idx,f in enumerate(self.fields):
-            if field == f: return idx
-        return -1
-    
+        try: return self.fields.index(field)
+        except ValueError as e: return -1
+
+    def index(self, field:str): return self.get_index(field)
+
+
 
     def __setitem__(self, key:str, value):
         if key in self.fields: self.vals[key] = value
@@ -97,7 +99,7 @@ class SQLContainer:
     def __str__(self):
         ostring = ''
         for f in self.fields:
-            ostring = f"{ostring}\n{f}:{self.vals[f]}"
+            ostring = f"{ostring}\n{f}: {self.vals[f]}"
         return ostring
 
 
@@ -177,7 +179,7 @@ class SQLContainer:
         nullif(self.vals.get('url'),''),
         nullif(self.vals.get('string'),''),
         )
-        if name in ('',None): name = self.vals.get('id','<???>')
+        if name in ('',None): name = str(self.vals.get('id','<???>'))
         else:
             name = ellipsize(name, 200)
             if with_id: name = f"""{name} ({self.vals.get('id','<???>')})"""
@@ -600,7 +602,7 @@ class FeedexFlag(SQLContainerEditable):
 
 
     def delete(self, **kargs):
-        """ Delete rule by ID """
+        """ Delete flag by ID """
         if not self.exists: return msg(FX_ERROR_NOT_FOUND, _('Flag %a not found!'), id)
 
         err = self.DB.run_sql_lock("delete from flags where id = :id", {'id':self.vals['id']} )
@@ -620,7 +622,7 @@ class FeedexFlag(SQLContainerEditable):
 
 
     def add(self, **kargs):
-        """ Add feed to database """
+        """ Add flag to database """
         idict = kargs.get('new')
         if idict is not None:
             self.clear()
@@ -645,6 +647,7 @@ class FeedexFlag(SQLContainerEditable):
 
         return msg(_('Flag %a added successfully'), self.name(with_id=True), log=True)
     
+
 
 
 

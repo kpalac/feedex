@@ -41,7 +41,8 @@ Features:
       i) Keyword extraction
       j) Extracting trending terms from a group of articles
       k) Ranking articles according to trends (i.e. "most talked about")
-      l) Text summarization 
+      l) Text summarization
+      m) Extensive Feed catalogue based on https://blog.feedspot.com for subscribing and searching channels 
 
   - Exporting results to CSV or JSON
 
@@ -67,8 +68,9 @@ ACKNOWLEDGEMENTS:
     Kozea community (Pyphen)
     Fredrik Lundh (PIL author), Alex Clark (Pillow fork author) and GitHub Contributors
     daniruiz (Super Flat Remix icon theme)
+    Qogir-ubuntu icon theme creator(s)
     Kim Saunders <kims@debian.org> Peter Ãstrand <astrand@lysator.liu.se> (XClip)
-    
+    https://blog.feedspot.com team for resources for feed catalogue
 
     If I failed to give credit to someone, please inform me and accept my apologies
     

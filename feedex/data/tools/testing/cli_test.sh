@@ -50,7 +50,6 @@ if [[ "$1" == "docs" || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex --help-rules
     F_Exec /usr/bin/feedex --help-scripting
     F_Exec /usr/bin/feedex --help-examples
-    F_Exec /usr/bin/feedex --help-html
 fi
 
 
@@ -62,8 +61,8 @@ if [[ "$1" == "db" || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex --debug --unlock-fetching
 
     TEST_DB="test.db"
-
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --lock-db
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --unlock-db
@@ -74,6 +73,7 @@ if [[ "$1" == "db" || "$1" == "all" ]]; then
 
     export FEEDEX_DB_PATH="test2.DB"
     [ -f "$FEEDEX_DB_PATH" ] && rm -r "$FEEDEX_DB_PATH"
+    F_Exec /usr/bin/feedex --debug --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --lock-db
     F_Exec /usr/bin/feedex --debug --db-stats
@@ -233,6 +233,7 @@ if [[ "$1" == 'actions_feed' || "$1" == "all" ]]; then
     TEST_DB="test.db"
 
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --delete-feed 1111111
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --delete-feed 1
@@ -275,6 +276,7 @@ if [[ "$1" == 'actions_category' || "$1" == "all" ]]; then
     TEST_DB="test.db"
 
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --add-category "'test test'" "test"
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --parent_category='Notes' --add-category "'test test'" "test"
@@ -297,6 +299,7 @@ if [[ "$1" == 'actions_rule' || "$1" == "all" ]]; then
     TEST_DB="test.db"
 
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --add-rule "''"
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --add-rule "test"
@@ -334,6 +337,7 @@ if [[ "$1" == 'actions_entry' || "$1" == "all" ]]; then
     TEST_DB="test.db"
 
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex -r 881579999000000
     F_Exec /usr/bin/feedex -r 88157
@@ -361,6 +365,7 @@ if [[ "$1" == 'actions_flag' || "$1" == "all" ]]; then
     TEST_DB="test.db"
 
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --list-flags
     F_Exec /usr/bin/feedex --database="$TEST_DB" --add-flag "test" "test test"
@@ -385,6 +390,7 @@ if [[ "$1" == 'actions_entry_add' || "$1" == "all" ]]; then
     IFILE2="test_ifile2.json"
     IFILE3="test_ifile_long3.json"
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
 
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --add-entry "'Test'" "'DESC Test'"
@@ -437,6 +443,7 @@ if [[ "$1" == 'actions_entry_edit' || "$1" == "all" ]]; then
     IFILE="test_ifile.json"
     IFILE2="test_ifile2.json"
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --database="$TEST_DB" --import-entries-from-file "$IFILE"
     F_Exec /usr/bin/feedex --database="$TEST_DB" -F 1
@@ -474,6 +481,7 @@ if [[ "$1" == 'ling' || "$1" == "all" ]]; then
     TEST_DB="test.db"
     IFILE="test_ifile_ling.json"
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --import-entries-from-file "$IFILE"
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" -r 1
@@ -492,6 +500,7 @@ if [[ "$1" == 'actions_fetching' || "$1" == "all" ]]; then
 
     TEST_DB="test.db"
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
     export FEEDEX_DB_PATH="$TEST_DB"
 
     F_Exec /usr/bin/feedex --debug --add-regex "'[]..\.*aaaa\sd9(][\]][\]]'"
@@ -542,6 +551,7 @@ if [[ "$1" == 'actions_port' || "$1" == "all" ]]; then
     [ -f "$FEEDS_EXP" ] && rm "$FEEDS_EXP"
     [ -f "$RULES_EXP" ] && rm "$RULES_EXP"
     [ -f "$FLAGS_EXP" ] && rm "$FLAGS_EXP"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --export-feeds "$FEEDS_EXP"
     F_Exec /usr/bin/feedex --debug --export-rules "$RULES_EXP"
@@ -570,6 +580,7 @@ if [[ "$1" == 'actions_add_from_url' || "$1" == "all" ]]; then
 
     TEST_DB="test.db"
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
+    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --add-feed 'http://feeds.arstechnica.com/arstechnica/index'
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --add-feed 'https://www.space.com/feeds/all'

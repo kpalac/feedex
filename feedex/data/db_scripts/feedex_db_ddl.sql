@@ -166,7 +166,7 @@ CREATE INDEX IF NOT EXISTS "idx_entries_id_desc" ON "entries" ( "id" DESC);
 CREATE INDEX IF NOT EXISTS "idx_entires_title" ON "entries" ( "title" );
 CREATE INDEX IF NOT EXISTS "idx_entries_author" ON "entries" ( "author" );
 CREATE INDEX IF NOT EXISTS "idx_entries_pubdate" ON "entries" ( "pubdate"	DESC );
-CREATE INDEX IF NOT EXISTS "idx_entries_addeddate" ON "entries" ( "adddate" DESC);
+CREATE INDEX IF NOT EXISTS "idx_entries_adddate" ON "entries" ( "adddate" DESC);
 CREATE INDEX IF NOT EXISTS "idx_entries_pubdate_asc" ON "entries" ( "pubdate"   ASC );
 CREATE INDEX IF NOT EXISTS "idx_entries_adddate_asc" ON "entries" ( "adddate"   ASC );
 CREATE INDEX IF NOT EXISTS "idx_entries_link" ON "entries" ( "link"	DESC );

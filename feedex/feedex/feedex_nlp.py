@@ -308,6 +308,7 @@ class FeedexLP(SmallSem):
         remember_lang = self.get_model()
 
         if type(fdx.rules_cache) is not list: fdx.rules_cache = list(fdx.rules_cache)
+
         for i,r in enumerate(fdx.rules_cache):
             # Stem and prefix all user's FTS rules
             qtype = scast(r[2], int, 0)
@@ -315,7 +316,11 @@ class FeedexLP(SmallSem):
             string = scast(r[5], str, '')
             field = scast(r[4], str, None)
 
-            if learned != 1:
+            if string == '': # Empty strings cause a mess later, so simply invalidate them 
+                learned = -1
+                qtype = -1
+            
+            elif learned != 1:
                 if qtype == 1:
                     self.set_model(r[7])
                     phrase = self.DB.Q.parse_query(string, str_match_stem=True, sql=False)

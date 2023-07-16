@@ -319,7 +319,8 @@ class FeedexFeed(SQLContainerEditable):
 
         self.vals['id'] = None
         self.vals['display_order'] = len(fdx.feeds_cache)
-        
+        self.vals['deleted'] = 0
+
         if kargs.get('validate',True):
             err = self.validate()
             if err != 0: return msg(*err)
@@ -335,7 +336,7 @@ class FeedexFeed(SQLContainerEditable):
         self.vals['id'] = self.DB.lastrowid
         self.DB.last_feed_id = self.vals['id']
 
-        if not fdx.single_run:
+        if not fdx.single_run and not kargs.get('no_reload', False):
             err = self.DB.load_feeds()
             if err != 0: return msg(FX_ERROR_DB, _('Error reloading Feeds after successfull add!'))
 

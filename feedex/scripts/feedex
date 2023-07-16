@@ -49,52 +49,49 @@ def main():
             if arg in ('-h', '--help', '--usage'):
                 from feedex_docs import FEEDEX_SHORT_HELP
                 mu_print(FEEDEX_SHORT_HELP)
-                sys.exit(0)
+                return 0
             elif arg in ('-hh', '--help-long'):
                 from feedex_docs import FEEDEX_LONG_HELP
                 mu_print(FEEDEX_LONG_HELP)
-                sys.exit(0)
+                return 0
             elif arg == ('--help-feeds'):
                 from feedex_docs import FEEDEX_HELP_FEEDS
                 mu_print(FEEDEX_HELP_FEEDS)
-                sys.exit(0)
+                return 0
             elif arg == ('--help-query'):
                 from feedex_docs import FEEDEX_HELP_QUERY
                 mu_print(FEEDEX_HELP_QUERY)
-                sys.exit(0)
+                return 0
             elif arg == ('--help-categories'):
                 from feedex_docs import FEEDEX_HELP_FEEDS
                 mu_print(FEEDEX_HELP_FEEDS)
-                sys.exit(0)
+                return 0
             elif arg == ('--help-entries'):
                 from feedex_docs import FEEDEX_HELP_ENTRIES
                 mu_print(FEEDEX_HELP_ENTRIES)
-                sys.exit(0)
+                return 0
             elif arg == ('--help-rules'):
                 from feedex_docs import FEEDEX_HELP_RULES
                 mu_print(FEEDEX_HELP_RULES)
-                sys.exit(0)
+                return 0
             elif arg == ('--help-scripting'):
-                from feedex_docs import FEEDEX_HELP_SCRIPTING
+                from feedex_docs import FEEDEX_HELP_SCRIPTING, FEEDEX_HELP_JSON_QUERY
                 mu_print(FEEDEX_HELP_SCRIPTING)
-                sys.exit(0)
-            elif arg == ('--help-html'):
-                from feedex_docs import FEEDEX_HELP_HTML
-                mu_print(FEEDEX_HELP_HTML)
-                sys.exit(0)
+                mu_print(FEEDEX_HELP_JSON_QUERY)
+                return 0
             elif arg == ('--help-examples'):
                 from feedex_docs import FEEDEX_HELP_EXAMPLES
                 mu_print(FEEDEX_HELP_EXAMPLES)
-                sys.exit(0)
+                return 0
                 
 
             elif arg in ('-v', '--version'):
                 print(f"{FEEDEX_VERSION}")
-                sys.exit(0)
+                return 0
 
             elif arg in ('--about',):
                 mu_print(FEEDEX_HELP_ABOUT)
-                sys.exit(0)
+                return 0
 
 
             # read parameters and actions... uses utilities from feedex_utils.py for clean parsing and sanity checks
@@ -119,17 +116,6 @@ def main():
             #DISPLAY 
             elif arg == '--csv':
                 params['output']='csv'
-                continue
-            elif arg.startswith('--html-template='):
-                params['html_template'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
-                params['output']='html'
-                continue
-            elif arg.startswith('--to-files-at-dir='):
-                params['to_files'] = True
-                params['to_files_dir'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
-                continue
-            elif arg.startswith('--to-files-names='):
-                params['to_files_names'] = fdx.sanitize_arg(arg, str, '', stripped=False, exit_fail=False)
                 continue
             elif arg == '--json':
                 params['output']='json'
@@ -531,36 +517,52 @@ def main():
             # Data transfer
             elif arg == '--import-feeds':
                 action = 'import_feeds'
-                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input JSON file'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--import-rules':
                 action = 'import_rules'
-                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input JSON file'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--import-flags':
                 action = 'import_flags'
-                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input JSON file'), exit_fail=True, allow_none=False)
                 break
 
             elif arg == '--export-feeds':
                 action = 'export_feeds'
                 query = True
-                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output JSON file'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--export-rules':
                 action = 'export_rules'
                 query = True
-                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output JSON file'), exit_fail=True, allow_none=False)
                 break
             elif arg == '--export-flags':
                 action = 'export_flags'
                 query = True
-                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('input pickle file'), exit_fail=True, allow_none=False)
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output JSON file'), exit_fail=True, allow_none=False)
+                break
+
+            elif arg == '--download-catalogue':
+                action = 'download_catalog'
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output dir'), exit_fail=True, allow_none=False)
                 break
 
 
 
             #DATABASE
+            elif arg == '--create-db':
+                action = 'create_db'
+                break
+            
+            elif arg == '--defaults':
+                params['defaults'] = True
+                continue
+            elif arg == '--default-feeds':
+                params['default_feeds'] = True
+                continue
+
             elif arg == '--db-maintenance':
                 action = 'db_maintenance'	
                 break
@@ -573,7 +575,7 @@ def main():
                 action = 'db_stats'
                 cli_display = True
             elif arg.startswith('--timeout='):
-                params['timeout'] = sanitize_arg(arg, int, 1000, stripped=False, exit_fail=False)
+                params['timeout'] = sanitize_arg(arg, int, 60, stripped=False, exit_fail=False)
                 continue
             elif arg == '--ignore-lock':
                 params['ignore_lock'] = True
@@ -600,15 +602,7 @@ def main():
             elif arg == '--no-fetch':
                 params['no_fetch'] = True
                 continue
-            elif arg == '--with-rules':
-                params['with_rules'] = True
-                continue
-            elif arg == '--no-read':
-                params['no_read'] = True
-                continue
-            elif arg == '--no-flagged':
-                params['no_flag'] = True
-                continue
+
                         
             # Parameters for searching entries et al.
             elif arg  == '--json_query':
@@ -787,13 +781,12 @@ def main():
                 break
 
             else:
-                msg(FX_ERROR_CL,_("""Invalid arguments given...
+                return msg(FX_ERROR_CL,_("""Invalid arguments given...
 Make sure that:
  - parameters are before actions
  - every parameter and action is available
  
  """) )
-                sys.exit(9)
                     
         
     else:
@@ -815,6 +808,8 @@ Make sure that:
 
     fdx.config['log'] = coalesce(log_file, fdx.config.get('log'), os.path.join(FEEDEX_SHARED_PATH, 'feedex.log') )
     fdx.config['db_path'] = coalesce(database, fdx.config.get('db_path'), os.path.join(FEEDEX_SHARED_PATH, 'feedex.db') )
+    fdx.config['use_keyword_learning'] = coalesce(params.get('learn'), fdx.config.get('use_keyword_learning'), True)
+    fdx.config['timeout'] = coalesce(params.get('timeout'), fdx.config.get('timeout'), 0)
 
     # Install locale
     if fdx.config.get('lang') not in (None,'en'):
@@ -836,16 +831,24 @@ Make sure that:
         return 0
 
 
+    # Create database if specified
+    if action == 'create_db':
+        feedex = FeedexDatabase(db_path=fdx.config['db_path'], config=fdx.config, allow_create=True, **params)
+        try: feedex.connect(defaults=params.get('defaults',False), default_feeds=params.get('default_feeds', False))
+        except (FeedexDatabaseError, FeedexDataError,) as e: return e.code
 
+        if not feedex.created: msg(_('Database %a already exists...'), fdx.config['db_path'])
 
-
-
+        return 0
 
 
     # Init the main workhorse ...
-    feedex = FeedexDatabase(db_path=fdx.config['db_path'], config=fdx.config, allow_create=True, **params)
-    try: feedex.connect()
-    except (FeedexDatabaseError, FeedexDataError) as e: sys.exit(e.code)
+    feedex = FeedexDatabase(db_path=fdx.config['db_path'], config=fdx.config, allow_create=False, **params)
+    try: feedex.connect(defaults=False, default_feeds=False)
+    except (FeedexDatabaseError, FeedexDataError,) as e: return e.code
+    except (FeedexDatabaseNotFoundError,) as e:
+        return msg(e.code, _('Use feedex --database=[PATH_TO_DB] [--defaults, --default-feeds] --create-db to create new Database'))
+
 
     # Lazy load desktop notification support
     if params.get('desktop_notify',False) and action in ('get_news','check','query_entries','add_entry','add_rule','add_regex','add_stemmed',):
@@ -865,7 +868,7 @@ Make sure that:
 
         if clipper.error is not None:
             if params.get('desktop_notify',False): desktop_notifier.notify(clipper.error, None, -1)
-            sys.exit(1)
+            return 1
 
 
     # Init query object
@@ -998,6 +1001,7 @@ Make sure that:
         entry = FeedexEntry(feedex)
         params['title'] = argument
         params['desc'] = argument2
+        if params.get('weight') is not None: params['read'] = scast(params.get('weight'), int, 0)
 
         if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding new Entry..."), None, 0)
 
@@ -1046,7 +1050,7 @@ Make sure that:
     elif action == 'add_regex':
         rule = FeedexRule(feedex)
         params['string'] = argument
-        params['type'] = 3
+        params['type'] = 2
         if params.get('desktop_notify',False): desktop_notifier.notify(_("Adding new REGEX Rule..."), None, 0)
         rule.add(new=params)
         if params.get('desktop_notify',False):
@@ -1155,7 +1159,7 @@ Make sure that:
             end_id = scast( slist(argl,1, None), int, None)
             if start_id is None and end_id is None:
                 sys.stderr.write(_("Could not resolve id range! Should be in format: NN-NN"))
-                sys.exit(9)
+                return FX_ERROR_CL
         else:
             argument = scast(argument, int, None)
 
@@ -1193,6 +1197,10 @@ Make sure that:
     elif action == 'import_rules': feedex.import_rules(argument)
     elif action == 'import_flags': feedex.import_flags(argument)
     
+    elif action == 'download_catalog':
+        from feedex_gui_utils import FeedexCatItem, create_thumbnail
+        catalog = FeedexCatItem(db=feedex)
+        catalog.build_catalog(odir=argument)
 
     elif action == 'unlock':
         if feedex.unlock() == 0: msg(_('Database unlocked.'))
@@ -1218,7 +1226,7 @@ Make sure that:
     # Formalities...
     feedex.close()
 
-    sys.exit( abs(fdx.ret_status) )
+    return fdx.ret_status
 
 
 
@@ -1227,6 +1235,6 @@ Make sure that:
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
 
 

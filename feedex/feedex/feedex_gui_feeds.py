@@ -61,7 +61,9 @@ class FeedexFeedTab(Gtk.ScrolledWindow):
 Double-click on a place to quickly load entries  
 Double-click on feed or category to filter results by chosen item
 Right click for more options
-Hit <b>Ctrl-F</b> for interactive search""") )
+Hit <b>Ctrl-F</b> for interactive search
+Hit <b>F2</b> for Menu
+Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
 
         self.selection = self.feed_tree.get_selection()
 
@@ -70,6 +72,7 @@ Hit <b>Ctrl-F</b> for interactive search""") )
         self.feed_tree.connect("row-collapsed", self._on_feed_collapsed)
         self.feed_tree.connect("button-release-event", self._on_button_press)
         self.feed_tree.connect('size-allocate', self._tree_changed)
+        self.connect("key-press-event", self._on_key_press)
 
         self.feed_tree.set_enable_search(True)
         self.feed_tree.set_search_equal_func(self.MW.quick_find_case_ins_tree, self.feed_tree, self.feed.gindex('name'))
@@ -80,6 +83,41 @@ Hit <b>Ctrl-F</b> for interactive search""") )
         self.add(self.feed_tree)
         self.reload(load=False)
 
+
+
+
+
+
+    def _on_key_press(self, widget, event):
+        """ When keyboard is used ... """
+        key = event.keyval
+        key_name = Gdk.keyval_name(key)
+        state = event.state
+        ctrl = (state & Gdk.ModifierType.CONTROL_MASK)
+
+        if key_name == 'Delete':
+            item = self.get_selection()
+            if item is not None and item.gget('gui_action') == 0: 
+                item.populate(fdx.find_f_o_c(item.gget('id'), load=True))
+                self.MW.on_del_feed(item)
+
+
+        elif ctrl and key_name == self.config.get('gui_key_edit','e'):
+            item = self.get_selection()
+            if item is not None and item.gget('gui_action') == 0: 
+                item.populate(fdx.find_f_o_c(item.gget('id'), load=True))
+                self.MW.on_feed_cat('edit', item)
+        
+        elif ctrl and key_name in ('F2',): pass
+        
+        elif key_name in ('F2',):
+            event.button = 3
+            item = self.get_selection()
+            if item is not None and item.gget('gui_action') == 0: 
+                item.populate(fdx.find_f_o_c(item.gget('id'), load=True))
+                self.MW.action_menu(item, self, event)
+
+        #debug(9, f"""{key_name}; {key}; {state}""")
 
 
 
@@ -272,23 +310,51 @@ Hit <b>Ctrl-F</b> for interactive search""") )
 
             if id == main_filter or id in filters: model[iter][self.feed.gindex('name_mu')] = f"""<u>{model[iter][self.feed.gindex('name_mu')]}</u>"""
 
-        if self.MW.curr_upper.type == FX_TAB_PLACES:
+        if model[iter][self.feed.gindex('gui_action')] == 1 and model[iter][self.feed.gindex('id')] == FX_PLACE_LAST:
+            if self.MW.new_items > 0:
+                if self.MW.curr_place == FX_PLACE_LAST: model[iter][self.feed.gindex('name_mu')] = f"""<u><b>{_('New')} ({self.MW.new_items})</b></u>"""
+                else: model[iter][self.feed.gindex('name_mu')] = f"""<b>{_('New')} ({self.MW.new_items})</b>"""
+            else:
+                if self.MW.curr_place == FX_PLACE_LAST: model[iter][self.feed.gindex('name_mu')] = f"""<u><b>{_('New')}</b></u>"""
+                else: model[iter][self.feed.gindex('name_mu')] = _('New')
+
+        elif self.MW.curr_upper.type == FX_TAB_PLACES:
             if model[iter][self.feed.gindex('gui_action')] == 1:
                 if model[iter][self.feed.gindex('id')] == self.MW.curr_place:
                     model[iter][self.feed.gindex('name_mu')] = f"""<u><b>{model[iter][self.feed.gindex('name')]}</b></u>"""
                 else: model[iter][self.feed.gindex('name_mu')] = model[iter][self.feed.gindex('name')]
+
         return False
+
+
 
 
     def redecorate(self, filter, sums):
         """ Change decorations (match number and underlining)"""
+        if sums == {} and self.feed_sums == {}: return 0
         self.feed_sums = sums.copy()
         filters = scast(filter, tuple, ())
         main_filter = slist(filters, 0, None)
-
-        if self.feed_sums in (None, {}): return 0
-
         self.feed_store.foreach(self._redecorate, main_filter, filters, self.feed_sums)
+
+
+
+    def _redecorate_new(self, model, path, iter, *args):
+        if model[iter][self.feed.gindex('gui_action')] == 1 and model[iter][self.feed.gindex('id')] == FX_PLACE_LAST:
+            if self.MW.new_items > 0:
+                if self.MW.curr_place == FX_PLACE_LAST: model[iter][self.feed.gindex('name_mu')] = f"""<u><b>{_('New')} ({self.MW.new_items})</b></u>"""
+                else: model[iter][self.feed.gindex('name_mu')] = f"""<b>{_('New')} ({self.MW.new_items})</b>"""
+            else:
+                if self.MW.curr_place == FX_PLACE_LAST: model[iter][self.feed.gindex('name_mu')] = f"""<u><b>{_('New')}</b></u>"""
+                else: model[iter][self.feed.gindex('name_mu')] = _('New')
+
+            return True
+
+        return False
+
+    def redecorate_new(self, *args, **kargs):
+        """ Decorate new item node on upcomming news """
+        self.feed_store.foreach(self._redecorate_new)
 
 
 
@@ -341,7 +407,7 @@ Hit <b>Ctrl-F</b> for interactive search""") )
 
         self.feed_store_tmp.append(None, self._feed_store_item(None))
 
-        # Crouped by handler type ...
+        # Grouped by handler type ...
         rss_row = self.feed_store_tmp.append(None, self._feed_store_item({'gui_action':2, 'name':_('RSS'), 'gui_icon':'rss', 'handler':'rss', 'gui_row_id':'H rss'}))
         for f in fdx.feeds_cache:
             if f[self.feed.get_index('deleted')] != 1 and f[self.feed.get_index('is_category')] != 1 and f[self.feed.get_index('handler')] == 'rss':

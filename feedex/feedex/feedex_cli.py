@@ -26,7 +26,7 @@ class FeedexCLI:
 
         # Output flags
         self.output = kargs.get('output','cli')
-        if self.output not in ('long','headlines','notes','csv','json','json_dict','html','cli',): self.output = 'cli'
+        if self.output not in ('long','headlines','notes','csv','json','json_dict','cli',): self.output = 'cli'
         self.plot = kargs.get('plot',False)
 
         # CLI display options
@@ -64,12 +64,7 @@ class FeedexCLI:
         # General file output
         self.ofile = kargs.get('ofile')
 
-        # HTML output options
-        self.html_template = kargs.get('html_template','')
-        self.to_files = kargs.get('to_files',False)
-        self.to_files_dir = kargs.get('to_files_dir')
-        self.to_files_names = kargs.get('to_files_names','<%id%>.html')        
-
+    
         # Curtom mask
         self.display_cols = kargs.get('display_cols')
 
@@ -352,8 +347,6 @@ class FeedexCLI:
                 for r in results: print(self._line(table, r))
  
 
-
-        elif self.output == 'html': self.to_html(table.vals.keys(), results)
 
 
         else:
@@ -644,64 +637,5 @@ class FeedexCLI:
 
 
 
-###############################################################################
-#   Exporting to HTML
-#
 
-    def htmlize(self, text):
-        """ Convert text to html """
-        if type(text) in (tuple, list):
-            snips = ''
-            for s in text:
-                if type(s) not in (list,tuple): return ''
-                if len(s) != 3: return ''
-                snips = f"""{snips}{self.delim2}{self.htmlize(s[0])}{self.snip_beg}{self.htmlize(s[1])}{self.snip_end}{self.htmlize(s[2])}"""
-            text = snips
-        else:
-            text = scast(text, str, '')
-        for ent in HTML_ENTITIES_REV: 
-            if ent[0] != '': text = text.replace(ent[0],ent[1])
-        return text
-
-    def fname(self, text):
-        """ Sanitize file name fields """
-        if type(text) in (list, tuple): return ''
-        text = scast(text, str, '')
-        text = text[:50]
-        text = text.replace('/','_').replace('"','_').replace("'",'_').replace("""\'""",'_').replace("\n",'_').replace("\r","_").replace(' ','_')
-        return text
-
-
-    def to_html(self, fields:list, table:list, **kargs):
-        """ Converts table into a html string from a template """
-        #Read template file
-        try:
-            with open(self.html_template, 'r') as f: templ = f.read()
-        except OSError: return msg(FX_ERROR_IO, _("Error reading template file %a!"), self.html_template)
-
-        if self.to_files:
-            if not os.path.isdir(self.to_files_dir): return msg(FX_ERROR_IO, _("Target directory %a does not exist! Aborting..."), self.to_files_dir)
-
-
-        for row in table:
-            text = templ
-            for i,f in enumerate(fields):
-                text = text.replace(f'<%{f}%>', self.htmlize( slist(row,i,'') ) )
-            
-            if self.to_files:
-                file_name = self.to_files_names
-                for i,f in enumerate(fields):
-                    file_name = file_name.replace(f'<%{f}%>', self.fname( slist(row,i,'') ) )
-
-                target_file = f'{self.to_files_dir}/{file_name}'
-                if os.path.isfile(target_file) or os.path.isfile(target_file):
-                    return msg(FX_ERROR_IO, _("File %a already exists!"), target_file)
-
-                try:
-                    with open(target_file, 'w') as ff: ff.write(text)
-                except OSError as e: return msg(FX_ERROR_IO, f'{_("Error writing to file ")}{target_file}: %a', e)
-
-            else: print(text)
-
-        return 0
 

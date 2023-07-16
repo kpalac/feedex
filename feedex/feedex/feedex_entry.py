@@ -20,8 +20,6 @@ class FeedexEntry(SQLContainerEditable):
 
         self.recalculate = False # These flags mark the need to recalculate linguistics and relearn rules
         self.relearn = False
-        
-        self.learn = True # This switch can disable learning conditions on adding and updating
 
         self.feed = ResultFeed()
         self.rule = SQLContainer('rules', RULES_SQL_TABLE)
@@ -102,8 +100,10 @@ class FeedexEntry(SQLContainerEditable):
         if not self.exists: return -8
 
         read = coalesce(self.vals['read'],0)
-        if kargs.get('update_read',True):
-            
+
+
+        if self.vals.get('link') is not None:
+
             now = datetime.now()
             now_raw = int(now.timestamp())
             now = now.strftime('%Y-%m-%d %H:%M:%S')
@@ -118,20 +118,23 @@ class FeedexEntry(SQLContainerEditable):
             self.vals['adddate'] = now_raw
             self.vals['adddate_str'] = now
 
-        if self.vals.get('link') is not None:
             err = fdx.ext_open('browser', self.vals.get('link'), background=kargs.get('background',True))
             if err != 0: return err
             else: msg(_('Opening in browser (%a) ...'), self.vals.get('link', '<UNKNOWN>'))
 
 
-        if kargs.get('learn',True) and self.learn and self.config.get('use_keyword_learning', True) and read == 0: learn = True
+        else: return msg(FX_ERROR_NOT_FOUND, _('No link found. Aborting...'))
+
+
+
+        if self.config.get('use_keyword_learning', True) and read == 0: learn = True
         else: learn = False
 
         # Reindex and learn
         if learn: msg(_('Reindexing and learning keywords...'))
         else: msg(_('Reindexing ...'))
         
-        err = self.ling(learn=learn, index=True, rank=False, save_rules=kargs.get('save_rules', True))
+        err = self.ling(learn=learn, index=True, rank=False, save_rules=learn)
         if err != 0: 
             self.DB.close_ixer(rollback=True)
             return err
@@ -245,7 +248,7 @@ class FeedexEntry(SQLContainerEditable):
         for f in self.to_update:
             if f in REINDEX_LIST: self.recalculate = True
             
-        if self.learn and self.config.get('use_keyword_learning', True):
+        if self.config.get('use_keyword_learning', True):
             if self.recalculate and coalesce(self.vals['read'],0) > 0: self.relearn = True
             if coalesce(self.vals['read'],0) > 0 and coalesce(self.backup_vals['read'],0) == 0: self.relearn = True
             if coalesce(self.vals['read'],0) < 0 and coalesce(self.backup_vals['read'],0) == 0: self.relearn = True
@@ -408,10 +411,6 @@ class FeedexEntry(SQLContainerEditable):
 
         now = datetime.now()
         
-        if self.vals.get('learn') is not None:
-            if self.vals.get('learn',True) is True: self.learn = True
-            else: self.learn = False
-
         self.vals['id'] = None
         self.vals['adddate_str'] = now
         self.vals['pubdate_str'] = coalesce(self.vals.get('pubdate_str', None), now)
@@ -422,12 +421,11 @@ class FeedexEntry(SQLContainerEditable):
             err = self.validate()
             if err != 0: return msg(*err)
 
-        if not self.learn: learn = False
-        elif not self.config.get('use_keyword_learning', True): learn = False
-        elif (kargs.get('learn', False) or coalesce(self.vals['read'], 0) > 0) and self.vals.get('learn',True): learn = True
+        if not self.config.get('use_keyword_learning', True): learn = False
+        elif coalesce(self.vals['read'], 0) > 0: learn = True
         else: learn = False
 
-        if kargs.get('ling',True): 
+        if kargs.get('ling',True):
             err = self.ling(index=True, rank=True, learn=learn, save_rules=False, counter=counter)
             if err != 0:
                 self.DB.close_ixer(rollback=True)
@@ -497,113 +495,117 @@ class FeedexEntry(SQLContainerEditable):
         self.set_feed()
 
 
-        if index or rank:
-
+        if index or rank: 
             self.ix_strings, self.rank_string = self.DB.LP.index(self.vals)
-            
-            if index:
-                self.DB.connect_ixer()
+            if stats: 
+                self.DB.LP.calculate_stats()
+                self.merge(self.DB.LP.stats)            
+        
 
-                # Remove doc if exists ...
-                if rebuilding or self.vals['ix_id'] is None: ix_doc = None
-                else:
-                    try: ix_doc = self.DB.ixer_db.get_document(self.vals['ix_id'])
-                    except (xapian.DocNotFoundError,): ix_doc = None
-                    except (xapian.DatabaseError,) as e: 
-                        return msg(FX_ERROR_DB, _('Index error: %a'), e)
-
-                if isinstance(ix_doc, xapian.Document):
-                    exists = True
-                    ix_doc.clear_terms()
-                    ix_doc.clear_values()
-                    uuid = ix_doc.get_data()
-                else:
-                    exists = False
-                    ix_doc = xapian.Document()
-                    uuid = None
-                    
-                if uuid in (None, ''):
-                    # Generating UUID... A desperate fight against coincidence
-                    ts = datetime.now()
-                    uuid = f"""{int(round(ts.timestamp()))}{counter}{random_str(length=10)}{len(scast(self.vals['title'], str, 'a'))}"""
-                    ix_doc.set_data(uuid)
-
-
-
-                self.DB.ixer.set_document(ix_doc)
-
-                # Add UUID
-                ix_doc.add_boolean_term(f"""UUID {uuid}""")
-                # Add feed tag for easier deletes later on
-                ix_doc.add_boolean_term(f'FEED_ID {self.vals["feed_id"]}')
-                # ... and other filters
-                ix_doc.add_boolean_term(f"""HANDLER {self.feed.get("handler",'')}""")
-                if coalesce(self.vals["note"],0) >= 1: ix_doc.add_boolean_term(f"""NOTE 1""")
-                else: ix_doc.add_boolean_term(f"""NOTE 0""")
-                if coalesce(self.vals["read"],0) >= 1: ix_doc.add_boolean_term(f"""READ 1""")
-                else: ix_doc.add_boolean_term(f"""READ 0""")
-
-                ix_doc.add_value(0, xapian.sortable_serialise(scast(self.vals['pubdate'], int, 0)) )
-                ix_doc.add_value(1, xapian.sortable_serialise(scast(self.vals['adddate'], int, 0)) )
-                ix_doc.add_value(2, xapian.sortable_serialise(scast(self.vals['flag'], int, 0)) )
-
-                # Index token strings, restarting term position after each one to facilitate mixed searches ...
-                for k in ('',PREFIXES['exact'],):
-                    self.DB.ixer.set_termpos(0)
-                    for f in self.ix_strings[k]: self.DB.ixer.index_text( scast(f[1], str, ''), scast(f[0], int, 1), k)
-                last_pos = self.DB.ixer.get_termpos() + 100
-                
-                # Add semantic postings one by one not to spam ...
-                for f in self.ix_strings[PREFIXES['sem']]:
-                    sems = f[1]
-                    weight = scast(f[0], int, 1)
-                    for s,ps in sems.items():
-                        for p in ps:
-                            ix_doc.add_posting(f"""{PREFIXES['sem']}{s.lower()}""", p, weight)
-    
-                # Index meta fields
-                self.DB.ixer.set_termpos(last_pos)
-                for k in META_PREFIXES:
-                    for f in self.ix_strings[k]: self.DB.ixer.index_text( scast(f[1], str, ''), scast(f[0], int, 1), k)
-                self.DB.ixer.set_termpos(last_pos)
-                for k in META_PREFIXES_EXACT:
-                    for f in self.ix_strings[k]: self.DB.ixer.index_text( scast(f[1], str, ''), scast(f[0], int, 1), k)
-
-                # Save stemming variants
-                for k,v in self.DB.LP.variants.items():
-                    for s in v: self.DB.ixer_db.add_synonym(k,s)
-
-                # Add/Replace in Database
-                if exists:
-                    try: self.vals['ix_id'] = self.DB.ixer_db.replace_document(f'UUID {uuid}', ix_doc)
-                    except (xapian.DatabaseError, xapian.DocNotFoundError,) as e: 
-                        return msg(FX_ERROR_DB, _('Index error: %a'), e)
-                    debug(2, f'Replaced Xapian doc: {self.vals["ix_id"]}')
-                else:            
-                    try: self.vals['ix_id'] = self.DB.ixer_db.add_document(ix_doc)
-                    except (xapian.DatabaseError,) as e: 
-                        return msg(FX_ERROR_DB, _('Index error: %a'), e)
-                    debug(2, f"""Added Xapian doc: {self.vals['ix_id']}""")
-
-                if stats: 
-                    self.DB.LP.calculate_stats()
-                    self.merge(self.DB.LP.stats)
-
-
+        
+        
         if rank:
             # Perform ranking based on saved rules. Construct laerning string for stemmed rules
             if self.feed['url'] not in (None, ''): self.rank_string = f"""  {self.rank_string}  URL:{self.feed['url']}  """
             if not to_disp:
                 self.vals['importance'], self.vals['flag'] = self.DB.LP.rank(self.vals, self.rank_string, to_disp=False)
-            else: 
-                return self.DB.LP.rank(self.vals, self.rank_string, to_disp=True)
+            else:
+                return self.DB.LP.rank(self.vals, self.rank_string, to_disp=True)     
+            
+
+
+            
+        if index:
+            self.DB.connect_ixer()
+
+            # Remove doc if exists ...
+            if rebuilding or self.vals['ix_id'] is None: ix_doc = None
+            else:
+                try: ix_doc = self.DB.ixer_db.get_document(self.vals['ix_id'])
+                except (xapian.DocNotFoundError,): ix_doc = None
+                except (xapian.DatabaseError,) as e: return msg(FX_ERROR_DB, _('Index error: %a'), e)
+
+            if isinstance(ix_doc, xapian.Document):
+                exists = True
+                ix_doc.clear_terms()
+                ix_doc.clear_values()
+                uuid = ix_doc.get_data()
+            else:
+                exists = False
+                ix_doc = xapian.Document()
+                uuid = None
+                    
+            if uuid in (None, ''):
+                # Generating UUID... A desperate fight against coincidence
+                ts = datetime.now()
+                uuid = f"""{int(round(ts.timestamp()))}{counter}{random_str(length=10)}{len(scast(self.vals['title'], str, 'a'))}"""
+                ix_doc.set_data(uuid)
+
+
+
+            self.DB.ixer.set_document(ix_doc)
+
+            # Add UUID
+            ix_doc.add_boolean_term(f"""UUID {uuid}""")
+            # Add feed tag for easier deletes later on
+            ix_doc.add_boolean_term(f'FEED_ID {self.vals["feed_id"]}')
+            # ... and other filters
+            ix_doc.add_boolean_term(f"""HANDLER {self.feed.get("handler",'')}""")
+            if coalesce(self.vals["note"],0) >= 1: ix_doc.add_boolean_term(f"""NOTE 1""")
+            else: ix_doc.add_boolean_term(f"""NOTE 0""")
+            if coalesce(self.vals["read"],0) >= 1: ix_doc.add_boolean_term(f"""READ 1""")
+            else: ix_doc.add_boolean_term(f"""READ 0""")
+
+            ix_doc.add_value(0, xapian.sortable_serialise(scast(self.vals['pubdate'], int, 0)) )
+            ix_doc.add_value(1, xapian.sortable_serialise(scast(self.vals['adddate'], int, 0)) )
+            ix_doc.add_value(2, xapian.sortable_serialise(scast(self.vals['flag'], int, 0)) )
+
+            # Index token strings, restarting term position after each one to facilitate mixed searches ...
+            for k in ('',PREFIXES['exact'],):
+                self.DB.ixer.set_termpos(0)
+                for f in self.ix_strings[k]: self.DB.ixer.index_text( scast(f[1], str, ''), scast(f[0], int, 1), k)
+            last_pos = self.DB.ixer.get_termpos() + 100
+                
+            # Add semantic postings one by one not to spam ...
+            for f in self.ix_strings[PREFIXES['sem']]:
+                sems = f[1]
+                weight = scast(f[0], int, 1)
+                for s,ps in sems.items():
+                    for p in ps:
+                        ix_doc.add_posting(f"""{PREFIXES['sem']}{s.lower()}""", p, weight)
+    
+            # Index meta fields
+            self.DB.ixer.set_termpos(last_pos)
+            for k in META_PREFIXES:
+                for f in self.ix_strings[k]: self.DB.ixer.index_text( scast(f[1], str, ''), scast(f[0], int, 1), k)
+            self.DB.ixer.set_termpos(last_pos)
+            for k in META_PREFIXES_EXACT:
+                for f in self.ix_strings[k]: self.DB.ixer.index_text( scast(f[1], str, ''), scast(f[0], int, 1), k)
+
+            # Save stemming variants
+            for k,v in self.DB.LP.variants.items():
+                for s in v: self.DB.ixer_db.add_synonym(k,s)
+
+            # Add/Replace in Database
+            if exists:
+                try: self.vals['ix_id'] = self.DB.ixer_db.replace_document(f'UUID {uuid}', ix_doc)
+                except (xapian.DatabaseError, xapian.DocNotFoundError,) as e: 
+                    return msg(FX_ERROR_DB, _('Index error: %a'), e)
+                debug(2, f'Replaced Xapian doc: {self.vals["ix_id"]}')
+            else:            
+                try: self.vals['ix_id'] = self.DB.ixer_db.add_document(ix_doc)
+                except (xapian.DatabaseError,) as e: 
+                    return msg(FX_ERROR_DB, _('Index error: %a'), e)
+                debug(2, f"""Added Xapian doc: {self.vals['ix_id']}""")
+
+
 
 
         if learn:
             # Learn text features by creating a learning string and running smallsem on it...
             self.learning_string = ''
             for f in LING_TEXT_LIST: self.learning_string = f"""{self.learning_string}  {scast(self.vals[f], str, '')}"""
-            depth = MAX_FEATURES_PER_ENTRY
+            depth = kargs.get('learning_depth', MAX_FEATURES_PER_ENTRY)
             rules_tmp = self.DB.LP.extract_features(self.learning_string, depth=depth)
 
             # Append link to source as a feature

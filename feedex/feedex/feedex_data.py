@@ -34,6 +34,8 @@ FEEDEX_SYS_ICON_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','pixmaps')
 FEEDEX_MODELS_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','models')
 FEEDEX_LOCALE_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','locales')
 
+FEEDEX_FEED_CATALOG_CACHE = os.path.join(FEEDEX_SYS_SHARED_PATH,'data', 'catalogue')
+
 
 gettext.install('feedex', FEEDEX_LOCALE_PATH)
 
@@ -344,8 +346,9 @@ TERMS_TABLE_SHORT = ('term', 'weight')
 
 TS_TABLE = ('time', 'from', 'to','freq')
 TS_TYPES = (str, str, str, float)
-TS_TABLE_PRINT = (_('Time'), _('From'), _('To'), _('Frequecy'))
+TS_TABLE_PRINT = (n_('Time'), n_('From'), n_('To'), n_('Frequecy'))
 TS_TABLE_SHORT = ('time', 'freq')
+
 
 
 
@@ -450,11 +453,8 @@ DEFAULT_CONFIG = {
             'error_threshold': 5,
             'max_items_per_transaction': 300,
             'ignore_images' : False,
-            'ignore_media' : False,
             'rule_limit' : 50000,
             'use_keyword_learning' : True,
-            'use_search_habits' : True,
-            'learn_from_added_entries': True,
             'ranking_scheme' : 'simple',
             'no_history': False,
             'default_entry_weight' : 2,
@@ -483,12 +483,13 @@ DEFAULT_CONFIG = {
             'window_name_exclude' : 'Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird',
 
             'imave_viewer': '',
-            'text_viewer' : '',
             'search_engine': 'https://duckduckgo.com/?t=ffab&q=%Q&ia=web',
             'gui_clear_cache' : 30,
-            'gui_key_search': 's',
+
             'gui_key_new_entry': 'n',
             'gui_key_new_rule': 'r',
+            'gui_key_add': 'a',
+            'gui_key_edit': 'e',
 
             'normal_color' : 'DEFAULT',
             'bold_color': 'WHITE_BOLD',
@@ -510,13 +511,10 @@ CONFIG_NAMES = {
             'error_threshold': _('Channel error threshold'),
             'max_items_per_transaction': _('Max items for a single transaction'),
             'ignore_images' : _('Ignore image processing'),
-            'ignore_media' : _('Ignore handling media'),
             'rule_limit' : _('Limit for rules'),
             'use_keyword_learning' : _('Use keyword learning'),
             'ranking_scheme' : _('Ranking Scheme/Algo'),
-            'use_search_habits' : _('Use search habits'),
             'no_history' : _('Do not save queries in History'),
-            'learn_from_added_entries': _('Learn from added Entries'),
             'default_entry_weight' : _('Default Entry weight'),
             'default_rule_weight' : _('Default Rule weight'),
             'query_rule_weight' : _('Default Rule wieght (query)'),
@@ -545,12 +543,13 @@ CONFIG_NAMES = {
             'window_name_exclude' : _('Phrases to exclude from window name'),
 
             'imave_viewer': _('Image viewer command'),
-            'text_viewer': _('Text File viewer command'),
             'search_engine': _('Search Engine to use in GUI'),
             'gui_clear_cache' : _('Clear image cache after n days'),
-            'gui_key_search': _('New Search shortkut key'),
+
             'gui_key_new_entry': _('New Entry shortcut key'),
             'gui_key_new_rule': _('New Rule shortcut key'),
+            'gui_key_add': _('Add item from tab shortcut key'),
+            'gui_key_edit': _('Edit item from tab shortcut key'),
 
             'normal_color' : _('CLI normal color'),
             'bold_color': _('CLI bold style'),
@@ -565,11 +564,11 @@ CONFIG_INTS_Z=('rule_limit','gui_clear_cache','default_depth','gui_layout','gui_
 CONFIG_FLOATS=('default_entry_weight', 'default_rule_weight', 'query_rule_weight' )
 
 CONFIG_STRINGS=('log','db_path','browser','lang','user_agent', 'fallback_user_agent', 'gui_notify_group', 'window_name_exclude', 'ranking_scheme',\
-    'gui_new_color','gui_deleted_color', 'gui_hilight_color', 'gui_default_flag_color' ,'imave_viewer','text_viewer','search_engine','bold_markup_beg','bold_markup_end')
-CONFIG_KEYS=('gui_key_search','gui_key_new_entry', 'gui_key_new_rule')
+    'gui_new_color','gui_deleted_color', 'gui_hilight_color', 'gui_default_flag_color' ,'imave_viewer', 'search_engine','bold_markup_beg','bold_markup_end')
+CONFIG_KEYS=('gui_key_new_entry', 'gui_key_new_rule', 'gui_key_add', 'gui_key_edit',)
 
-CONFIG_BOOLS=('notify','ignore_images', 'ignore_media', 'use_keyword_learning', 'learn_from_added_entries','do_redirects','ignore_modified','gui_desktop_notify',
-'gui_fetch_periodically', 'use_search_habits', 'save_perm_redirects', 'mark_deleted', 'no_history')
+CONFIG_BOOLS=('notify','ignore_images', 'use_keyword_learning', 'do_redirects','ignore_modified','gui_desktop_notify',
+'gui_fetch_periodically', 'save_perm_redirects', 'mark_deleted', 'no_history')
 
 CONFIG_COLS=('normal_color','bold_color')
 

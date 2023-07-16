@@ -320,12 +320,24 @@ class FeedexRSSHandler:
         for i in self.images:
             href = scast( slist(i, 2, None), str, '')
             feed_id = scast( slist(i, 0, 0), str, '0')
-            
+            icon_filename = os.path.join(self.DB.icon_path, f'feed_{feed_id}.ico' )
             if href not in (None, 0):
                 debug(3, f'Downloading image for feed {feed_id} from {href}...')                
-                fdx.download_res(href, ofile=os.path.join(self.DB.icon_path, f'feed_{feed_id}.ico' ), user_agent=self.agent)
-
-
+                fdx.download_res(href, ofile=icon_filename, user_agent=self.agent)
+            
+            # Fallback to catalog icons
+            if not os.path.isfile(icon_filename):
+                feed_url = ''
+                for f in fdx.feeds_cache:
+                    if f[self.feed.get_index('id')] == feed_id: 
+                        feed_url = f[self.feed.get_index('url')]
+                        break
+                if feed_url != '':
+                    hash_obj = hashlib.sha1(feed_url.encode())
+                    thumbnail_filename = os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'thumbnails', f"""{hash_obj.hexdigest()}.img""")
+                    if os.path.isfile(thumbnail_filename):
+                        try: copyfile(thumbnail_filename, icon_filename)
+                        except (IOError, OSError,) as e: msg(FX_ERROR_IO, f"""{_('Error copying thumbnail for feed')} {feed_id}: %a""", e)
 
 
 
@@ -337,7 +349,9 @@ class FeedexRSSHandler:
         if kargs.get('feed_raw') is not None:
             self.feed_raw = kargs.get('feed_raw')
 
-        if self.feed_raw.get('feed',None) is None: return f'{_("Downloaded feed empty")} ({feed.name()})!'
+        if self.feed_raw.get('feed',None) is None: 
+            self.error = True
+            return msg(f'{_("Downloaded feed empty")} ({feed.name()})!')
 
         self.feed.clear()
         # Get image urls for later download
@@ -494,7 +508,7 @@ class FeedexHTMLHandler(FeedexRSSHandler):
     def _do_download(self, url: str, **kargs):
         """ Download HTML resource """
         response, html = fdx.download_res(url, output_pipe='', user_agent=self.agent, mimetypes=FEEDEX_TEXT_MIMES)
-        if response == -3: return {}
+        if type(response) is int or type(html) is not str: return {}
 
         feed_raw = {}
         feed_raw['status'] = response.status
@@ -526,7 +540,7 @@ class FeedexHTMLHandler(FeedexRSSHandler):
             debug(3, f"""Downloading {self.ifeed.get('url')} ...""")
             self.feed_raw = self._do_download(self.ifeed.get('url'), download_only=True)
 
-        if not self.error: return self._parse_html(self.feed_raw.get('raw_html'))
+        if not self.error and type(self.feed_raw.get('raw_html')) is str: return self._parse_html(self.feed_raw.get('raw_html'))
         else: return FX_ERROR_HANDLER, '<???>', '<???>', '<???>', '<???>', '<???>', () 
 
 
@@ -555,6 +569,10 @@ class FeedexScriptHandler:
             msg(FX_ERROR_HANDLER, _('No script file or command provided!'))
             return {}
 
+        # Setup running environ
+        run_env = os.environ.copy()
+        run_env['FEEDEX_FEED_JSON'] = None
+
         # Substitute command line params ...
         rstr = random_str(string=command)
         command = command.split()
@@ -575,7 +593,7 @@ class FeedexScriptHandler:
         debug(3, f"""Runing script: {' '.join(command)}""")
 
         try:
-            comm_pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            comm_pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=run_env)
             json_str = comm_pipe.stdout.read()
         except OSError as e:
             self.error = True
@@ -586,7 +604,7 @@ class FeedexScriptHandler:
 
         try:
             return json.loads(json_str)
-        except (OSError, JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError,) as e:
             self.error = True
             msg(FX_ERROR_HANDLER, _("Error decoding JSON: %a"), e)
             return {}

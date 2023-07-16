@@ -38,6 +38,10 @@ Usage: <b>feedex [parameters|filters] [actions]</b>
         --long                                  Show long output for queries
         --headlines                             Output only date, title and channel
 
+        --create-db                             Create database in default location or specified by <b>--database=PATH</b>
+                                                Additional options:
+                                                    --defaults      Import default Flags, Rules etc.
+                                                    --default-feeds Import default Feeds 
 
     <b>!!! See feedex -hh for full manual !!!</b>
         --help-query                            Manual for Queries
@@ -62,10 +66,10 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
     adding a news channel with URL or simply as a tool to read, query and analyse news/notes.
 
     Technical notes:
-    Feedex uses <b>SQLite</b> database to store data and Xapian for indexing. DB and index by default can be found in <b>~/.local/share/feedex/feedex.db/</b>
-    Language Models, used to rank and extract keywords, can be found in <b>/use/share/feedex/models</b> in pickle format. 
-    You can add new language model with examples in <b>/usr/share/feedex/data/model_generators</b> directory.
-    Icons and thumbnails are saved separately in <b>~/.local/share/feedex/icons</b> and <b>~/.local/share/feedex/cache</b> respectively.
+    Feedex uses <b>SQLite</b> database to store data and <b>Xapian</b> for indexing. Ranking, indexing, feature learning and text summary
+    are performed by heuristic language models in <b>smallsem</b> module with "good enough" precision-performance balance. 
+    RSS is handled by <b>UniversalFeedParser</b> library. Resources like images and HTML documents are handled with <b>URLLib</b>.
+              
 
     <b>General:</b>
         -h, --help                              Show short help
@@ -85,9 +89,6 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         
         --export, --export=FILE                 Export results as JSON string compatibile for later import (query results-entries, feeds, rules, flags)
         --ofile=FILE                            Output file for export
-
-        --html-template=[FILE]                  Output results as HTML using a template from text file
-                                                See --help-html for more information abot displaying results in HTML format
 
         --silent                                Do not print output
 
@@ -309,10 +310,17 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
         --batch_size=INT                        The size of processed entries before committing
 
+        
+        --download-catalogue [OUTPUT DIR]       Download feed catalogue from blog.feedspot.com. For development and testing
 
                                                     
     <b>Database:</b>
-
+                   
+        --create-db                             Create database in default location or specified by <b>--database=PATH</b>
+                                                Additional options:
+                                                    --defaults      Import default Flags, Rules etc.
+                                                    --default-feeds Import default Feeds 
+        
         --lock-db, --unlock-db                  Force-lock/unlock database (use with caution)
         --lock-fetching,
         --unlock-fetching                       Force-lock/unlock database for fetching. Useful for scripts and error recovery
@@ -797,12 +805,12 @@ Each entry has 'weight' field, that is also multiplied when matching to offset a
 Each rule's weight is also multiplied by weight of a field it was extracted from, e.g. you will want title to bear more weight
 than text. Field weight is implemented during feature learning
 
-Learned rules are simply features extracted by ling_processor according to tagging and rules whenever entry is opened in browser
-or marked. Example language model is described in comments in <b>sample_model_generator.py</b> in 'utils' folder along with mechanism
-used for analysis, extraction, tagging and tokenizing.
-
+Learned rules are simply features extracted by NLProcessor according to tagging and rules whenever entry is opened in browser
+or marked. Example language models can be found in <b>tools</b> directory with comments explaining how they work.
+                    
 Rules are stored in DB in rules table. Below are field descriptions:
 
+                    
     <b>id</b>                   unique identifier for a rule (integer)
     <b>name</b>                 name of rule used for display (<i>not matching!</i> Display only)
     <b>type</b>                 matching type of a rule:
@@ -877,6 +885,8 @@ Several parameters can be passed in the command and be replaced by variables:
     <b>%F</b>   Feed's ID
     <b>%%</b>   % character
 
+<i>Environment variable FEEDEX_FEED_JSON is added containing JSON string of processed channel for use in the script</i>                        
+                        
 <b>Output JSON string should have specific format:</b>
 
 {
@@ -888,7 +898,7 @@ Several parameters can be passed in the command and be replaced by variables:
 <i>#Feed data...</i>
 <b>feed</b>:  {
                     'title': ...
-                    'pubdate': <i>#Updated date string</b>
+                    'pubdate': <i>#Updated date string</i>
                     'image': <i>#link to feed's icon/emblem</i>
                     'charset': ...
                     'lang': <i>#Language code, e.g. 'en'</i>
@@ -905,13 +915,13 @@ Several parameters can be passed in the command and be replaced by variables:
                                 },
                                 ...
                                 ]
-
                 }
-
 }
+""")
 
 
 
+FEEDEX_HELP_JSON_QUERY = _("""
 <b>Feedex: JSON queries</b>
 
 You can query Feedex by using JSON string as a phrase and --json_query parameter. All filters will be overwritten by fields from JSON string.
@@ -968,95 +978,39 @@ Fields are:
 
 
 
-FEEDEX_HELP_HTML=_("""
-<b>Feedex: HTML Output</b>
-
-Using the --html-template= option user can output results in a predefined HTML format. Every result is processed and marked field names
-in the template are replaced with relevant fields. HTML special characters are escaped. Nearly every query can be processed in this way.
-
-Field names must be contained within <%,%> strings, e.g. '<%title%>' will be replaced with the field 'title' from result. 
-
-If field by a given name is not found, no changes will be made.
-
-<b>Additional options:</b>
-
-    --to-files-at-dir=[TARGET_DIR]      Save as separate files at TARGET_DIR - for mass-generated content
-    --to-files-names=[STR]              Naming pattern for created files. STR is parsed the same as template (<%field%> is valid)
-                                        Field valus will be truncated. Spaces and special characters will be escaped with _ character.
-                                        User must take care of uniqueness. Good practice would be including <%id%> field in name string.
-                                        Example:
-                                            --to-files-names='<%id%>_<%pubdate_str%>_<%title%>.html'
 
 
-<b>Field names:</b>
+FEEDEX_HELP_PLUGINS = _("""
+<b>Feedex: Plugins</b>
 
-    Field names are the same as SQL fields described in <b>--help-entries</b>, <b>--help-feeds</b>, and <b>--help-rules</b> sections.
+Plugins allow user to run scripts/commands on various Feedex items. 
+When executing a plugin command certain substitutions will be made:
+                        
+    <b>%%</b>                       Percent (%) character
+                        
+    <b>%[FIELD_NAME]%</b>           Value from item's field (for search result, channel and category plugins)
+                                        e.g. %desc% will be substituted for description
 
-Some queries have additional fields:
+    <b>%selected_text%</b>          Text selected from preview. Useful e.g. for sending text to browsers
 
-    Query with phrase:
+                        
+    <b>%choose_file_save%</b>       File chooser dialog for a new file will be displayed and chosen filename will be substituted for this string        
+    <b>%choose_file_open%</b>       File chooser dialog for an existing file will be displayed and chosen file will be substituted for this string        
+    <b>%choose_dir_open%</b>        Folder chooser dialog will be displayed and chosen folder will be substituted for this string        
 
-        rank                Result ranking (tf-idf or Xapian)
-        count               Count of phrase occurrences
-        snippets            A list of snippets 
+                        
+Following environment variables are available:
 
+    <b>FEEDEX_TABLE_TYPE</b>            Result table type (e.g. entries, feeds, rules, terms, time_series, keywords)
+    <b>FEEDEX_RESULT_FIELDS_JSON</b>    JSON string containing container orderred container field name list
+    <b>FEEDEX_RESULTS_JSON</b>          JSON string containing query results for relevant plugin
+    <b>FEEDEX_ITEM_JSON</b>             JSON string for item like entry/term/channel/category
+    <b>FEEDEX_SELECTED_TEXT</b>         String with selected text                     
 
-    All querries for entries:
-
-        feed_name           Name of Channel/Category
-        parent_name         Name of Feedex Category 
-        feed_name_id        Name of Channel/Category with ID
-        flag_name           Name of Flag
-        pubdate_short       Short version of Published Date
-
-    Entries grouped in a summary have additonal 'is_node' field (1 means this row is a node)
-
-
-    Time series queries have only two fields:
-
-        time                The time slice (depends on grouping)
-        frequency           Term/Document frequency
-
-    Contexts have additional 'context' field
-
-    Related terms:
-        term, weight, count
-
-    Keywords for etry: 
-        term, weight
-
-    
-
-<b>EXAMPLE:</b>
-
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/>
-        <meta name="date" content="<%pubdate_str%>"/>
-        <meta name="title" content="<%title%>"/>
-        <meta name="url" content="<%link%>"/>
-    </head>
-
-    <body>
-        <a class="ulink" href="<%link%>"><%title%></a> (<%feed_name%>, <%author%>)
-        <p>
-        <%pubdate_str%>
-        </p>
-
-        <p>
-        <%category%>
-        </p>
-
-        <p>
-        <%desc%>
-        </p>
-        <p>
-        <%title%>
-        </p>
-
-    </body>
-</html>
-<!!!--------------------------------------------- doc section for splitting
+                        
+Output from executed command will be send to status bar. 
+Pipes and redirecting are not allowed.
+                        
+Plugin examples can be found in data/examples/plugins folder.
 
 """)

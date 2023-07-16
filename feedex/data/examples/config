@@ -11,24 +11,27 @@ log = ~/.local/share/feedex/feedex.log
 # Path to news SQLite3 database
 db_path = ~/.local/share/feedex/feedex.db
 # Database timeout
-timeout = 5
+timeout = 120
 
 
-# Command for openning URLs, Text files and viewing images
+# Command for openning URLs and Images
 browser = xdg-open %u
-text_viewer = xdg-open %u
 image_viewer = xdg-open %u
 
 default_rule_weight = 2
 
-# Learn keywords from manually added entries?
-learn_from_added_entries = True
-# ... what should be the weight?
+
+# What weight should manually added (not fetched from RSS/HTML/Script) items get
+# It will affect ranking. Zero (0) will disable learning on added entries 
 default_entry_weight = 2
 
-# Learning and ranking
+# Use feature learning at all>
 use_keyword_learning = True
+
+# Limit learned rules used for ranking. Can boost performance and precision
 rule_limit = 50000
+
+# Use search history for ranking
 use_search_habits = True
 
 # Snippet length (to exclude long wildcard matches)
@@ -43,10 +46,10 @@ default_depth = 5
 
 
 # Limit similarity search results for better performance
-default_similarity_limit = 20
+default_similarity_limit = 30
 
 # How similarity query should increase entry's importance?
-default_similar_weight = 2
+default_similar_weight = 0
 
 # Fetching and WWW connections
 error_threshold = 5
@@ -77,12 +80,15 @@ gui_key_search = s
 gui_key_new_entry = n
 gui_key_new_rule = r
 gui_layout = 0
-gui_orientation = 2
-gui_startup_page = 2
+gui_orientation = 0
+
 search_engine = https://duckduckgo.com/?t=ffab&q=%Q&ia=web
+
+# Clear cache (thumbnails, temp files) from items older than ...
 gui_clear_cache = 30
 
 # Desktop integration options 
+# Exclude those strings from window names when adding entry from desktop selection buffer
 window_name_exclude = Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird
 
 # CLI display beautifiers

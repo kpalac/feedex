@@ -16,6 +16,11 @@ class FeedexDataError(FeedexDatabaseError):
     """ Something went wrong with retrieving or caching data like feeds, rules, flags etc."""
     def __init__(self, *args): super().__init__(*args)
 
+class FeedexDatabaseNotFoundError(FeedexDatabaseError):
+    """ Database does not exist and current connection is not authorized to create it """
+    def __init__(self, *args): super().__init__(*args)
+
+
 
 class FeedexDatabase:
     """ Database interface for Feedex with additional maintenance and utilities """
@@ -58,9 +63,10 @@ class FeedexDatabase:
 
         # Flag if db creation is allowed
         self.allow_create = kargs.get('allow_create',False)
-        self.no_defaults = kargs.get('no_defaults',False) # Should defaults be loaded upon creation?
+        # Flag if this connection created a new DB
+        self.created = False
 
-        self.timeout = kargs.get('timeout', self.config.get('timeout',15)) # Wait time if DB is locked
+        self.timeout = self.config.get('timeout', 600) # Wait time if DB is locked
         
 
         # Define SQLite interfaces
@@ -99,6 +105,8 @@ class FeedexDatabase:
 
     def connect(self, **kargs):
         """ Establish connection to DB and/or create it if not exists """
+        defaults = kargs.get('defaults', False)
+        default_feeds = kargs.get('default_feeds', False)
 
         # Check DB folders ...
         if not os.path.isdir(self.db_path):
@@ -106,31 +114,33 @@ class FeedexDatabase:
                 msg(_('DB not found. Creating one now at %a...'), self.db_path)
                 try:
                     os.makedirs(self.db_path)
+                    self.created = True
                     msg(_('Created %a...'), self.db_path)
                 except (OSError,) as e: raise FeedexDatabaseError(FX_ERROR_DB, _('Error creating database: %a'), e)
-            else: raise FeedexDatabaseError(FX_ERROR_DB, _('DB %a not found. Aborting...'), self.db_path)
+            else: raise FeedexDatabaseNotFoundError(FX_ERROR_DB, _('DB %a not found. Aborting...'), self.db_path)
 
-        if self.allow_create:
-            # Check/create cache and icon dirs
-            if not os.path.isdir(self.icon_path):
-                try:
-                    os.makedirs(self.icon_path)
-                    msg(_('Icon folder %a created...'), self.icon_path)
-                except (OSError, IOError): raise FeedexDatabaseError(FX_ERROR_DB, _('Error creating icon folder %a'), self.icon_path)
+        
+        # Check/create cache and icon dirs
+        if not os.path.isdir(self.icon_path):
+            try:
+                os.makedirs(self.icon_path)
+                msg(_('Icon folder %a created...'), self.icon_path)
+            except (OSError, IOError): raise FeedexDatabaseError(FX_ERROR_DB, _('Error creating icon folder %a'), self.icon_path)
 
-            if not os.path.isdir(self.cache_path):
-                try:
-                    os.makedirs(self.cache_path)
-                    msg(_('Cache folder %a created...'), self.cache_path)
-                except (OSError, IOError): raise FeedexDatabaseError(FX_ERROR_DB, _('Error creating cache folder %a'), self.cache_path)
+        if not os.path.isdir(self.cache_path):
+            try:
+                os.makedirs(self.cache_path)
+                msg(_('Cache folder %a created...'), self.cache_path)
+            except (OSError, IOError): raise FeedexDatabaseError(FX_ERROR_DB, _('Error creating cache folder %a'), self.cache_path)
 
 
         # Init SQLite DB
         if not os.path.isfile(self.sql_path): 
             if self.allow_create: 
-                create_sqlite = True 
+                create_sqlite = True
+                self.created = True
                 msg(_('Creating SQL DB %a...'), self.sql_path) 
-            else: raise FeedexDatabaseError(-2, _('SQL DB %a not found! Aborting...'), self.sql_path)
+            else: raise FeedexDatabaseNotFoundError(-2, _('SQL DB %a not found! Aborting...'), self.sql_path)
         else: create_sqlite = False
 
         # Establish SQLite3 connection and cursor...
@@ -160,13 +170,21 @@ class FeedexDatabase:
                 raise FeedexDatabaseError(FX_ERROR_DB, _('Error writing DDL scripts to database! %a'), e)
             
             # Add defaults if allowed ...
-            if not self.no_defaults:
+            if defaults:
                 try:
                     with open( os.path.join(sql_scripts_path,'feedex_db_defaults.sql'), 'r') as sql: sql_ddl = sql.read()
                     with self.conn: self.curs.executescript(sql_ddl)
                     msg(0, _('Added defaults...'))
                 except (sqlite3.Error, sqlite3.OperationalError, OSError) as e:
                     raise FeedexDatabaseError(FX_ERROR_DB, _('Error writing defaults to database: %a'), e)
+
+            if default_feeds:
+                try:
+                    with open( os.path.join(sql_scripts_path,'feedex_db_default_feeds.sql'), 'r') as sql: sql_ddl = sql.read()
+                    with self.conn: self.curs.executescript(sql_ddl)
+                    msg(0, _('Added default Feeds...'))
+                except (sqlite3.Error, sqlite3.OperationalError, OSError) as e:
+                    raise FeedexDatabaseError(FX_ERROR_DB, _('Error writing default feeds to database: %a'), e)
 
         if self.allow_create:
             # Checking versions and aborting if needed
@@ -699,15 +717,15 @@ class FeedexDatabase:
             self.update_stats()
             doc_count = self.qr_sql("select val from params where name = 'doc_count'", one=True)
             if doc_count in (None, (None,),()): return fdx.doc_count
-        doc_count = scast(doc_count[0], int, 1)
-        fdx.doc_count = doc_count
+        doc_count = scast(slist(doc_count,0, -1), int, 1)
+        if doc_count != -1: fdx.doc_count = doc_count
         return doc_count
 
 
 
     def get_last_docid(self, **kargs):
         """ Get last document ID from SQL database """
-        doc_id = scast( self.qr_sql("select max(id) from entries", one=True)[0], int, 0)
+        doc_id = scast( slist(self.qr_sql("select max(id) from entries", one=True), 0, -1), int, 0)
         if self.status != 0: return -1
         return doc_id
 
@@ -784,7 +802,6 @@ class FeedexDatabase:
 
     def import_entries(self, **kargs):
         """ Wraper for inserting entries from list of dicts or a file """
-        learn = kargs.get('learn', self.config.get('use_keyword_learning', True))
         pipe = kargs.get('pipe',False)
         efile = kargs.get('efile')
         elist = kargs.get('elist')
@@ -820,7 +837,6 @@ class FeedexDatabase:
 
             entry.clear()
             entry.strict_merge(e)
-            entry.learn = learn
             
             err = entry.add(new=e, update_stats=False, counter=i)
             if err == 0: num_added += 1
@@ -847,18 +863,29 @@ class FeedexDatabase:
         if feed_data == -1: return -1
 
         self.cache_feeds()
-        max_id = max(map(lambda x: x[0], fdx.feeds_cache))
+        if len(fdx.feeds_cache) == 0: max_id = 0
+        else: max_id = max(map(lambda x: x[0], fdx.feeds_cache))
 
         if type(feed_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
 
-        feed = SQLContainer('feeds', FEEDS_SQL_TABLE)
+        feed = FeedexFeed(self)
         insert_sql = []
         for f in feed_data:
             if type(f) is not dict: return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
             feed.clear()
-            feed.merge(f)
-            feed['id'] += max_id
-            if feed['parent_id'] is not None: feed['parent_id'] += max_id
+            feed.strict_merge(f)
+            feed_id = feed['id'] + max_id
+            if scast(feed['parent_id'], int, 0) > 0: parent_id = scast(feed['parent_id'], int, 0) + max_id
+            else: parent_id = None
+            feed['id'] = None
+            feed['parent_id'] = None
+            
+            err = feed.validate()
+            if err != 0: return msg(*err)
+
+            feed['id'] = feed_id
+            feed['parent_id'] = parent_id
+            
             insert_sql.append(feed.vals.copy())
 
         if len(insert_sql) > 0:
@@ -880,13 +907,17 @@ class FeedexDatabase:
 
         if type(rule_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
 
-        rule = SQLContainer('rules', RULES_SQL_TABLE)
+        rule = FeedexRule(self)
         insert_sql = []
         for r in rule_data:
             if type(r) is not dict: return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
             rule.clear()
-            rule.merge(r)
+            rule.strict_merge(r)
             rule['id'] = None
+            
+            err = rule.validate()
+            if err != 0: return msg(*err)
+            
             insert_sql.append(rule.vals.copy())
 
         if len(insert_sql) > 0:
@@ -908,12 +939,16 @@ class FeedexDatabase:
 
         if type(flag_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
 
-        flag = SQLContainer('flags', FLAGS_SQL_TABLE)
+        flag = FeedexFlag(self)
         insert_sql = []
         for f in flag_data:
             if type(f) is not dict: return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
             flag.clear()
-            flag.merge(f)
+            flag.strict_merge(f)
+
+            err = flag.validate()
+            if err != 0: return msg(*err)
+
             insert_sql.append(flag.vals.copy())
 
         if len(insert_sql) > 0:
