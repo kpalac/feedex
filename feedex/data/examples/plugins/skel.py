@@ -8,39 +8,16 @@ import os
 import json
 
 
+TMP_FILE_ENV = os.getenv('FEEDEX_TMP_FILE')
+TABLE_ENV = os.getenv('FEEDEX_TABLE')
+FIELDS_ENV = os.getenv('FEEDEX_FIELDS')
 
-RESULTS_JSON = os.getenv('FEEDEX_RESULTS_JSON','')
-try: RESULTS = json.loads(RESULTS_JSON)
-except (json.JSONDecodeError,): RESULTS = ''
-
-FIELDS_JSON = os.getenv('FEEDEX_RESULT_FIELDS_JSON','')
-try: FIELDS = json.loads(FIELDS_JSON)
-except (json.JSONDecodeError,): FIELDS = ''
-
-ITEM_JSON = os.getenv('FEEDEX_ITEM_JSON','')
-try: ITEM = json.loads(ITEM_JSON)
-except (json.JSONDecodeError,): ITEM = ''
-
-RESULT_TYPE = os.getenv('FEEDEX_TABLE_TYPE','')
-
-if len(sys.argv) > 1:
+if len(sys.argv) > 2:
     OFILE = sys.argv[1]
-else: OFILE = None
+    TMP_FILE = sys.argv[2]
+else: sys.exit(1)
 
 
-
-if OFILE is not None:
-     with open(OFILE, 'w') as f: 
-         f.write(f"""
-Feedex Pugin Test
-
-Table Type: {RESULT_TYPE}
-Fields: {', '.join(FIELDS)}                                         
-
-RESULTS: {RESULTS_JSON}
-
-""")
-         
-print('Plugin executed...')
+print(f'Plugin executed: {TMP_FILE};{TMP_FILE_ENV};{TABLE_ENV};{FIELDS_ENV}')
 
 

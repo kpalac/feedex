@@ -166,6 +166,13 @@ class PreferencesDialog(Gtk.Dialog):
         self.result = {}
         self.response = 0        
 
+        # Markers if reloads, restarts etc. are required
+        self.restart = False
+        self.reload = False
+        self.reload_lang = False
+        self.reload_decor = False
+
+
         self.desktop_notify_button = Gtk.CheckButton.new_with_label(_('Enable desktop notifications?') )
         self.desktop_notify_button.connect('clicked', self.on_changed)
         self.desktop_notify_button.set_tooltip_markup(_('Should Feedex send desktop notifications on incomming news?') )
@@ -246,6 +253,8 @@ If no grouping is selected, it will simply show top results"""))
         key_edit_label = f_label(_('Hotkey, edit item from a tab: Ctrl + '))
         self.key_edit_entry = Gtk.Entry()
 
+        key_search_label = f_label(_('Hotkey, start search from a tab: Ctrl + '))
+        self.key_search_entry = Gtk.Entry()
 
 
 
@@ -257,9 +266,6 @@ If no grouping is selected, it will simply show top results"""))
 
         lang_label = f_label(_('Language:'))
         self.lang_combo = f_loc_combo()
-
-        self.ignore_images_button = Gtk.CheckButton.new_with_label(_('Ignore Images?'))
-        self.ignore_images_button.set_tooltip_markup(_('Should images and icons be ignored alltogether? Ueful for better performance'))
 
         browser_label = f_label(_('Default WWW browser:'))
         self.browser_entry = Gtk.Entry()
@@ -305,6 +311,10 @@ If no grouping is selected, it will simply show top results"""))
         self.db_entry = Gtk.Entry()
         self.db_entry.set_tooltip_markup(f"{_('Feedex database to be used.')}\n<i>{_('Changes require application restart')}</i>")
 
+        db_timeout_label = f_label(_('Timeout:'))
+        self.db_timeout_entry = Gtk.Entry()
+        self.db_timeout_entry.set_tooltip_markup(_("""This timeout tells after how many seconds should operation on busy database be aborted"""))
+
         log_label = f_label('Log file:')
         log_choose_button = f_button(None,'folder-symbolic', connect=self.on_file_choose_log, tooltip=_("Search filesystem"))
         self.log_entry = Gtk.Entry()
@@ -314,6 +324,15 @@ If no grouping is selected, it will simply show top results"""))
         user_agent_combo, self.user_agent_entry = f_user_agent_combo(tooltip=f"""{_('User Agent string to be used when requesting URLs. Be careful, as some publishers are very strict about that.')} 
 {_('Default is:')} {FEEDEX_USER_AGENT}
 <b>{_('Changing this tag is not recommended and for debugging purposes only')}</b>""")
+
+        fetch_timeout_label = f_label(_('Timeout:'))
+        self.fetch_timeout_entry = Gtk.Entry()
+        self.fetch_timeout_entry.set_tooltip_markup(_("Timeout for fetching remote resources"))
+    
+        profile_name_label = f_label(_('Profile name:'))
+        self.profile_name_entry = Gtk.Entry()
+        self.profile_name_entry.set_tooltip_markup(_("""Name of this configuration profile.
+If configuration has a name, its sessions are treated as separate with regards to caching, attributes and plugins"""))
 
         win_name_excl_label = f_label(_('Exclude from Window Name:'))
         self.win_name_excl_entry = Gtk.Entry()
@@ -357,7 +376,6 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         interface_grid.attach(self.layout_combo, 4, 2, 4,1)        
         interface_grid.attach(orientation_label, 1, 3, 3, 1)
         interface_grid.attach(self.orientation_combo, 4, 3, 4,1)        
-        interface_grid.attach(self.ignore_images_button, 1,4, 5,1)
         interface_grid.attach(new_color_label, 1,5, 3,1)
         interface_grid.attach(self.new_color_button, 4,5, 1,1)
         interface_grid.attach(del_color_label, 1,6, 3,1)
@@ -375,6 +393,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         interface_grid.attach(self.key_add_entry, 10, 7, 1,1)
         interface_grid.attach(key_edit_label, 7, 8, 3, 1)
         interface_grid.attach(self.key_edit_entry, 10, 8, 1,1)        
+        interface_grid.attach(key_search_label, 7, 9, 3, 1)
+        interface_grid.attach(self.key_search_entry, 10, 9, 1,1)        
 
         fetching_grid = create_grid()
         fetching_grid.attach(self.desktop_notify_button, 1,1, 4,1)
@@ -391,6 +411,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         fetching_grid.attach(self.error_threshold_entry, 4,8, 3,1)
         fetching_grid.attach(user_agent_label, 1,9, 2,1)
         fetching_grid.attach(user_agent_combo, 4,9, 3,1)
+        fetching_grid.attach(fetch_timeout_label, 1,10, 2,1)
+        fetching_grid.attach(self.fetch_timeout_entry, 4,10, 2,1)
 
 
         learn_grid = create_grid()
@@ -418,6 +440,9 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         system_grid.attach(db_label, 1,1, 3,1)
         system_grid.attach(db_choose_button, 4,1, 1,1)
         system_grid.attach(self.db_entry, 5,1, 10,1)
+        system_grid.attach(db_timeout_label, 16,1, 2,1)
+        system_grid.attach(self.db_timeout_entry, 18,1, 3,1)
+
         system_grid.attach(log_label, 1,2, 3,1)
         system_grid.attach(log_choose_button, 4,2, 1,1)
         system_grid.attach(self.log_entry, 5,2, 10,1)
@@ -436,6 +461,10 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
         system_grid.attach(clear_cache_label, 1,10, 5,1)
         system_grid.attach(self.clear_cache_entry, 7,10, 3,1)
+
+        system_grid.attach(profile_name_label, 1,11, 5,1)
+        system_grid.attach(self.profile_name_entry, 7,11, 3,1)
+
 
 
         self.notebook = Gtk.Notebook()
@@ -478,11 +507,11 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
 
     def on_file_choose_db(self, *args): 
-        filename = self.parent.chooser(self, action='open_dir', start_dir=os.path.dirname(self.config.get('db_path')), header=_('Choose Database...'))
+        filename = f_chooser(self, self.parent, action='open_dir', start_dir=os.path.dirname(self.config.get('db_path')), header=_('Choose Database...'))
         if filename is not False: self.db_entry.set_text(filename)       
 
     def on_file_choose_log(self, *args):
-        filename = self.parent.chooser(self, action='open_file', start_dir=os.path.dirname(self.config.get('log')), header=_('Choose Log File...'))
+        filename = f_chooser(self, self.parent, action='open_file', start_dir=os.path.dirname(self.config.get('log')), header=_('Choose Log File...'))
         if filename is not False: self.log_entry.set_text(filename)       
 
 
@@ -518,6 +547,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
 
     def on_restore(self, *args):
+
+        self.profile_name_entry.set_text(scast(self.config.get('profile_name'), str, ''))
 
         if self.config.get('use_keyword_learning', True): self.learn_button.set_active(True)
         else: self.learn_button.set_active(False)
@@ -569,14 +600,12 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         f_set_combo(self.layout_combo, self.config.get('gui_layout',0))        
         f_set_combo(self.orientation_combo, self.config.get('gui_orientation',0))        
         f_set_combo(self.lang_combo, self.config.get('lang'))
-        
-        if self.config.get('ignore_images',False): self.ignore_images_button.set_active(True)
-        else: self.ignore_images_button.set_active(False)
 
         self.key_new_entry_entry.set_text(coalesce(self.config.get('gui_key_new_entry','n'), ''))
         self.key_new_rule_entry.set_text(coalesce(self.config.get('gui_key_new_rule','r'), ''))
         self.key_add_entry.set_text(coalesce(self.config.get('gui_key_add','a'), ''))
         self.key_edit_entry.set_text(coalesce(self.config.get('gui_key_edit','e'), ''))
+        self.key_search_entry.set_text(coalesce(self.config.get('gui_key_search','e'), ''))
 
         self.browser_entry.set_text(coalesce(self.config.get('browser',''),''))
         self.external_iv_entry.set_text(coalesce(self.config.get('image_viewer',''),''))
@@ -592,9 +621,12 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         else: self.ignore_modified_button.set_active(False)
 
         self.db_entry.set_text(scast(self.config.get('db_path',''), str, _('<<ERROR>>')))
+        self.db_timeout_entry.set_text(scast(self.config.get('timeout',''), str, _('<<ERROR>>')))
+
         self.log_entry.set_text(scast(self.config.get('log',''), str, _('<<ERROR>>')))
 
         self.user_agent_entry.set_text(scast(self.config.get('user_agent'), str, FEEDEX_USER_AGENT))
+        self.fetch_timeout_entry.set_text(scast(self.config.get('fetch_timeout'), str, '0'))
 
         if self.config.get('no_history', False): self.no_history_button.set_active(True)
         else: self.no_history_button.set_active(False)
@@ -606,15 +638,18 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
     def validate_entries(self, *args):
         self.get_data()
-        err = fdx.validate_config(config=self.result, old_config=self.config, tryout=True)
+        err = fdx.validate_config(config=self.result, strict=True, load=False)
         if err != 0:
             self.err_label.set_markup(gui_msg(*err))
             return False
-        else:
-            return True
+        else: return True
+
+
 
 
     def get_data(self, *args):
+
+        self.result['profile_name'] = self.profile_name_entry.get_text()
 
         if self.learn_button.get_active(): self.result['use_keyword_learning'] = True
         else: self.result['use_keyword_learning'] = False
@@ -664,6 +699,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         self.result['gui_key_new_rule'] = self.key_new_rule_entry.get_text()
         self.result['gui_key_add'] = self.key_add_entry.get_text()
         self.result['gui_key_edit'] = self.key_edit_entry.get_text()
+        self.result['gui_key_search'] = self.key_search_entry.get_text()
 
         self.result['gui_layout'] = f_get_combo(self.layout_combo)
         self.result['gui_orientation'] = f_get_combo(self.orientation_combo)
@@ -680,12 +716,11 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         if self.ignore_modified_button.get_active(): self.result['ignore_modified'] = True
         else: self.result['ignore_modified'] = False
 
-        if self.ignore_images_button.get_active(): self.result['ignore_images'] = True
-        else: self.result['ignore_images'] = False
-
         self.result['db_path'] = nullif(self.db_entry.get_text(),'')
+        self.result['timeout'] = scast(self.db_timeout_entry.get_text(), int, 120)
         self.result['log'] = nullif(self.log_entry.get_text(),'')
         self.result['user_agent'] = coalesce(nullif(self.user_agent_entry.get_text(),''), FEEDEX_USER_AGENT)
+        self.result['fetch_timeout'] = scast(self.fetch_timeout_entry.get_text(), int, 0)
         self.result['window_name_exclude'] = self.win_name_excl_entry.get_text()
 
         if self.no_history_button.get_active(): self.result['no_history'] = True
@@ -695,6 +730,19 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
     def on_save(self, *args):
         if self.validate_entries():
+            if self.result.get('db_path') !=  self.config.get('db_path'): self.restart = True
+            if self.result.get('gui_layout') !=  self.config.get('gui_layout'): self.restart = True
+            if self.result.get('gui_orientation') !=  self.config.get('gui_orientation'): self.restart = True
+
+            if self.result.get('use_keyword_learning') !=  self.config.get('use_keyword_learning'): self.reload = True
+            if self.result.get('rule_limit') !=  self.config.get('rule_limit'): self.reload = True
+
+            if self.result.get('profile_name') !=  self.config.get('profile_name'): self.reload_decor = True
+
+            if self.result.get('lang') !=  self.config.get('lang'): 
+                self.restart = True
+                self.reload_lang = True
+
             self.response = 1
             self.close()
 
@@ -702,6 +750,127 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         self.response = 0
         self.result = {}
         self.close()
+
+
+
+
+
+
+
+
+
+
+class CalendarDialog(Gtk.Dialog):
+    """ Date chooser for queries """
+    def __init__(self, parent, **kargs):
+
+        self.response = 0
+        self.result = {'from_date':None,'to_date':None, 'date_string':None}
+
+        Gtk.Dialog.__init__(self, title=_("Choose date range"), transient_for=parent, flags=0)
+        self.set_default_size(kargs.get('width',400), kargs.get('height',200))
+        box = self.get_content_area()
+
+        from_label = f_label(_('  From:'), justify=FX_ATTR_JUS_LEFT, selectable=False, wrap=False)
+        to_label = f_label(_('    To:'), justify=FX_ATTR_JUS_LEFT, selectable=False, wrap=False)
+
+        self.from_clear_button = Gtk.CheckButton.new_with_label(_('Empty'))
+        self.from_clear_button.connect('toggled', self.clear_from)
+        self.to_clear_button = Gtk.CheckButton.new_with_label(_('Empty'))
+        self.to_clear_button.connect('toggled', self.clear_to)
+
+        accept_button = f_button(_('Accept'),'object-select-symbolic', connect=self.on_accept)
+        cancel_button = f_button(_('Cancel'),'window-close-symbolic', connect=self.on_cancel)
+
+        self.cal_from = Gtk.Calendar()
+        self.cal_to = Gtk.Calendar()
+        self.cal_from.connect('day-selected', self.on_from_selected)
+        self.cal_to.connect('day-selected', self.on_to_selected)
+
+
+
+        top_box = Gtk.HBox(homogeneous = False, spacing = 0)
+        bottom_box = Gtk.HBox(homogeneous = False, spacing = 0)
+
+        left_box = Gtk.VBox(homogeneous = False, spacing = 0)
+        right_box = Gtk.VBox(homogeneous = False, spacing = 0)
+
+        box.pack_start(top_box, False, False, 1)
+        box.pack_start(bottom_box, False, False, 1)
+
+        bottom_box.pack_start(cancel_button, False, False, 1)
+        bottom_box.pack_end(accept_button, False, False, 1)
+
+        top_box.pack_start(left_box, False, False, 1)
+        top_box.pack_start(right_box, False, False, 1)
+
+        left_box.pack_start(from_label, False, False, 1)
+        left_box.pack_start(self.cal_from, False, False, 1)
+        left_box.pack_start(self.from_clear_button, False, False, 1)
+
+        right_box.pack_start(to_label, False, False, 1)
+        right_box.pack_start(self.cal_to, False, False, 1)
+        right_box.pack_start(self.to_clear_button, False, False, 1)
+
+        self.show_all()
+        self.on_to_selected()
+        self.on_from_selected()
+
+    def on_accept(self, *args):
+        self.response = 1
+        if not self.from_clear_button.get_active():
+            (year, month, day) = self.cal_from.get_date()
+            self.result['from_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
+        else: self.result['from_date'] = None
+
+        if not self.to_clear_button.get_active():
+            (year, month, day) = self.cal_to.get_date()
+            self.result['to_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
+        else: self.result['to_date'] = None
+
+        self.result['date_string'] = f"""{coalesce(self.result['from_date'], '...')} - {coalesce(self.result['to_date'], '...')}"""
+        self.close()
+
+    def on_cancel(self, *args):
+        self.response = 0
+        self.result = {'from_date':None,'to_date':None, 'date_string':None}
+        self.close()
+        
+    def clear_from(self, *args):
+
+        if self.cal_from.get_sensitive():
+            self.cal_from.set_sensitive(False)
+        else:
+            self.cal_from.set_sensitive(True)
+
+    def clear_to(self, *args):
+        if self.cal_to.get_sensitive():
+            self.cal_to.set_sensitive(False)
+        else:
+            self.cal_to.set_sensitive(True)
+
+    def on_from_selected(self, *args):
+        (year, month, day) = self.cal_from.get_date()
+        self.result['from_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
+
+    def on_to_selected(self, *args):
+        (year, month, day) = self.cal_to.get_date()
+        self.result['to_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

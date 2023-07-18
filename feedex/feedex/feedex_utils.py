@@ -166,7 +166,7 @@ class FeedexMainBus:
         
         code, text, arg = self.parse_msg_args(*args, **kargs)
 
-        if code < 0: self.ret_status = abs(code)
+        if code < 0: self.ret_status = code
         else: self.ret_status = 0
         if do_print or log:
             if code < 0:
@@ -221,16 +221,13 @@ class FeedexMainBus:
         """ Parse configuration from a given file and put it to a general storage """
 
         self.config = {}
-        config_str = kargs.get('config_str')
 
-        if config_str is None:
-            try:        
-                with open(cfile, 'r') as f: lines = f.readlines()
-            except OSError as e:
-                self.msg(FX_ERROR_IO, f'{_("Error reading config from %a:")} {e}', cfile)
-                raise FeedexConfigError
-        else:
-            lines = config_str.splitlines()
+        try: 
+            with open(cfile, 'r') as f: lines = f.readlines()
+        except OSError as e:
+            self.msg(FX_ERROR_IO, f'{_("Error reading config from %a:")} {e}', cfile)
+            raise FeedexConfigError
+
 
         for l in lines:
 
@@ -266,22 +263,20 @@ class FeedexMainBus:
             
             self.config[option] = value
 
+        self.config_file = cfile
+
         debug(7, self.config)
-        return self.config
+        return 0
 
 
 
 
 
 
-    def save_config(self, ofile, **kargs):
+    def save_config(self, **kargs):
         """ Saves config dict to a file """
-        config = kargs.get('config', self.config)
-        base_config = self.parse_config(ofile)
-        for k,v in config.items(): base_config[k] = v
-
         contents = ''
-        for k,v in base_config.items():
+        for k,v in self.config.items():
             if v in (None,''): v = ''
             elif v is True: v = 'True'
             elif v is False: v = 'False'
@@ -289,12 +284,11 @@ class FeedexMainBus:
             contents = f"{contents}\n{k} = {v}"
 
         try:        
-            with open(ofile, 'w') as f: f.write(contents)
-            self.msg(_('Configuration saved to %a'), ofile)  
-            return contents
+            with open(self.config_file, 'w') as f: f.write(contents)
+            self.msg(_('Configuration saved to %a'), self.config_file)  
+            return 0
         except OSError as e:
-            self.msg(FX_ERROR_IO, f'{_("Error saving configuration to %a:")} {e}', ofile )
-            raise FeedexConfigError
+            return self.msg(FX_ERROR_IO, f'{_("Error saving configuration to %a:")} {e}', self.config_file )
 
 
 
@@ -304,10 +298,10 @@ class FeedexMainBus:
     def validate_config(self, **kargs):
         """ Validates config dictionary """
         config = kargs.get('config', self.config)
-        tryout = kargs.get('tryout',False)
+        strict = kargs.get('strict', False)
+        load = kargs.get('load', True)
 
         new_config = config.copy()
-        old_config = kargs.get('old_config',{}).copy()
 
         for k,v in config.items():
 
@@ -320,54 +314,34 @@ class FeedexMainBus:
 
             if k in CONFIG_INTS_NZ:
                 if v_int is None or v_int <= 0:
-                    if tryout: return FX_ERROR_VAL, _('%a must be integer > 0'), CONFIG_NAMES.get(k)
+                    if strict: return FX_ERROR_VAL, _('%a must be integer > 0'), CONFIG_NAMES.get(k)
                     else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
                     new_config[k] = DEFAULT_CONFIG[k]
             if k in CONFIG_INTS_Z:
                 if v_int is None or v_int < 0:
-                    if tryout: return FX_ERROR_VAL, _('%a must be integer >= 0'), CONFIG_NAMES.get(k)
+                    if strict: return FX_ERROR_VAL, _('%a must be integer >= 0'), CONFIG_NAMES.get(k)
                     else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
                     new_config[k] = DEFAULT_CONFIG[k]
             if k in CONFIG_BOOLS:
                 if v_bool is None:
-                    if tryout: return FX_ERROR_VAL, _('%a must be True or False'), CONFIG_NAMES.get(k)
+                    if strict: return FX_ERROR_VAL, _('%a must be True or False'), CONFIG_NAMES.get(k)
                     else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
                     new_config[k] = DEFAULT_CONFIG[k]
             if k in CONFIG_FLOATS:
                 if v_float is None:
-                    if tryout: return FX_ERROR_VAL, _('%a must be a valid number'), CONFIG_NAMES.get(k)
+                    if strict: return FX_ERROR_VAL, _('%a must be a valid number'), CONFIG_NAMES.get(k)
                     else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
                     new_config[k] = DEFAULT_CONFIG[k]
             if k in CONFIG_STRINGS:
                 if v_str is None:
-                    if tryout: return FX_ERROR_VAL, _('%a must be a valid string'), CONFIG_NAMES.get(k)
+                    if strict: return FX_ERROR_VAL, _('%a must be a valid string'), CONFIG_NAMES.get(k)
                     else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
                     new_config[k] = DEFAULT_CONFIG[k]
             if k in CONFIG_KEYS:
                 if v_str is None or len(v) > 1:
-                    if tryout: return FX_ERROR_VAL, _('%a must be a single character ([a-zA-Z0-9])'), CONFIG_NAMES.get(k)
+                    if strict: return FX_ERROR_VAL, _('%a must be a single character ([a-zA-Z0-9])'), CONFIG_NAMES.get(k)
                     else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
                     new_config[k] = DEFAULT_CONFIG[k]
-
-    
-        if tryout: 
-            config['restart'] = False
-            config['reload'] = False
-            config['reload_lang'] = False
-
-            if not os.path.isdir(config.get('db_path')): return FX_ERROR_VAL, _('Database directory %a does not exist!'), config.get('db_path')
-
-            if old_config.get('db_path') != config.get('db_path'): config['restart'] = True
-            if old_config.get('gui_layout') != config.get('gui_layout'): config['restart'] = True
-            if old_config.get('gui_orientation') != config.get('gui_orientation'): config['restart'] = True
-            if old_config.get('lang') != config.get('lang'): 
-                config['restart'] = True
-                config['reload_lang'] = True
-
-            if scast(old_config.get('use_keyword_learning'), bool, None) != scast( config.get('use_keyword_learning'), bool, None): config['reload'] = True
-            if scast(old_config.get('rule_limit'), int, None) != scast(config.get('rule_limit'), int, None): config['reload'] = True
-
-            return 0
 
 
         # ... CLI display and markup options ...
@@ -387,9 +361,10 @@ class FeedexMainBus:
         if config.get('bold_markup_end') is not None and type(config.get('bold_markup_end')) is str:
             BOLD_MARKUP_END = config.get('bold_markup_end')
 
-        self.config = new_config.copy()
-        return self.config
-
+        if load: self.config = new_config.copy()
+        
+        return 0
+    
 
 
     
@@ -481,8 +456,8 @@ class FeedexMainBus:
             arg = arg.replace('%U', main_arg)
             arg = arg.replace('%f', main_arg)
             arg = arg.replace('%F', main_arg)
-            if kargs.get('title') is not None: arg = arg.replace('%t', scast(kargs.get('title'), str, '') )
-            if kargs.get('alt') is not None: arg = arg.replace('%a', scast(kargs.get('alt'), str, '') )
+            if kargs.get('title') is not None: arg = arg.replace('%t', scast(kargs['title'], str, '') )
+            if kargs.get('alt') is not None: arg = arg.replace('%a', scast(kargs['alt'], str, '') )
             arg = arg.replace(rstr,'%')
             command[i] = arg
 
@@ -647,12 +622,19 @@ class FeedexMainBus:
 #   Resource downloading
 #
 
+    def hash_url(self, url, **kargs):
+        hash_obj = hashlib.sha1(url.encode())
+        return hash_obj.hexdigest()
+
     def download_res(self, url:str, **kargs):
         """ Downloading resurces and error handling """
         if url in self.download_errors: return 0, None
         verbose = kargs.get('verbose', True)
     
         headers = {'User-Agent' : coalesce(kargs.get('user_agent', self.config.get('user_agent')), FEEDEX_USER_AGENT) }
+        timeout = scast(kargs.get('timeout', self.config.get('fetch_timeout',0)), int, 0)
+        if timeout != 0: headers['timeout'] = timeout
+
         ofile = kargs.get('ofile')
         mimetypes = kargs.get('mimetypes', FEEDEX_IMAGE_MIMES)
         
@@ -753,10 +735,13 @@ class FeedexMainBus:
 
             # Strips markup from text - a simple one for speed and convenience
             # Handle tags...
-            raw_text = raw_text.replace("\n\r",' ')
-            raw_text = raw_text.replace("\n",' ')
-            raw_text = raw_text.replace("\r",' ')
-            raw_text = raw_text.replace("</p>","\n\n")
+            raw_text = raw_text.replace("\n\r","\n")
+            raw_text = raw_text.replace("\r","\n")
+            raw_text = raw_text.replace("<table>","\n")
+            raw_text = raw_text.replace("</table>","\n")
+            raw_text = raw_text.replace("</tr>","\n")
+            raw_text = raw_text.replace("<p>","\n")
+            raw_text = raw_text.replace("</p>","\n")
             raw_text = raw_text.replace("<br>","\n")
             raw_text = raw_text.replace("<br />","\n")
             raw_text = raw_text.replace("<br/>","\n")
@@ -768,18 +753,80 @@ class FeedexMainBus:
             raw_text = raw_text.replace('</i>','«')
             raw_text = raw_text.replace('<u>','»')
             raw_text = raw_text.replace('</u>','«')
+            raw_text = raw_text.replace('<strong>','»')
+            raw_text = raw_text.replace('</strong>','«')
             stripped_text = re.sub(RSS_HANDLER_STRIP_HTML_RE, '', scast(raw_text, str, ''))
             stripped_text = stripped_text.strip()
-
         else:
             stripped_text = raw_text
             images = ()
             links = ()
 
+        stripped_text = re.sub(" +", " ", stripped_text)
+        stripped_text = re.sub("\t+", "\t", stripped_text)
+        stripped_text = re.sub("\n\n\n", "\n\n", stripped_text)
+
         return stripped_text, images, links
 
 
 
+
+
+    def parse_res_link(self, string:str, **kargs):
+        """ Extracts elements and generates resource thumbnail filename for cache """
+        string = string.strip()
+        if string == '': return None
+        res = {'url':'', 'desc':'', 'title':'', 'alt':'', 'url_hash':'', 'thumbnail':''}
+        do_process_desc = False
+        gui = kargs.get('gui', True)
+
+        if string.startswith('http://') or string.startswith('https://'): res['url'] = string
+        else:
+            res['url'] = slist(re.findall(IM_URL_RE, string), 0, None)
+            do_process_desc = True
+
+        res['url'] = scast(res['url'], str, '')
+        # This is to avoid showing icons from feedburner etc.
+        if res['url'] == '': return None
+        for i in FEEDEX_IGNORE_THUMBNAILS:
+            if res['url'].startswith(i): return None
+
+        if do_process_desc:
+            alt = slist(re.findall(IM_ALT_RE, string), 0, '')
+            title = slist(re.findall(IM_TITLE_RE, string), 0, '')
+            res['alt'] = slist( self.strip_markup(scast(alt, str, ''), html=True), 0, '').strip()
+            res['title'] = slist( self.strip_markup(scast(title, str,''), html=True), 0, '').strip()
+            
+            if not gui:
+                desc=''
+                if title != '': desc=f"""<b>{res['title']}</b>"""
+                if alt != '': desc=f"""{desc}; <b>{res['alt']}</b>"""
+                if desc != '': desc = f"""{desc}({res['url']})"""
+                else: desc = res['url']
+                res['desc'] = desc
+
+        elif not gui: res['desc'] = res['url']
+
+        res['url_hash'] = self.hash_url(res['url'])
+        res['thumbnail'] = f"""{res['url_hash']}.img"""
+
+        return res
+
+
+
+
+    ######################################################################3
+    #
+    #       Catalog routines
+
+
+    def load_catalog(self, **kargs):
+        """ Load Feed catalog from JSON cache """
+        if not hasattr(self, 'catalog'): self.catalog = None
+        if self.catalog is None:
+            self.catalog = load_json(os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'catalog.json'), ())
+            if self.catalog == (): return FX_ERROR_IO
+        return 0
 
 
 
@@ -796,6 +843,8 @@ fdx = FeedexMainBus()
 # ... and alias messaging methods
 def msg(*args, **kargs): return fdx.msg(*args, **kargs)
 def debug(*args): return fdx.debug(*args)
+
+
 
 
 

@@ -97,7 +97,7 @@ class FeedexEntry(SQLContainerEditable):
 
     def open(self, **kargs):
         """ Open in browser """
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
 
         read = coalesce(self.vals['read'],0)
 
@@ -220,7 +220,7 @@ class FeedexEntry(SQLContainerEditable):
     def do_update(self, **kargs):
         """ Apply edit changes to DB """
         if not self.updating: return 0
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
 
         self.vals['adddate_str'] = datetime.now()
 
@@ -344,11 +344,11 @@ class FeedexEntry(SQLContainerEditable):
 
     def delete(self, **kargs):
         """ Delete from DB with rules if necessary """   
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
         id = kargs.get('id', None)
         if id is not None and self.vals['id'] is None: self.get_by_id(id)
         id = self.vals.get('id')
-        if id is None: return -8
+        if id is None: return FX_ERROR_NOT_FOUND
 
         if self.vals.get('deleted',0) == 1:
             err = self.DB.run_sql_multi_lock( \
@@ -377,6 +377,11 @@ class FeedexEntry(SQLContainerEditable):
 
 
         if self.DB.rowcount > 0:
+
+            im_file = os.path.join(self.DB.img_path, f"""{id}.img""")
+            if os.path.isfile(im_file):
+                try: os.remove(im_file)
+                except (OSError, IOError,) as e: msg(FX_ERROR_IO, f"""{_('Error removing image %a')}: {e}""", im_file)
 
             if not fdx.single_run: 
                 err = self.DB.load_rules()
@@ -633,7 +638,6 @@ class FeedexEntry(SQLContainerEditable):
                 if err != 0: return err
         
         return 0
-
 
 
 

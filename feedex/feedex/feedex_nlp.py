@@ -398,9 +398,6 @@ class FeedexLP(SmallSem):
             if r[6] == 1: case_ins = True
             else: case_ins = False
 
-            lang = r[7]
-            if lang is not None and lang != self.get_model(): continue
-
             rweight     = r[8]
             additive    = r[9]
             learned     = r[10]
@@ -473,7 +470,7 @@ class FeedexLP(SmallSem):
                     rule['field_id'] = field
                     rule['feed_id'] = feed
                     rule['flag'] = rflag
-                    rule['lang'] = lang
+                    rule['lang'] = r[7]
                     rule['weight'] = rweight
                     rule['context_id'] = context_id
 

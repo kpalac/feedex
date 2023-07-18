@@ -1081,8 +1081,6 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-
-
 #####################################################################
 #
 #       QUERY BUILDING
@@ -1684,7 +1682,85 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
+class FeedexCatalogQuery(FeedexQueryInterface):
+    """ Interface for querying feed import catalog """
+    def __init__(self, **kargs) -> None:
+        super().__init__()
+        self.result = ResultCatItem()
 
 
 
+    def resolve_cat(self, category):
+        """ Resolve category to ID """
+        for ci in fdx.catalog:
+            if ci[self.result.get_index('is_node')] == 1:
+                if ci[self.result.get_index('name')] == category or ci[self.result.get_index('id')] == category:
+                    return ci[self.result.get_index('id')]
+        msg(FX_ERROR_QUERY, _('Category %a not found!'), category)
+        return -1
 
+
+
+    def query(self, qr, filters, **kargs):
+        """ Query Catalog """
+        fdx.load_catalog()
+        if fdx.catalog in (None, (), []): 
+            self._empty()
+            return 0
+
+        load_all = kargs.get('load_all', False)
+
+        qr = scast(qr, str, '').lower()
+
+        # Resolve field
+        field = filters.get('field')
+        if field not in (None, 'name', 'desc', 'tags', 'location'): 
+            self._empty()
+            return msg(FX_ERROR_VAL, _('Invalid search field! Must be name, desc, tags or location.'))
+
+        # Resolve category
+        category = filters.get('category') 
+        if category is not None:
+            category = self.resolve_cat(category)
+            if category == -1:
+                self._empty()
+                return FX_ERROR_QUERY
+
+
+        self.results.clear()
+
+        if qr.strip() == '':
+            if category is None:
+                if load_all: self.results = fdx.catalog
+                else:
+                    for ci in fdx.catalog:
+                        if ci[self.result.get_index('is_node')] == 1: self.results.append(ci)
+
+            else:
+                for ci in fdx.catalog:
+                    if ci[self.result.get_index('is_node')] == 1 and ci[self.result.get_index('id')] == category: self.results.append(ci)
+                    if ci[self.result.get_index('is_node')] == 0 and ci[self.result.get_index('parent_id')] == category: self.results.append(ci)
+
+
+        else:
+
+            for ci in fdx.catalog:
+                if category is not None:
+                    if ci[self.result.get_index('id')] == category: 
+                        self.results.append(ci)
+                        continue
+                    if ci[self.result.get_index('parent_id')] != category: 
+                        continue 
+
+                if ci[self.result.get_index('is_node')] == 1: 
+                    self.results.append(ci)
+                    continue 
+
+                if field is None: search_text = f"""{ci[self.result.get_index('name')]} {ci[self.result.get_index('desc')]} {ci[self.result.get_index('tags')]} {ci[self.result.get_index('location')]}"""
+                else: search_text = scast(ci[self.result.get_index(field)], str, '')
+                search_text = search_text.lower()
+                if qr in search_text: self.results.append(ci)
+
+
+        self.result_no = len(self.results)
+        return 0

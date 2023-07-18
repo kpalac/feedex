@@ -17,13 +17,9 @@ from feedex_headers import *
 
 # Constants for Feedex GUI
 
-FEEDEX_GUI_ATTR_CACHE = os.path.join(FEEDEX_SHARED_PATH, 'feedex_gui_cache.json')
-
 
 
 # Plugin consts
-FEEDEX_GUI_PLUGINS = os.path.join(FEEDEX_SHARED_PATH, 'feedex_plugins.json')
-
 FX_PLUGIN_RESULT = 1
 FX_PLUGIN_ENTRY = 2
 FX_PLUGIN_SELECTION = 9
@@ -35,18 +31,10 @@ FX_PLUGIN_TABLE = ('id', 'type', 'name', 'command', 'desc',)
 FX_PLUGIN_TABLE_PRINT = (_('ID'), _('Type'), _('Name'), _('Command'), _('Description'),)
 FX_PLUGIN_TABLE_TYPES = (int, int, str, str, str,)
 
-# Catalogue consts
-FEEDEX_CATALOG_TABLE = ('id', 'name', 'desc', 'link_res', 'link_home', 'link_img', 'tags', 'location', 'handler', 
-                        'freq', 'popularity', 'regexes', 'parent_id', 'check', 'thumbnail', 'is_node', 'children_no', 'is_toggled')
-FEEDEX_CATALOG_TABLE_NAMES = ('id', _('Name'), _('Description'), _('Link'), _('Homepage'), 'link_image', _('Tags'), _('Location'), _('Type'), 
-                              _('Frequency'), _('Popularity'), 'regexes', 'parent_id', 'check', 'thumbnail', 'is_node', 'children_no', 'is_toggled')
-FEEDEX_CATALOG_TABLE_TYPES = (int,  str, str,str, str, str, str, str, str,      int, int, dict, int, bool, str,      int, int, bool )
-
-
 if PLATFORM == 'linux':
     FX_DEFAULT_PLUGINS = (
-        (1, FX_PLUGIN_SELECTION, _("Search Wikipedia"), f"xdg-open https://en.wikipedia.org/w/index.php?search=%selected_text%&title=Special%3ASearch&ns0=1", _("Search Wikipedia for selected text")),
-        (2, FX_PLUGIN_SELECTION, _("Search Google"), f"xdg-open https://www.google.com/search?q=%selected_text%", _("Search Google for selected text")),
+        (1, FX_PLUGIN_SELECTION, _("Search Wikipedia"), f"xdg-open https://en.wikipedia.org/w/index.php?search=%S&title=Special%3ASearch&ns0=1", _("Search Wikipedia for selected text")),
+        (2, FX_PLUGIN_SELECTION, _("Search Google"), f"xdg-open https://www.google.com/search?q=%S", _("Search Google for selected text")),
     )
 
 
@@ -73,12 +61,11 @@ FEEDEX_GUI_SEARCH_ENGINES=(
 "https://yandex.com/search/?text=%Q",
 )
 
-# This is needed to ignore downloading useless icons etc.
-FEEDEX_GUI_IGNORE_THUMBNAILS=(
-'http://feeds.feedburner.com',
-)
 
-FEEDEX_GUI_ICONS=('rss','www','script','mail','twitter','calendar','document','ok','edit',)
+FEEDEX_GUI_ICONS=('rss','www','script','mail','twitter','calendar','document','ok','edit','comment','warning','archive','bookmark','hand','heart','link',
+                  'money', 'violence', 'no_violence', 'community', 'terminal', 'dev', 'education', 'electronics','game','image','health','media',
+                  'science','utils','bug','toolkit','radio','google','player','audio','weather','notes','lightbulb', 'travel', 'sport','surprise',
+                  'markup', 'law', 'python', 'database', 'card', 'avatar', 'cert', 'shield', 'sun', 'night', 'voltage', 'clouds', 'rain', 'disk',)
 
 
 
@@ -344,7 +331,7 @@ FEEDEX_REGEX_HTML_TEMPLATES_SHORT = {
 
 
 #####################################################################################
-# GUI objects factories
+# GUI objects assembly methods
 
 
 
@@ -447,6 +434,35 @@ def f_dual_combo(store, **kargs):
 
 
 
+
+
+
+def f_combo_with_icons(store, **kargs):
+    """ Generic combo with icons """
+    tooltip = kargs.get('tooltip')
+    style = kargs.get('style',False)
+    
+    combo = Gtk.ComboBox()
+    text_rend = Gtk.CellRendererText()
+    icon_rend = Gtk.CellRendererPixbuf()
+    combo.pack_start(icon_rend, False)
+    combo.pack_start(text_rend, True)
+    combo.add_attribute(text_rend, 'text', 2)
+    combo.add_attribute(icon_rend, 'pixbuf', 1)
+    if style: combo.add_attribute(text_rend, 'weight', 3)
+    combo.set_model(store)
+
+    if tooltip is not None: combo.set_tooltip_markup(tooltip)
+    if kargs.get('ellipsize', True): text_rend.props.ellipsize = FX_ATTR_ELL_START
+    if kargs.get('color', False): combo.add_attribute(text_rend, 'foreground', 3)
+
+    return combo
+
+
+
+
+
+
 def f_user_agent_combo(**kargs):
     """ Construct combo with entry for custom User Agents"""
     tooltip = kargs.get('tooltip',f"""{_('Sometimes it is needed to change user anger tag if the publisher does not allow download (e.g. 403 HTTP response)')}
@@ -482,21 +498,44 @@ def f_search_engine_combo(**kargs):
     return combo, entry    
 
 
-def f_feed_icon_combo(**kargs):
+
+
+
+
+
+
+
+def f_feed_icon_combo(main_win, **kargs):
     """ Construct combo with standard display icons for feeds"""
     tooltip = kargs.get('tooltip', _("""Choose icon for this Channel. Leave empty to diplay downloaded logo, if present""") )
+    feed_id = kargs.get('id')
+    is_category = kargs.get('is_category', True)
 
-    search_engine_store = Gtk.ListStore(str)
-    for se in FEEDEX_GUI_ICONS: search_engine_store.append((se,))
+    store = Gtk.ListStore(str, GdkPixbuf.Pixbuf, str)
+    
+    if is_category: default = 'document'
+    else: default = 'rss'
 
-    combo = Gtk.ComboBox.new_with_entry()
-    combo.set_entry_text_column(0)
-    combo.set_model(search_engine_store)
+    if feed_id is not None:
+        if is_category: pb = main_win.icons.get(feed_id, main_win.icons[default])
+        else:
+            ico_path = os.path.join(main_win.DB.icon_path, f'feed_{feed_id}.ico')
+            if os.path.isfile(ico_path): pb = GdkPixbuf.Pixbuf.new_from_file_at_size( ico_path, 16, 16)
+            else: pb = main_win.icons.get(feed_id, main_win.icons[default])
+        store.append( ('', pb, f"""  {_('Default')}""") )
+    else:
+        pb = main_win.icons.get(default)
+        store.append( ('', pb, f"""  {_('Default')}""") ) 
 
-    entry = combo.get_child()
-    if tooltip is not None: combo.set_tooltip_markup(tooltip)
+    for ico in FEEDEX_GUI_ICONS:
+        pb = main_win.icons[ico]
+        store.append( (ico, pb, f' {ico}') )
+     
+    return f_combo_with_icons(store, **kargs)
 
-    return combo, entry    
+
+
+
 
 
 def f_layout_combo(**kargs):
@@ -622,8 +661,7 @@ def f_read_combo(**kargs):
 
 
 
-def f_flag_combo(**kargs):
-    """ Constr. combo for flag choosers and search filters """
+def f_flag_store(**kargs):
     if kargs.get('filters',True):
         store = [
         (None, _("Flagged and Unflagged"), None),
@@ -634,9 +672,23 @@ def f_flag_combo(**kargs):
     else:
         store = [(-1, _("No Flag"), None)]
         for fl in fdx.flags_cache.keys(): store.append( (fl, fdx.get_flag_name(fl), fdx.get_flag_color(fl) ) )
+    
+    if kargs.get('list_store',False):
+        lstore = Gtk.ListStore(str, str, str)
+        for si in store: lstore.append(si)
+        return lstore
+    
+    return store
 
+
+def f_flag_combo(**kargs):
+    """ Constr. combo for flag choosers and search filters """
+    store = f_flag_store(**kargs)
     kargs['color'] = True
     return f_dual_combo(store, **kargs)
+
+
+
 
 
 def f_cli_color_combo(**kargs):
@@ -647,38 +699,46 @@ def f_cli_color_combo(**kargs):
     return f_dual_combo(store, tooltip=tooltip, **kargs)
 
 
-def f_feed_combo(**kargs):
-    """ Builds Feed/Category store for combos. This action is often repeated """
-    store = []
+
+
+
+def f_feed_store(main_win, **kargs):
+    """ Build store for feeds and categories """
+    store = Gtk.ListStore(int, GdkPixbuf.Pixbuf, str, int)
+
     feed = ResultFeed()
     empty_label = kargs.get('empty_label' , _('-- No Category --'))
     exclude_id = kargs.get('exclude_id')
 
     if not kargs.get('no_empty',False):
-        store.append((-1, empty_label, 400))
+        store.append((-1, None, empty_label, 400))
 
     if kargs.get('with_templates',False):
         for k,v in FEEDEX_REGEX_HTML_TEMPLATES.items():
-            store.append( (-k, f"""{v.get('name',f'{_("Template")} {k}')}""", 700) )
+            store.append( (-k, main_win.icons.get('markup'), f"""{v.get('name',f'{_("Template")} {k}')}""", 700) )
     elif kargs.get('with_short_templates',False):
         for k,v in FEEDEX_REGEX_HTML_TEMPLATES_SHORT.items():
-            store.append( (-k, f"""{v.get('name',f'{_("Template")} {k}')}""", 700) )
+            store.append( (-k, main_win.icons.get('markup'), f"""{v.get('name',f'{_("Template")} {k}')}""", 700) )
 
     if kargs.get('with_categories',True):
         for c in fdx.feeds_cache:
             feed.populate(c)
             if feed['is_category'] == 1 and feed['deleted'] != 1 and feed['id'] != exclude_id:
-                store.append((feed['id'], feed.name(), 700,))
+                store.append((feed['id'], main_win.icons.get(feed['id']), feed.name(), 700,))
 
     if kargs.get('with_feeds',False):
         for f in fdx.feeds_cache:
             feed.populate(f)
             if feed['is_category'] != 1 and feed['deleted'] != 1 and feed['id'] != exclude_id:
-                store.append(  (feed['id'], feed.name(), 400,)  )
+                store.append(  (feed['id'], main_win.icons.get(feed['id']), feed.name(), 400,)  )
+    return store
 
-    kargs['icons'] = True
+
+def f_feed_combo(main_win, **kargs):
+    """ Builds Feed/Category store for combos. This action is often repeated """
     kargs['style'] = True
-    return f_dual_combo(store, **kargs)
+    store = f_feed_store(main_win, **kargs)
+    return f_combo_with_icons(store, **kargs)
 
 
 
@@ -918,7 +978,9 @@ def f_get_combo(combo, **kargs):
 
     if kargs.get('name',False): 
         if val is None: return None
-        else: return model[active][1]
+        else:
+            if type(model[active][1]) is str: return model[active][1] 
+            else: return model[active][2]
     else: return val
 
 
@@ -990,6 +1052,36 @@ def f_button(label:str, icon:str, **kargs):
 
 
 
+def f_set_button_image(button, image_path:str, **kargs):
+    """ Set image for f_image_button"""
+    if not os.path.isfile(image_path): 
+        image = Gtk.Image.new_from_icon_name('image-x-generic-symbolic', Gtk.IconSize.DIALOG)
+    else:
+        try: pb = GdkPixbuf.Pixbuf.new_from_file_at_size( image_path, 64, 64)
+        except Exception as e: return msg(FX_ERROR_IO, f"""{_('Error getting image from ')} {image_path}:""", e)
+        image = Gtk.Image.new_from_pixbuf(pb)
+    
+    for c in button.get_children(): button.remove(c)
+    button.add(image)
+    image.show()
+    return 0
+
+
+
+def f_image_button(image_path:str, **kargs):
+    """ Construct a button with image """
+    tooltip = kargs.get('tooltip')
+    button = Gtk.Button()
+    f_set_button_image(button, image_path)
+    if kargs.get('connect') is not None: 
+        args = kargs.get('args',[])
+        kwargs = kargs.get('kargs')
+        if kwargs is not None:
+            args = list(args)
+            args.append(kwargs)
+        button.connect('clicked', kargs.get('connect'), *args)
+
+    return button
 
 
 
@@ -1119,55 +1211,105 @@ def f_menu_item(item_type:int, label:str, connect, **kargs):
 
 
 
+def f_imagebox(res, **kargs):
+    """ Build a box with image in it provided a dictionary with specs """
+    eventbox = Gtk.EventBox()
+    try:
+        pixb = GdkPixbuf.Pixbuf.new_from_file(res['thumbnail'])
+        image = Gtk.Image.new_from_pixbuf(pixb)
+    except GLib.Error as e:
+        fdx.add_error(res['url'])
+        msg(FX_ERROR_HANDLER, _('Image error: %a'), e)
+        return None
+
+    build_res_tooltip(res)
+    image.set_tooltip_markup(f"""{res.get('tooltip')}Click to open in image viewer""")
+
+    eventbox.add(image)
+    image.show()
+    eventbox.show()
+    return eventbox
+
+
+
+def f_chooser(parent, main_win, *args, **kargs):
+    """ File chooser for porting """
+    action = kargs.get('action', 'open_file')
+    start_dir = kargs.get('start_dir')
+    mimes = kargs.get('mimes')
+
+    if action == 'save':
+        header = kargs.get('header',_('Save as...'))
+        dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.SAVE)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+    elif action == 'open_file':
+        header = kargs.get('header',_('Open File'))
+        dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.OPEN)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+    elif action == 'open_dir':
+        header = kargs.get('header',_('Open Folder'))
+        dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.SELECT_FOLDER)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+
+    if start_dir is not None: dialog.set_current_folder(start_dir)
+    else: dialog.set_current_folder(main_win.gui_cache.get('last_dir', os.getcwd()))
+    response = dialog.run()
+    if response == Gtk.ResponseType.OK:
+        filename = dialog.get_filename()
+    else: filename = False
+    dialog.destroy()
+
+    if action == 'save':
+        if os.path.isfile(filename):
+            dialog = YesNoDialog(parent, f'{_("Overwrite?")}', f'{_("File ")}<b>{esc_mu(filename)}</b>{_(" already exists!   Do you want to overwrite it?")}')
+            dialog.run()
+            if dialog.response == 1: os.remove(filename)
+            else: filename = False
+            dialog.destroy()
+        elif os.path.isdir(filename):
+            msg(FX_ERROR_IO, _('Target %a is a directory!'), filename)
+            filename = False
+
+    if filename in ('',None,False,): filename = False
+    else: main_win.gui_cache['last_dir'] = os.path.dirname(filename)
+
+    return filename
+
+
+
+
 
 ####################################################################################################
 # General GUI Utilities
 
 
-def process_res_links(string:str, cache_path:str):
-    """ Extracts elements and generates resource filename for cache """
-    string = string.strip()
-    if string == '': return 0
-    if string.startswith('http://') or string.startswith('https://'): url = string
-    else: url = slist(re.findall(IM_URL_RE, string), 0, None)
-    
-    # This is to avoid showing icons from feedburner etc.
-    if url is None: return 0
-    for i in FEEDEX_GUI_IGNORE_THUMBNAILS:
-        if url.startswith(i): return 0
-
-    alt = slist(re.findall(IM_ALT_RE, string), 0, '')
-    title = slist(re.findall(IM_TITLE_RE, string), 0, '')
-    alt = slist( fdx.strip_markup(scast(alt, str, ''), html=True), 0, '')
-    title = slist( fdx.strip_markup(scast(title, str,''), html=True), 0, '')
- 
-    hash_obj = hashlib.sha1(url.encode())
-    filename = os.path.join(cache_path, f"""{hash_obj.hexdigest()}.img""")
-
-    tooltip=''
-    if title.strip() not in ('',None): tooltip=f"""<b><i>{esc_mu(title)}</i></b>
-"""
-    if alt.strip() not in ('',None): tooltip=f"""{tooltip}<b>{esc_mu(alt)}</b>"""
-
-    return {'url':url, 'tooltip':tooltip, 'filename':filename, 'title':title, 'alt':alt}
-
-
-
-def create_thumbnail(url:str, ofile:str, **kargs):
-    """ Save remote resource to a thumbnail file """
-    kargs['verbose'] = False
-    response, res_data = fdx.download_res(url, mimetypes=FEEDEX_IMAGE_MIMES, output_pipe=BytesIO(), **kargs)
-    if response == -3: return -3
+def save_thumbnail(bin_data, ofile, **kargs):
+    """ Saves binary data to thumbnail """
     try:
-        img = Image.open(res_data)
+        img = Image.open(bin_data)
         img.thumbnail((150, 150))
         img.save(ofile, format="PNG")
         return 0
     except (OSError, UnidentifiedImageError, Image.DecompressionBombError, FileNotFoundError, AttributeError) as e:
-        return msg(FX_ERROR_HANDLER, f"""{_('Error saving thumbnail from %a: ')}{e}""")
+        return msg(FX_ERROR_HANDLER, f"""{_('Error saving thumbnail from ')}{url}: %a""", e)
 
 
+def download_thumbnail(url, ofile, **kargs):
+    """ Downloads an image from url and saves it to ofile """
+    kargs['verbose'] = kargs.get('verbose', False)
+    response, bin_data = fdx.download_res(url, mimetypes=FEEDEX_IMAGE_MIMES, output_pipe=BytesIO(), **kargs)
+    if response == -3: return -3
+    return save_thumbnail(bin_data, ofile, **kargs)
 
+
+def local_thumbnail(ifile, ofile, **kargs):
+    """ Creates thumbnail out of local image """
+    bin_data = BytesIO()
+    try:
+        with open(ifile, 'rb') as f: bin_data.write(f.read())
+    except (OSError, IOError,) as e: return msg(FX_ERROR_HANDLER, f"""{_('Error creating thumbnail for')} {ifile}: %a""", e)
+    return save_thumbnail(bin_data, ofile, **kargs)
+    
 
 
 
@@ -1190,67 +1332,6 @@ def image2pixbuf(im):
     pix = GdkPixbuf.Pixbuf.new_from_bytes(data, GdkPixbuf.Colorspace.RGB,
             False, 8, w, h, w * 3)
     return pix
-
-
-
-
-def get_icons(feeds, ficons):
-    """ Sets up a dictionary with feed icon pixbufs for use in lists """
-    icons = {}
-    icons['large'] = {}
-    for f,ic in ficons.items():
-        try: 
-            icons[f] = GdkPixbuf.Pixbuf.new_from_file_at_size(ic, 16, 16)
-        except Exception as e:
-            try: os.remove(ic)
-            except OSError as ee: msg(FX_ERROR_IO, f"""_('Error removing %a:'){ee}""", ic)
-            msg(FX_ERROR_IO, _('Image error: %a'), e)
-            continue
-
-        try: icons['large'][f] = GdkPixbuf.Pixbuf.new_from_file_at_size(ic, 32, 32)
-        except Exception as e: icons['large'][f] = icons.get(f)
-
-
-    icons['default']  = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 16, 16)
-    icons['main']  = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'feedex.png'), 64, 64)
-    icons['tray_new']  = GdkPixbuf.Pixbuf.new_from_file_at_size(    os.path.join(FEEDEX_SYS_ICON_PATH, 'tray_new.png'), 64, 64)
-    icons['doc'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'document.svg'), 16, 16)
-    icons['ok'] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, 'ok.svg'), 16, 16)
-    icons['error'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'error.svg'), 16, 16)
-    icons['trash'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'trash.svg'), 16, 16)
-    icons['calendar'] = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'calendar.svg'), 16, 16)
-    icons['new'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'new.svg'), 16, 16)
-    icons['db'] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, 'db.svg'), 64, 64)
-    icons['rss'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 16, 16)
-    icons['www'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'www.svg'), 16, 16)
-    icons['script'] = GdkPixbuf.Pixbuf.new_from_file_at_size(       os.path.join(FEEDEX_SYS_ICON_PATH, 'script.svg'), 16, 16)
-    icons['twitter'] = GdkPixbuf.Pixbuf.new_from_file_at_size(      os.path.join(FEEDEX_SYS_ICON_PATH, 'twitter.svg'), 16, 16)
-    icons['disk'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'disk.svg'), 16, 16)
-    icons['local'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'local.svg'), 16, 16)
-    icons['table'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'table.svg'), 16, 16)
-    icons['edit'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'edit.svg'), 16, 16)
-    icons['flag'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'flag.svg'), 16, 16)
-
-    icons['large']['default']  = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 32, 32)
-    icons['large']['doc'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'document.svg'), 32, 32)
-    icons['large']['ok'] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, 'ok.svg'), 32, 32)
-    icons['large']['error'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'error.svg'), 32, 32)
-    icons['large']['trash'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'trash.svg'), 32, 32)
-    icons['large']['calendar'] = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'calendar.svg'), 32, 32)
-    icons['large']['new'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'new.svg'), 32, 32)
-    icons['large']['rss'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 32, 32)
-    icons['large']['www'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'www.svg'), 32, 32)
-    icons['large']['script'] = GdkPixbuf.Pixbuf.new_from_file_at_size(       os.path.join(FEEDEX_SYS_ICON_PATH, 'script.svg'), 32, 32)
-    icons['large']['twitter'] = GdkPixbuf.Pixbuf.new_from_file_at_size(      os.path.join(FEEDEX_SYS_ICON_PATH, 'twitter.svg'), 32, 32)
-    icons['large']['disk'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'disk.svg'), 32, 32)
-    icons['large']['local'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'local.svg'), 32, 32)
-    icons['large']['table'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'table.svg'), 32, 32)
-    icons['large']['edit'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'edit.svg'), 32, 32)
-
-    icons['large']['main_emblem'] = Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_size(  os.path.join(FEEDEX_SYS_ICON_PATH,'feedex.png'), 64, 64))
-
-    return icons
-
 
 
 
@@ -1290,7 +1371,15 @@ def esc_mu(string, **kargs):
 
 
 
+def build_res_tooltip(res):
+    """ Builds tooltip for res """
+    tooltip=''
+    if res['title'] != '': tooltip=f"""<b><i>{esc_mu(res['title'])}</i></b>
+"""
+    if res['alt'] != '': tooltip=f"""{tooltip}<b>{esc_mu(res['alt'])}</b>
+"""
 
+    res['tooltip'] = tooltip
 
 
 
@@ -1299,616 +1388,35 @@ def esc_mu(string, **kargs):
 
 
 
-def validate_gui_cache(gui_attrs):
-    """ Validate GUI attributes in case the config file is not right ( to prevent crashing )"""
-    
-    
-    new_gui_attrs = {}
-    
-    new_gui_attrs['win_width'] = scast(gui_attrs.get('win_width'), int, 1500)
-    new_gui_attrs['win_height'] = scast(gui_attrs.get('win_height'), int, 800)
-    new_gui_attrs['win_maximized'] = scast(gui_attrs.get('win_maximized'), bool, True)
 
-    new_gui_attrs['div_horiz'] = scast(gui_attrs.get('div_horiz'), int, 400)
-    new_gui_attrs['div_vert2'] = scast(gui_attrs.get('div_vert2'), int, 700)
-    new_gui_attrs['div_vert'] = scast(gui_attrs.get('div_vert'), int, 250)
 
-    new_gui_attrs['feeds_expanded'] = scast(gui_attrs.get('feeds_expanded',{}).copy(), dict, {})
-    for v in new_gui_attrs['feeds_expanded'].values():
-        if type(v) is not bool: 
-            new_gui_attrs['feeds_expanded'] = {}
-            msg(FX_ERROR_VAL, _('Expanded feeds invalid. Defaulting...') )
-            break
 
-    new_gui_attrs['layouts'] = scast(gui_attrs.get('layouts'), dict, {})
-    if new_gui_attrs['layouts'] == {}:
-        msg(FX_ERROR_VAL, _('No valid layouts found. Defaulting...'))
-        new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
 
-    if new_gui_attrs['layouts'].keys() != FX_DEF_LAYOUTS.keys(): 
-        msg(FX_ERROR_VAL, _('Invalid layout list. Defaulting...'))
-        new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
-    
-    for k,v in new_gui_attrs['layouts'].items():
-        if type(v) not in (tuple, list) or len(v) == 0:
-            msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
-            new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
-            continue
 
-        for i,c in enumerate(v):
-            if type(c) not in (tuple, list): 
-                msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
-                new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
-                break
-            if type(slist(c,0,None)) is not str or type(slist(c,1,None)) is not int or slist(c,1,0) <= 0:
-                msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
-                new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
-                break
+#################################################
+#       UTILITIES
+#
 
+def quick_find_case_ins(self, model, column, key, rowiter, *args):
+    """ Guick find 'equals' fundction - case insensitive """
+    column=args[-1]
+    row = model[rowiter]
+    if key.lower() in scast(list(row)[column], str, '').lower(): return False
+    return True
 
-    
-    new_gui_attrs['default_search_filters'] = scast(gui_attrs.get('default_search_filters',FEEDEX_GUI_DEFAULT_SEARCH_FIELDS).copy(), dict, {})    
-    
-    new_gui_attrs['tabs'] = gui_attrs.get('tabs',[]).copy()
+def quick_find_case_ins_tree(self, model, column, key, rowiter, *args):
+    """ Quick find 'equals' function - basically case insensitivity """
+    column = args[-1]
+    tree = args[-2]
+    row = model[rowiter]
+    if key.lower() in scast(list(row)[column], str, '').lower(): return False
 
-    return new_gui_attrs
-
-
-
-
-
-
-
-
-
-
-
-
-class ResultGUI:
-    """ Template for GUI result"""
-    def __init__(self, **kargs) -> None:
-        self.MW = kargs.get('main_win', None)
-        self.config = kargs.get('config')
-        if self.config is None:
-            if self.MW is None: self.config = fdx.config
-            else: self.config = self.MW.config
-        self.gui_fields = ()
-        self.gui_types = ()
-        self.gui_vals = {}
-        self.gui_markup_fields = ()
-        self.search_col = None
-
-    def gindex(self, field):
-        """ Returns a GUI field index """
-        return self.gui_fields.index(field)
-
-    def gget(self, field, *args):
-        """ Get GUI value """
-        if len(args) > 1: default = args[0]
-        else: default = None
-        return self.gui_vals.get(field, default)
-
-    def gadd(self, field, type):
-        """ Add typed field to store template """
-        self.gui_fields, self.gui_types = list(self.gui_fields), list(self.gui_types)
-        self.gui_fields.append(field)
-        self.gui_types.append(type)
-        self.gui_fields, self.gui_types = tuple(self.gui_fields), tuple(self.gui_types)
-
-    def gpopulate(self, ilist):
-        for i,f in enumerate(self.gui_fields): self.gui_vals[f] = ilist[i]
-
-    def gclear(self): self.gui_vals.clear()
-
-    def glistify(self):
-        """ Return GUI fields as ordered list"""
-        out_list = []
-        for f in self.gui_fields: out_list.append(self.gui_vals.get(f))
-        return out_list
-
-    def gtuplify(self): return tuple(self.glistify())
-
-
-
-
-
-
-
-
-
-class FeedexPlugin(SQLContainer):
-    """ GUI Plugin container class"""
-    def __init__(self, **kargs) -> None:
-        SQLContainer.__init__(self, 'plugins', FX_PLUGIN_TABLE)
-        self.MW = kargs.get('main_win')
-        self.col_names = FX_PLUGIN_TABLE_PRINT
-        self.types = FX_PLUGIN_TABLE_TYPES
-        self.backup_vals = {}
-
-        self.exists = False
-        if kargs.get('id') is not None: self.get_by_id(kargs.get('id'))
-
-
-    def get_by_id(self, id, **kargs):
-        """ Populate this container with IDd plugin """
-        for p in self.MW.gui_plugins:
-            if p[self.get_index('id')] == id: 
-                self.populate(p)
-                self.exists = True
-                return 0
-        self.exists = False
-        return msg(FX_ERROR_NOT_FOUND, _('Plugin %a not found!'), id)
-
-    def populate(self, ilist: list, **kargs):
-        super().populate(ilist, **kargs)
-        self.backup_vals = self.vals.copy()
-
-
-    def humanize(self):
-        if self.vals['type'] == FX_PLUGIN_RESULT: self.vals['stype'] = _('Search result')
-        elif self.vals['type'] == FX_PLUGIN_RESULTS: self.vals['stype'] = _('All search results')
-        elif self.vals['type'] == FX_PLUGIN_SELECTION: self.vals['stype'] = _('Selected text')
-        elif self.vals['type'] == FX_PLUGIN_CATEGORY: self.vals['stype'] = _('Category')
-        elif self.vals['type'] == FX_PLUGIN_FEED: self.vals['stype'] = _('Channel')
-        elif self.vals['type'] == FX_PLUGIN_ENTRY: self.vals['stype'] = _('Article/Note')
-    
-    def fill(self): pass
-    
-
-    def validate(self):
-        """ Validate plugin's field valuse and types """
-        for i,t in enumerate(self.types):
-            field = self.fields[i]
-            if field == 'id': continue 
-            if self.vals[field] is not None and type(self.vals[field]) is not t: return FX_ERROR_VAL, _('Invalid type for %a field'), self.fields[i]
-        
-        if scast(self.vals['name'], str, '').strip() == '': return FX_ERROR_VAL, _('Name cannot be empty!')
-        if self.vals['type'] not in (FX_PLUGIN_SELECTION, FX_PLUGIN_RESULTS, FX_PLUGIN_CATEGORY, FX_PLUGIN_FEED, FX_PLUGIN_ENTRY, FX_PLUGIN_RESULT, FX_PLUGIN_RESULTS,): 
-            return FX_ERROR_VAL, _('Invalid plugin type!')
-        if scast(self.vals['command'], str, '').strip() == '': return FX_ERROR_VAL, _('Command cannot be empty!')
-        return 0
-
-
-
-    def add(self, **kargs):
-        """ Add plugin to main window and save to JSON """
-        max_id = len(self.MW.gui_plugins) + 1
-
-        self.vals['id'] = max_id
-        if kargs.get('validate',True):
-            err = self.validate()
-            if err != 0: return msg(*err)
-
-        if type(self.MW.gui_plugins) is not list: list(self.MW.gui_plugins)
-        self.MW.gui_plugins.append(self.tuplify())
-        err = save_json(FEEDEX_GUI_PLUGINS, self.MW.gui_plugins)
-
-        if err == 0: return msg(_('Plugin %a added successfully'), self.vals['id'])
-        else: return err
-
-
-
-
-
-    def edit(self, **kargs):
-        """ Edit existing plugin """
-        if not self.exists: return FX_ERROR_NOT_FOUND
-
-        if kargs.get('validate',True):
-            err = self.validate()
-            if err != 0: return msg(*err)
-
-        for ix, p in enumerate(self.MW.gui_plugins):
-            if p[self.get_index('id')] == self.vals['id']: 
-                self.MW.gui_plugins[ix] = self.tuplify()
-                break
-        err = save_json(FEEDEX_GUI_PLUGINS, self.MW.gui_plugins)
-
-        if err == 0: return msg(_('Plugin %a updated successfully'), self.vals['id'])
-        else: return err
-        
-
-
-
-
-    def delete(self, **kargs):
-        """ Delete existing plugin """
-        if not self.exists: return FX_ERROR_NOT_FOUND
-
-        ix = -1
-        for i, p in enumerate(self.MW.gui_plugins):
-            if p[self.get_index('id')] == self.vals['id']:
-                ix = i
-                break
-
-        if ix != -1: del self.MW.gui_plugins[ix]
-        err = save_json(FEEDEX_GUI_PLUGINS, self.MW.gui_plugins)
-
-        if err == 0: return msg(_('Plugin %a deleted'), self.vals['id'])
-        else: return err
-
-
-
-
-
-
-    def run(self, item, **kargs): 
-        """ Execute command, substitute fields and run additional dialogues if needed """
-
-        command = scast( self.vals.get('command'), str, '')
-        if command == '': return -1
-
-        rstr = random_str(length=5, string=command)
-        run_env = os.environ.copy()
-
-        # Setup running environment
-        is_cont = False
-        if isinstance(item, SQLContainer):
-            is_cont = True
-            if self['type'] in (FX_PLUGIN_RESULTS,):
-                try: run_env['FEEDEX_RESULTS_JSON'] = json.dumps(self.MW.curr_upper.table.results)
-                except json.JSONDecodeError as e: return msg(FX_ERROR_VAL, _('Error encoding search results to JSON: %a'), e)
-            elif self['type'] in (FX_PLUGIN_RESULT, FX_PLUGIN_ENTRY, FX_PLUGIN_FEED, FX_PLUGIN_CATEGORY,): 
-                try: run_env['FEEDEX_ITEM_JSON'] = json.dumps(item.vals)
-                except json.JSONDecodeError as e: return msg(FX_ERROR_VAL, _('Error encoding item dict to JSON: %a'), e)
-
-            run_env['FEEDEX_RESULT_FIELDS_JSON'] = json.dumps(item.fields)
-            run_env['FEEDEX_TABLE_TYPE'] = item.table
-
-        elif type(item) is str:
-            run_env['FEEDEX_SELECTED_TEXT'] = item
-
-
-        # Substitute parametrized values
-        command = command.split(' ')
-        for i, arg in enumerate(command):
-            
-            # Handle escaping percent signs
-            arg = arg.replace('%%',rstr)
-
-            # File/Dir choosers
-            if '%choose_file_save%' in arg:
-                filename = self.MW.chooser(self.MW, action='save', header=_('Save to...'))
-                if filename is not None: arg = arg.replace('%choose_file_save%', filename)
-            if '%choose_file_open%' in arg:
-                filename = self.MW.chooser(self.MW, action='open_file', header=_('Choose File...'))
-                if filename is not None: arg = arg.replace('%choose_file_open%', filename)
-            if '%choose_dir_open%' in arg:
-                filename = self.MW.chooser(self.MW, action='open_dir', header=_('Choose Directory...'))
-                if filename is not None: arg = arg.replace('%choose_dir_open%', filename)
-
-            # Substitute fields
-            if is_cont:
-                for f in item.fields:
-                    if f'%{f}%' in arg: arg = arg.replace(f'%{f}%', scast(item.get(f), str, ''))
-            
-            elif '%selected_text%' in arg and type(item) is str: 
-                arg = arg.replace('%selected_text%', item)
-
-            # Restore escaped percent sign
-            arg = arg.replace(rstr, '%')
-
-        command[i] = arg
-
-        debug(3, f'Running: {" ".join(command)}')
-        # Run command
-        try:
-            comm_pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=run_env)
-            output = comm_pipe.stdout.read()
-            msg(output.decode())
-        except OSError as e:
-            return msg(FX_ERROR_HANDLER, _("Error executing script: %a"), e)
-
-        return 0
-
-
-
-
-
-
-def validate_gui_plugins(gui_plugins):
-    """ Initial validation of plugin list """
-    new_gui_plugins = []
-    plugin = FeedexPlugin()
-    plugin_len = len(plugin.fields)
-    for p in gui_plugins:
-        if type(p) not in (list, tuple): 
-            msg(FX_ERROR_VAL, _('Plugin item %a not a valid list! Ommiting'), p)
-            continue
-        if len(p) != plugin_len:
-            msg(FX_ERROR_VAL, _('Invalid plugin item %a! Ommiting'), p)
-            continue
-        plugin.populate(p)
-        if plugin.validate() != 0: continue
-        new_gui_plugins.append(p)
-    
-    return new_gui_plugins
-
-
-
-
-
-
-
-
-
-class FeedexCatItem(SQLContainer):
-    """ Store item from """
-    def __init__(self, **kargs) -> None:
-        SQLContainer.__init__(self, 'catalog', FEEDEX_CATALOG_TABLE)
-        self.col_names = FEEDEX_CATALOG_TABLE_NAMES
-        self.types = FEEDEX_CATALOG_TABLE_TYPES
-
-        self.MW = kargs.get('main_win', None)
-        self.DB = kargs.get('db', None)
-        if self.DB is None: self.DB = self.MW.DB
-        
-
-
-    def humanize(self): pass
-    def fill(self): pass
-
-    def do_import(self, **kargs):
-        # Create categories if needed
-        cat_dict = {}
-        for c in self.cat_q:
-            exists = False
-            for f in fdx.feeds_cache:
-                if f[self.feed.get_index('is_category')] != 1: continue
-                if f[self.feed.get_index('name')] == c or f[self.feed.get_index('title')] == c:
-                    exists = True
-                    cat_dict[c] = f[self.feed.get_index('id')]
-                    break
-            
-            if not exists:
-                self.feed.clear()
-                self.feed['is_category'] = 1
-                self.feed['name'] = c
-                self.feed['title'] = c
-                self.feed.add(no_reload=True)
-                cat_dict[c] = self.feed['id']
-
-        self.DB.load_feeds()
-
-        # Import feeds themselves
-        for f in self.queue:
-            self.feed.clear()
-            self.feed['name'] = f[self.get_index('name')]
-            self.feed['title'] = self['name']
-            self.feed['url'] = f[self.get_index('link_res')]
-            self.feed['link'] = f[self.get_index('link_home')]
-            self.feed['subtitle'] = f[self.get_index('desc')]
-            self.feed['handler'] = f[self.get_index('handler')]
-            self.feed['interval'] = self.MW.config.get('default_interval', 45)
-            self.feed['parent_id'] = cat_dict.get(f[-1])
-            self.feed['autoupdate'] = 1
-            self.feed['fetch'] = 1
-            self.feed['is_category'] = 0
-            err = self.feed.add(no_reload=True)
-            if err == 0:
-                if os.path.isfile(f[self.get_index('thumbnail')]):
-                    try: copyfile(f[self.get_index('thumbnail')], os.path.join(self.DB.icon_path, f"""feed_{self.feed['id']}.ico""" ))
-                    except (IOError, OSError,) as e: msg(FX_ERROR_IO, f"""{_('Error creating thumbnail for %a:')} {e}""", self.feed.name())
-
-        if not fdx.single_run: self.DB.load_feeds()
-
-
-
-
-
-    def prep_import(self, **kargs):
-        """ Mass import of toggled items """
-        self.feed = FeedexFeed(self.DB)
-        self.queue = []
-        self.url_q = []
-        self.cat_q = []
-        
-        self.present_feeds = []
-        for f in fdx.feeds_cache:
-            if f[self.feed.get_index('is_category')] != 1 and f[self.feed.get_index('deleted')] != 1 and f[self.feed.get_index('url')] not in (None, ''):
-                self.present_feeds.append(f[self.feed.get_index('url')])
-        
-        for ci in self.MW.catalog:
-            if ci[self.get_index('is_toggled')] is True:
-                if ci[self.get_index('link_res')] in self.present_feeds: continue
-                if ci[self.get_index('link_res')] not in self.url_q:
-                    c = ci.copy()
-                    parent_name = ''
-                    for pi in self.MW.catalog:
-                        if pi[self.get_index('is_node')] != 1: continue
-                        if pi[self.get_index('id')] == c[self.get_index('parent_id')]:
-                            parent_name = pi[self.get_index('name')]
-                            break
-                    c.append(parent_name)
-                    if parent_name not in self.cat_q and parent_name != '': self.cat_q.append(parent_name)
-                    self.queue.append(c)
-                    self.url_q.append(ci[self.get_index('link_res')])
-        self.queue_len = len(self.queue)
-
-
-
-    def catalog_add_category(self, name, id, children_no, **kargs):
-        """ Add single category item """
-        self.curr_id += 1
-        self.clear()
-        self['id'] = id
-        self['name'] = name
-        self['parent_id'] = None
-        self['children_no'] = children_no
-        self['is_node'] = 1
-        self['is_toggled'] = False
-        self.results.append(self.tuplify())
-        return self.curr_id
-
-
-
-    def catalog_download_category(self, name, url, **kargs):
-        """ Build a category node for Feed cache """
-        msg(_('Processing %a'), f'{name} ({url})')
-        response, html = fdx.download_res(url, output_pipe='', user_agent=FEEDEX_USER_AGENT, mimetypes=FEEDEX_TEXT_MIMES)
-        if type(response) is int or type(html) is not str: return ()
-
-        parent_id = self.curr_id
-        count = 0
-        node_tmp = []
-
-        entries = re.findall('<h3 id=(.*?<p class=.*?)</p>', html, re.DOTALL)
-        for i, e in enumerate(entries):
-            self.clear()
-            self.curr_id += 1
-            count += 1
-            self['id'] = self.curr_id
-            sname = slist( re.findall('<img src=".*?" data-lazy-src=".*?" class="thumb.*?" alt="(.*?)"', e), 0, '')
-            self['name'] = fdx.strip_markup(sname)[0]
-            desc1 = slist( re.findall('<span class="feed_desc ">(.*?)<span class="feed_desc_more">', e), 0, '')
-            desc2 = slist( re.findall('<span class="feed_desc_mrtxt">(.*?)</span>', e), 0, '')
-            self['desc'] = fdx.strip_markup(f'{desc1}{desc2}')[0]
-            self['link_home'] = slist( re.findall('<a class=" extdomain ext" href="(.*?)"', e), 0, '')
-            self['link_res'] = slist( re.findall('<a class="ext" href="(.*?)"', e), 0, '')
-            if self['link_res'] == '': continue
-            self['link_img'] = slist( re.findall('<img src=".*?" data-lazy-src="(.*?)" class="thumb.*?" alt=".*?"', e), 0, '')
-            self['location'] = slist( re.findall('<span class="location_new">(.*?)</span>', e), 0, '')
-            self['freq'] = slist( re.findall('<span class="fs-frequency">.*?title="Frequency"></i> <span class="eng_v">(.*?)</span></span>', e), 0, '')
-            self['popularity'] = i
-            self['handler'] = 'rss'
-            self['parent_id'] = parent_id
-            self['is_node'] = 0
-            self['is_toggled'] = False
-            hash_obj = hashlib.sha1(self['link_res'].encode())
-            thumbnail_tmp = f"""{hash_obj.hexdigest()}.img"""
-            path_tmp = os.path.join(self.odir_thumbnails, thumbnail_tmp)
-            if not os.path.isfile(path_tmp): create_thumbnail(self['link_img'], path_tmp, verbose=True)
-            self['thumbnail'] = os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'thumbnails', thumbnail_tmp)
-            node_tmp.append(self.tuplify())
-
-        self.catalog_add_category(name, parent_id, count)
-        self.results = self.results + node_tmp
-
-
-
-
-    def build_catalog(self, **kargs):
-        """ Build Feed catalog JSON cache from web resource """        
-        msg(_('Building catalogue...'))
-        self.odir = kargs.get('odir', None)
-        if self.odir is None: return msg(FX_ERROR_IO, _('No output dir provided!'))
-        if not os.path.isdir(self.odir):
-            if os.path.exists(self.odir): msg(FX_ERROR_IO, _('Not a directory (%a)!'))
-            try: os.mkdir(self.odir)
-            except (OSError, IOError,) as e: return msg(FX_ERROR_IO, _('Error creating directory:'), e)
-
-        self.odir_thumbnails = os.path.join(self.odir, 'thumbnails')
-        if not os.path.isdir(self.odir_thumbnails):
-            if os.path.exists(self.odir_thumbnails): msg(FX_ERROR_IO, _('Not a directory (%a)!'))
-            try: os.mkdir(self.odir_thumbnails)
-            except (OSError, IOError,) as e: return msg(FX_ERROR_IO, _('Error creating thumbnails directory:'), e)
-                
-        self.curr_id = 0
-        self.results = []
-        self.catalog_download_category('World News', 'https://blog.feedspot.com/world_news_rss_feeds/')
-        self.catalog_download_category('US News', 'https://rss.feedspot.com/usa_news_rss_feeds/')
-        self.catalog_download_category('Europe News', 'https://rss.feedspot.com/european_news_rss_feeds/')
-        self.catalog_download_category('Indian News', 'https://rss.feedspot.com/indian_news_rss_feeds/')
-        self.catalog_download_category('Asian News', 'https://rss.feedspot.com/asian_news_rss_feeds/')
-        self.catalog_download_category('Chinese News', 'https://rss.feedspot.com/chinese_news_rss_feeds/?_src=tagcloud')
-        self.catalog_download_category('UK News', 'https://rss.feedspot.com/uk_news_rss_feeds/?_src=tagcloud')
-        self.catalog_download_category('Russian News', 'https://rss.feedspot.com/russian_news_rss_feeds/')
-        
-        self.catalog_download_category('Technology', 'https://rss.feedspot.com/technology_rss_feeds/')
-        self.catalog_download_category('Science', 'https://rss.feedspot.com/science_rss_feeds/')
-        self.catalog_download_category('Music', 'https://rss.feedspot.com/music_rss_feeds/')
-        self.catalog_download_category('Books', 'https://rss.feedspot.com/book_review_rss_feeds/')
-        self.catalog_download_category('Movies', 'https://rss.feedspot.com/movie_rss_feeds/?_src=rss_directory')
-        self.catalog_download_category('Travel', 'https://rss.feedspot.com/travel_rss_feeds/')
-        self.catalog_download_category('Food', 'https://rss.feedspot.com/food_rss_feeds/?_src=rss_directory')
-        self.catalog_download_category('Gaming', 'https://rss.feedspot.com/video_game_rss_feeds/')
-        self.catalog_download_category('Pets', 'https://rss.feedspot.com/pet_rss_feeds/?_src=rss_directory')
-        self.catalog_download_category('Education', 'https://rss.feedspot.com/education_rss_feeds/?_src=rss_directory')
-        self.catalog_download_category('Art', 'https://rss.feedspot.com/art_rss_feeds/?_src=rss_directory')
-        self.catalog_download_category('Economics', 'https://rss.feedspot.com/economics_rss_feeds/?_src=rss_directory')
-        self.catalog_download_category('Sports', 'https://rss.feedspot.com/sports_news_rss_feeds/')
-        self.catalog_download_category('Science Fiction', 'https://rss.feedspot.com/science_fiction_rss_feeds/')
-        self.catalog_download_category('Parenting', 'https://rss.feedspot.com/parenting_rss_feeds/?_src=rss_directory_p')
-        self.catalog_download_category('Mental Health', 'https://rss.feedspot.com/mental_health_rss_feeds/?_src=rss_directory_m')
-
-
-        save_json(os.path.join(self.odir,'catalogue.json'), self.results)
-
-
-    def open(self, *args, **kargs):
-        """ Visit homepage """
-        link = scast(self.vals.get('link_home'), str, '')
-        if link is not None: err = fdx.ext_open('browser', link)
-        else: return msg(FX_ERROR_VAL, _('Empty URL!'))
-
-        if err == 0: return msg(_('Sent to browser (%a)'), link)
-        else: return err
-
-
-
-
-
-class FeedexCatalogQuery(FeedexQueryInterface):
-    """ Interface for querying feed import catalogue """
-    def __init__(self, **kargs) -> None:
-        super().__init__()
-        self.MW = kargs.get('main_win')
-        self.result = FeedexCatItem(main_win=self.MW)
-
-
-    def query(self, qr, filters, **kargs):
-        """ Query Catalog """
-        if not hasattr(self.MW, 'catalog') or not hasattr(self.MW, 'catalog_icons'): self.get_catalog()
-
-        qr = scast(qr, str, '').lower()
-        field = filters.get('field')
-        if field not in (None, 'name', 'desc', 'tags', 'location'): 
-            self._empty()
-            return msg(FX_ERROR_VAL, _('Invalid search field! Must be name, desc, tags or location.'))
-
-
-        self.results.clear()
-
-        if qr.strip() == '': 
-            self.results = self.MW.catalog.copy()
-            self.result_no = len(self.results)
-            return 0
-
-        for ci in self.MW.catalog:
-
-            if ci[FEEDEX_CATALOG_TABLE.index('is_node')] == 1: 
-                self.results.append(ci)
-                continue 
-
-            if field is None: search_text = f"""{ci[FEEDEX_CATALOG_TABLE.index('name')]} {ci[FEEDEX_CATALOG_TABLE.index('desc')]} {ci[FEEDEX_CATALOG_TABLE.index('tags')]} {ci[FEEDEX_CATALOG_TABLE.index('location')]}"""
-            else: search_text = scast(ci[FEEDEX_CATALOG_TABLE.index(field)], str, '')
-            search_text = search_text.lower()
-            if qr in search_text: self.results.append(ci)
-
-        self.result_no = len(self.results)
-
-        return 0
-
-
-
-    def get_catalog(self, **kargs):
-        """ Load Feed catalog from JSON cache """
-        self.MW.catalog = load_json(os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'catalogue.json'), ())
-        self.MW.catalog_icons = {}
-        if self.MW.catalog == (): 
-            self._empty()
-            return FX_ERROR_IO
-        return 0
-        
-
-
-
-
-
-
-
-
-
+    # Search in child rows.  If one of the rows matches, expand the row so that it will be open in later checks.
+    for inner in row.iterchildren():
+        if key.lower() in scast(list(inner)[column], str, '').lower():
+            tree.expand_to_path(row.path)
+            return False
+    return True
 
 
 
@@ -1918,10 +1426,12 @@ class FeedexCatalogQuery(FeedexQueryInterface):
 
 
 from feedex_desktop_notifier import DesktopNotifier
-from feedex_gui_tabs import FeedexTab, FeedexGUITable, ResultGUI, ResultGUIEntry, ResultGUINote, ResultGUIContext, ResultGUIRule, ResultGUIFlag, ResultGUITerm, ResultGUITimeSeries, CalendarDialog
+from feedex_gui_containers import ResultGUI, ResultGUIEntry, ResultGUINote, ResultGUITree, ResultGUIContext, ResultGUIRule, ResultGUIFlag, ResultGUITerm, ResultGUITimeSeries, FeedexPlugin, FeedexCatalogQuery, ResultGUIPlugin, ResultGUICatItem, ResultPlugin, ResultCatItem
+from feedex_gui_dialogs_utils import BasicDialog, YesNoDialog, PreferencesDialog, CalendarDialog
+from feedex_gui_tabs import FeedexTab, FeedexGUITable
 from feedex_gui_feeds import FeedexFeedTab
 from feedex_gui_dialogs_entts import NewFromURL, EditCategory, EditEntry, EditFlag, EditPlugin, EditRule, EditFeedRegex, EditFeed
-from feedex_gui_dialogs_utils import BasicDialog, YesNoDialog, PreferencesDialog
+from feedex_gui_actions import FeedexGUIActions
 
 
 

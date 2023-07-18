@@ -34,7 +34,7 @@ FEEDEX_SYS_ICON_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','pixmaps')
 FEEDEX_MODELS_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','models')
 FEEDEX_LOCALE_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','locales')
 
-FEEDEX_FEED_CATALOG_CACHE = os.path.join(FEEDEX_SYS_SHARED_PATH,'data', 'catalogue')
+FEEDEX_FEED_CATALOG_CACHE = os.path.join(FEEDEX_SYS_SHARED_PATH,'data', 'catalog')
 
 
 gettext.install('feedex', FEEDEX_LOCALE_PATH)
@@ -58,9 +58,8 @@ FEEDEX_HELP_ABOUT=f"""
 
 # Hardcoded params
 MAX_SNIPPET_COUNT = 50
-MAX_RANKING_DEPTH = 70
-LOCAL_DB_TIMEOUT = 180 
-MAX_LAST_UPDATES = 25
+MAX_RANKING_DEPTH = 70 
+MAX_LAST_UPDATES = 35
 MAX_FEATURES_PER_ENTRY = 30
 TERM_NET_DEPTH = 30
 SOURCE_URL_WEIGHT = 0.1
@@ -71,6 +70,12 @@ SOURCE_URL_WEIGHT = 0.1
 IM_URL_RE=re.compile('src=\"(.*?)\"', re.IGNORECASE)
 IM_ALT_RE=re.compile('alt=\"(.*?)\"', re.IGNORECASE)
 IM_TITLE_RE=re.compile('title=\"(.*?)\"', re.IGNORECASE)
+
+# This is needed to ignore downloading useless icons etc.
+FEEDEX_IGNORE_THUMBNAILS=(
+'http://feeds.feedburner.com',
+)
+
 
 # RSS Handling and parsing
 FEEDEX_USER_AGENT = 'UniversalFeedParser/5.0.1 +http://feedparser.org/'
@@ -350,6 +355,14 @@ TS_TABLE_PRINT = (n_('Time'), n_('From'), n_('To'), n_('Frequecy'))
 TS_TABLE_SHORT = ('time', 'freq')
 
 
+# Catalog consts
+FEEDEX_CATALOG_TABLE = ('id', 'name', 'desc', 'link_res', 'link_home', 'link_img', 'tags', 'location', 'handler', 
+                        'freq', 'rank', 'regexes', 'parent_id', 'thumbnail', 'is_node', 'children_no')
+FEEDEX_CATALOG_TABLE_NAMES = (n_('ID'), _('Name'), _('Description'), _('Link'), _('Homepage'), n_('Link to Image'), _('Tags'), _('Location'), _('Handler'), 
+                              _('Frequency'), _('Ranking'), n_('Regexes for HTML parsing'), n_('Parent ID'), n_('Thumbnail'), n_('Is node?'), n_('Children No') )
+FEEDEX_CATALOG_TABLE_TYPES = (int,  str, str,str, str, str, str, str, str, str,      int, dict, int, str,      int, int,)
+FEEDEX_CATALOG_TABLE_SHORT = ('id', 'name', 'desc', 'link_home', 'link_res', 'location', 'freq', 'rank',)
+
 
 
 
@@ -442,17 +455,18 @@ BOLD_MARKUP_END = '</b>'
 
 
 DEFAULT_CONFIG = {
+            'profile_name' : '',
             'log' : os.path.join(FEEDEX_SHARED_PATH, 'feedex.log'), 
             'db_path' : os.path.join(FEEDEX_SHARED_PATH, 'feedex.db'),
             'browser' : FEEDEX_DEFAULT_BROWSER,
             'lang' : 'en',
             'user_agent' : FEEDEX_USER_AGENT,
             'fallback_user_agent' : None, 
-            'timeout' : 15,
+            'timeout' : 120,
+            'fetching_timeout' : 20,
             'default_interval': 45,
             'error_threshold': 5,
             'max_items_per_transaction': 300,
-            'ignore_images' : False,
             'rule_limit' : 50000,
             'use_keyword_learning' : True,
             'ranking_scheme' : 'simple',
@@ -490,6 +504,7 @@ DEFAULT_CONFIG = {
             'gui_key_new_rule': 'r',
             'gui_key_add': 'a',
             'gui_key_edit': 'e',
+            'gui_key_search' : 's',
 
             'normal_color' : 'DEFAULT',
             'bold_color': 'WHITE_BOLD',
@@ -500,6 +515,7 @@ DEFAULT_CONFIG = {
 }
 
 CONFIG_NAMES = {
+            'profile_name' : _('Profile name'),
             'log' : _('Log file'),
             'db_path' : _('Feedex database'),
             'browser' : _('Browser command'),
@@ -507,10 +523,10 @@ CONFIG_NAMES = {
             'user_agent': _('User Agent String'),
             'fallback_user_agent': _('Fallback User Agt.'),
             'timeout' : _('Database timeout'),
+            'fetching timeout' : _('Fetching timeout'),
             'default_interval': _('Default Channel check interval'),
             'error_threshold': _('Channel error threshold'),
             'max_items_per_transaction': _('Max items for a single transaction'),
-            'ignore_images' : _('Ignore image processing'),
             'rule_limit' : _('Limit for rules'),
             'use_keyword_learning' : _('Use keyword learning'),
             'ranking_scheme' : _('Ranking Scheme/Algo'),
@@ -550,6 +566,7 @@ CONFIG_NAMES = {
             'gui_key_new_rule': _('New Rule shortcut key'),
             'gui_key_add': _('Add item from tab shortcut key'),
             'gui_key_edit': _('Edit item from tab shortcut key'),
+            'gui_key_search' : _('Search shortcut key'),
 
             'normal_color' : _('CLI normal color'),
             'bold_color': _('CLI bold style'),
@@ -559,15 +576,15 @@ CONFIG_NAMES = {
 
 
 CONFIG_INTS_NZ=('timeout','notify_level','default_interval','error_threshold','max_items_per_transaction', 'default_similarity_limit')
-CONFIG_INTS_Z=('rule_limit','gui_clear_cache','default_depth','gui_layout','gui_orientation','gui_notify_depth')
+CONFIG_INTS_Z=('rule_limit','gui_clear_cache','default_depth','gui_layout','gui_orientation','gui_notify_depth','fetch_timeout')
 
 CONFIG_FLOATS=('default_entry_weight', 'default_rule_weight', 'query_rule_weight' )
 
-CONFIG_STRINGS=('log','db_path','browser','lang','user_agent', 'fallback_user_agent', 'gui_notify_group', 'window_name_exclude', 'ranking_scheme',\
+CONFIG_STRINGS=('profile_name', 'log','db_path','browser','lang','user_agent', 'fallback_user_agent', 'gui_notify_group', 'window_name_exclude', 'ranking_scheme',\
     'gui_new_color','gui_deleted_color', 'gui_hilight_color', 'gui_default_flag_color' ,'imave_viewer', 'search_engine','bold_markup_beg','bold_markup_end')
-CONFIG_KEYS=('gui_key_new_entry', 'gui_key_new_rule', 'gui_key_add', 'gui_key_edit',)
+CONFIG_KEYS=('gui_key_new_entry', 'gui_key_new_rule', 'gui_key_add', 'gui_key_edit', 'gui_key_search',)
 
-CONFIG_BOOLS=('notify','ignore_images', 'use_keyword_learning', 'do_redirects','ignore_modified','gui_desktop_notify',
+CONFIG_BOOLS=('notify', 'use_keyword_learning', 'do_redirects','ignore_modified','gui_desktop_notify',
 'gui_fetch_periodically', 'save_perm_redirects', 'mark_deleted', 'no_history')
 
 CONFIG_COLS=('normal_color','bold_color')

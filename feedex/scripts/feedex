@@ -544,11 +544,22 @@ def main():
                 argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output JSON file'), exit_fail=True, allow_none=False)
                 break
 
-            elif arg == '--download-catalogue':
+
+
+            elif arg == '--download-catalog':
                 action = 'download_catalog'
                 argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('output dir'), exit_fail=True, allow_none=False)
                 break
 
+            elif arg in ('-qc', '--query-catalog'):
+                action = 'query_catalog'
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('search phrase'), exit_fail=True, allow_none=True)
+                break
+
+            elif arg == '--import-from-catalog':
+                action = 'import_from_catalog'
+                argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name=_('id list'), exit_fail=True, allow_none=False)
+                break
 
 
             #DATABASE
@@ -780,6 +791,10 @@ def main():
                 argument = fdx.sanitize_arg(slist(sys.argv, i+1, None), str, None, singleton=True, arg_name='SQL statement', exit_fail=True, allow_none=False)
                 break
 
+            elif arg == '--test':
+                action = 'test'
+                break
+
             else:
                 return msg(FX_ERROR_CL,_("""Invalid arguments given...
 Make sure that:
@@ -811,6 +826,12 @@ Make sure that:
     fdx.config['use_keyword_learning'] = coalesce(params.get('learn'), fdx.config.get('use_keyword_learning'), True)
     fdx.config['timeout'] = coalesce(params.get('timeout'), fdx.config.get('timeout'), 0)
 
+    # Validate configuration
+    if action == 'GUI': fdx.validate_config(load=True, strict=False)
+    else: 
+        err = fdx.validate_config(load=True, strict=True)
+        if err != 0: return msg(*err)
+
     # Install locale
     if fdx.config.get('lang') not in (None,'en'):
         lang = gettext.translation('feedex', languages=[fdx.config.get('lang')])
@@ -838,8 +859,21 @@ Make sure that:
         except (FeedexDatabaseError, FeedexDataError,) as e: return e.code
 
         if not feedex.created: msg(_('Database %a already exists...'), fdx.config['db_path'])
-
         return 0
+
+    # Building catalog (dev)
+    if action == 'download_catalog':
+        catalog = FeedexCatalog()
+        err = catalog.build_catalog(odir=argument)
+        return err
+
+    # Searching feed catalog
+    elif action == 'query_catalog':
+        Q = FeedexCatalogQuery()
+        err = Q.query(argument, {'field':params.get('field'), 'category':params.get('category')})
+        feedex_cli = FeedexCLI(**params)
+        if err == 0: feedex_cli.out_table(Q)
+        return err
 
 
     # Init the main workhorse ...
@@ -868,7 +902,7 @@ Make sure that:
 
         if clipper.error is not None:
             if params.get('desktop_notify',False): desktop_notifier.notify(clipper.error, None, -1)
-            return 1
+            return FX_ERROR
 
 
     # Init query object
@@ -1197,10 +1231,11 @@ Make sure that:
     elif action == 'import_rules': feedex.import_rules(argument)
     elif action == 'import_flags': feedex.import_flags(argument)
     
-    elif action == 'download_catalog':
-        from feedex_gui_utils import FeedexCatItem, create_thumbnail
-        catalog = FeedexCatItem(db=feedex)
-        catalog.build_catalog(odir=argument)
+
+    elif action == 'import_from_catalog':
+        catalog = FeedexCatalog(db=feedex)
+        catalog.prep_import(argument)
+        if catalog.queue_len > 0: catalog.do_import()
 
     elif action == 'unlock':
         if feedex.unlock() == 0: msg(_('Database unlocked.'))
@@ -1223,6 +1258,12 @@ Make sure that:
         print(_('Done.'))
 
 
+
+    elif action == 'test' and fdx.debug_level not in (None,0):
+        pass
+
+
+
     # Formalities...
     feedex.close()
 
@@ -1235,6 +1276,7 @@ Make sure that:
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    ret_status = main() 
+    sys.exit(abs(ret_status))
 
 

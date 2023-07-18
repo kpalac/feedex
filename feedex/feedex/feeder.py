@@ -36,6 +36,7 @@ class FeedexDatabase:
 
         # Paths to resources
         self.cache_path = os.path.join(self.db_path, 'cache')
+        self.img_path = os.path.join(self.db_path, 'images')
         self.icon_path = os.path.join(self.db_path,'icons')
         self.sql_path = os.path.join(self.db_path,'main.db')
         self.ix_path = os.path.join(self.db_path,'index')
@@ -66,7 +67,7 @@ class FeedexDatabase:
         # Flag if this connection created a new DB
         self.created = False
 
-        self.timeout = self.config.get('timeout', 600) # Wait time if DB is locked
+        self.timeout = self.config.get('timeout', 120) # Wait time if DB is locked
         
 
         # Define SQLite interfaces
@@ -132,6 +133,12 @@ class FeedexDatabase:
                 os.makedirs(self.cache_path)
                 msg(_('Cache folder %a created...'), self.cache_path)
             except (OSError, IOError): raise FeedexDatabaseError(FX_ERROR_DB, _('Error creating cache folder %a'), self.cache_path)
+
+        if not os.path.isdir(self.img_path):
+            try:
+                os.makedirs(self.img_path)
+                msg(_('Image folder %a created...'), self.img_path)
+            except (OSError, IOError): raise FeedexDatabaseError(FX_ERROR_DB, _('Error creating image folder %a'), self.img_path)
 
 
         # Init SQLite DB
@@ -529,9 +536,6 @@ class FeedexDatabase:
                 if os.path.isfile(icon_file):
                     fdx.icons_cache[id] = icon_file
                     continue
-                elif os.path.isfile(icon_name):
-                    fdx.icons_cache[id] = icon_name
-                    continue
 
             if is_category == 1:
                 fdx.icons_cache[id] = os.path.join(FEEDEX_SYS_ICON_PATH, 'document.svg')
@@ -823,10 +827,16 @@ class FeedexDatabase:
 
         
         entry = FeedexEntry(self)
+        rule = FeedexRule(self)
         elist_len = len(elist)
+        now = datetime.now()
         num_added = 0
 
+
         if self.locked_fetching(ignore=kargs.get('ignore_lock', False)): return msg(FX_ERROR_LOCK,_('Database locked for fetching'))
+
+        entries_sql_q = [] # SQL statemets to be executed, adding entries
+        rules_sql_d = {} # Rules 
 
         # Queue processing
         for i,e in enumerate(elist):
@@ -834,19 +844,74 @@ class FeedexDatabase:
             if not isinstance(e, dict):
                 msg(FX_ERROR_VAL, _('Input entry no. %a is not a dictionary!'), i)
                 continue
-
+            
             entry.clear()
             entry.strict_merge(e)
+
+            entry['id'] = None
+            entry['adddate_str'] = coalesce(entry.get('adddate_str'), now)
+            entry['pubdate_str'] = coalesce(entry.get('pubdate_str'), now)
+
+            err = entry.validate()
+            if err != 0:
+                msg(*err)
+                continue
+
+            learn = False
+            if scast(entry['read'], int, 0) != 0: learn = True
             
-            err = entry.add(new=e, update_stats=False, counter=i)
-            if err == 0: num_added += 1
+            err = entry.ling(index=True, rank=True, learn=learn, save_rules=False, counter=i)
+            if err != 0: 
+                self.close_ixer(rollback=True)
+                self.unlock_fetching()
+                return msg(FX_ERROR_LP, _('Indexing or LP error precludes further actions! Aborting!'))
+
+            if learn:
+                rules_sql_d[entry['ix_id']] = []
+                for r in entry.rules:
+                    rule.strict_merge(r)
+                    rules_sql_d[entry['ix_id']].append(rule.tuplify())
+                rules_sql_d[entry['ix_id']] = tuple(rules_sql_d[entry['ix_id']])
+
+            num_added += 1
+            entries_sql_q.append(entry.vals.copy())
+
+
+        if num_added > 0:
+            err = self.run_sql_lock(entry.insert_sql(all=True), entries_sql_q, many=True)
+            if err == 0:
+                self.close_ixer()
+
+                # Assign context_ids to rules and insert them
+                if len(rules_sql_d.keys()) > 0:
+                    
+                    rules_sql_q = []
+
+                    ixs_list = ''
+                    for ix in rules_sql_d.keys(): ixs_list = f"""{ixs_list}{ix},"""
+                    if ixs_list.endswith(','): ixs_list = ixs_list[:-1]
+                    ix_to_ids = self.qr_sql(f'select ix_id, id from entries where ix_id in ({ixs_list})', all=True)
+
+                    for it in ix_to_ids:
+                       ix_id = it[0]
+                       id = it[1]
+                       for r in rules_sql_d[ix_id]:
+                           rule.populate(r)
+                           rule['context_id'] = id
+                           rules_sql_q.append(rule.vals.copy())
+
+                    if len(rules_sql_q) > 0: self.run_sql_lock(rule.insert_sql(all=True), rules_sql_q, many=True)
+
+            else:
+                self.close_ixer(rollback=True)
+                self.unlock_fetching()
+                return 0
 
         # stat
         if num_added > 0:
             self.update_stats()
             if not fdx.single_run: self.load_rules()
-
-        if num_added > 1: msg(_('Added %a new entries'), num_added, log=True)
+            msg(_('Added %a new entries'), num_added, log=True)
         
         self.unlock_fetching()
         return 0
@@ -1168,7 +1233,7 @@ class FeedexDatabase:
 
                 msg(_('Updating metadata for %a'), self.feed.name())
 
-                handler.update(self.feed, ignore_images=self.config.get('ignore_images',False))
+                handler.update(self.feed)
                 if not handler.error:
 
                     updated_feed = handler.feed

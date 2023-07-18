@@ -75,7 +75,7 @@ class FeedexFeed(SQLContainerEditable):
 
     def open(self, **kargs):
         """ Open in browser """
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
         if self.vals['is_category'] == 1: return msg(FX_ERROR_VAL, _('Cannot open a category!'))
 
         if self.vals.get('link') is not None:
@@ -161,7 +161,7 @@ class FeedexFeed(SQLContainerEditable):
     def do_update(self, **kargs):
         """ Apply edit changes to DB """
         if not self.updating: return 0
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
 
         if kargs.get('validate', True):
             err = self.validate()
@@ -249,7 +249,7 @@ class FeedexFeed(SQLContainerEditable):
 
     def delete(self, **kargs):
         """ Remove channel/cat with entries and rules if required """
-        if not self.exists: return -8, _('Nothing to do. Aborting...')
+        if not self.exists: return FX_ERROR_NOT_FOUND
 
         deleted = self.vals['deleted']
 
@@ -410,10 +410,10 @@ class FeedexFeed(SQLContainerEditable):
 
     def order_insert(self, target:int, **kargs):
         """ Insert (display order) before target, or assign to category """
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
 
         target = FeedexFeed(self.DB, id=target)
-        if not target.exists: return -8
+        if not target.exists: return FX_ERROR_NOT_FOUND
 
         with_cat = kargs.get('with_cat',False)            
 
@@ -467,6 +467,252 @@ class FeedexFeed(SQLContainerEditable):
 
 
 
+
+
+class ResultCatItem(SQLContainer):
+    def __init__(self, **kargs):
+        SQLContainer.__init__(self, 'catalog', FEEDEX_CATALOG_TABLE)
+        self.col_names = FEEDEX_CATALOG_TABLE_NAMES
+        self.types = FEEDEX_CATALOG_TABLE_TYPES
+
+    def humanize(self): pass
+    def fill(self): pass
+
+
+
+
+
+class FeedexCatalog(ResultCatItem):
+    """ Store item from """
+    def __init__(self, **kargs) -> None:
+        ResultCatItem.__init__(self, **kargs)
+        self.DB = kargs.get('db', None)
+
+
+    def parse_ids(self, ids_str, **kargs):
+        """ Parse ids from comma-separated string """
+        ids = []
+        for id in ids_str.split(','):
+            id = scast(id, int, None)
+            if id is None: continue
+            elif id <= 0: continue
+            ids.append(id)
+        return ids
+
+
+    def prep_import(self, ids, **kargs):
+        """ Mass import of toggled items """
+        if type(ids) is str: ids = self.parse_ids(ids)
+        ids = scast(ids, list, [])
+        if ids == []: return msg(FX_ERROR_VAL, _('No valid IDs given!'))
+        fdx.load_catalog()
+
+        self.feed = FeedexFeed(self.DB)
+        self.queue = []
+        self.url_q = []
+        self.cat_q = []
+        self.cat_im_dict = {}
+        
+        self.present_feeds = []
+        for f in fdx.feeds_cache:
+            if f[self.feed.get_index('is_category')] != 1 and f[self.feed.get_index('deleted')] != 1 and f[self.feed.get_index('url')] not in (None, ''):
+                self.present_feeds.append(f[self.feed.get_index('url')])
+        
+        for ci in fdx.catalog:
+            if ci[self.get_index('is_node')] == 1: 
+                self.cat_im_dict[ci[self.get_index('name')]] = ci[self.get_index('thumbnail')]
+                continue
+            if ci[self.get_index('id')] in ids:
+                if ci[self.get_index('link_res')] in self.present_feeds: continue
+                if ci[self.get_index('link_res')] not in self.url_q:
+                    c = ci.copy()
+                    parent_name = ''
+                    for pi in fdx.catalog:
+                        if pi[self.get_index('is_node')] != 1: continue
+                        if pi[self.get_index('id')] == c[self.get_index('parent_id')]:
+                            parent_name = pi[self.get_index('name')]
+                            break
+                    c.append(parent_name)
+                    if parent_name not in self.cat_q and parent_name != '': self.cat_q.append(parent_name)
+                    self.queue.append(c)
+                    self.url_q.append(ci[self.get_index('link_res')])
+        self.queue_len = len(self.queue)
+        if self.queue_len == 0: msg(_('Nothing to import...'))
+
+
+
+
+    def do_import(self, **kargs):
+        # Create categories if needed
+        cat_dict = {}
+        for c in self.cat_q:
+            exists = False
+            for f in fdx.feeds_cache:
+                if f[self.feed.get_index('is_category')] != 1: continue
+                if f[self.feed.get_index('name')] == c or f[self.feed.get_index('title')] == c:
+                    exists = True
+                    cat_dict[c] = f[self.feed.get_index('id')]
+                    break
+            
+            if not exists:
+                self.feed.clear()
+                self.feed['is_category'] = 1
+                self.feed['name'] = c
+                self.feed['title'] = c
+                self.feed['icon_name'] = self.cat_im_dict[c]
+                self.feed.add(no_reload=True)
+                cat_dict[c] = self.feed['id']
+
+        self.DB.load_feeds()
+
+        # Import feeds themselves
+        for f in self.queue:
+            self.feed.clear()
+            self.feed['name'] = f[self.get_index('name')]
+            self.feed['title'] = self['name']
+            self.feed['url'] = f[self.get_index('link_res')]
+            self.feed['link'] = f[self.get_index('link_home')]
+            self.feed['subtitle'] = f[self.get_index('desc')]
+            self.feed['handler'] = f[self.get_index('handler')]
+            self.feed['interval'] = self.DB.config.get('default_interval', 45)
+            self.feed['parent_id'] = cat_dict.get(f[-1])
+            self.feed['autoupdate'] = 1
+            self.feed['fetch'] = 1
+            self.feed['is_category'] = 0
+            err = self.feed.add(no_reload=True)
+            if err == 0:
+                thumbnail = os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'thumbnails', f[self.get_index('thumbnail')])
+                if os.path.isfile(thumbnail):
+                    try: copyfile(thumbnail, os.path.join(self.DB.icon_path, f"""feed_{self.feed['id']}.ico""" ))
+                    except (IOError, OSError,) as e: msg(FX_ERROR_IO, f"""{_('Error creating thumbnail for %a:')} {e}""", self.feed.name())
+
+        if not fdx.single_run: self.DB.load_feeds()
+
+
+
+
+
+
+
+
+
+    def catalog_add_category(self, name, id, children_no, icon, **kargs):
+        """ Add single category item """
+        self.curr_id += 1
+        self.clear()
+        self['id'] = id
+        self['name'] = name
+        self['parent_id'] = None
+        self['children_no'] = children_no
+        self['is_node'] = 1
+        self['thumbnail'] = icon
+        self.results.append(self.tuplify())
+        return self.curr_id
+
+
+
+    def catalog_download_category(self, name, url, icon, **kargs):
+        """ Build a category node for Feed cache """
+        msg(_('Processing %a'), f'{name} ({url})')
+        response, html = fdx.download_res(url, output_pipe='', user_agent=FEEDEX_USER_AGENT, mimetypes=FEEDEX_TEXT_MIMES)
+        if type(response) is int or type(html) is not str: return FX_ERROR_HANDLER
+
+        parent_id = self.curr_id
+        count = 0
+        node_tmp = []
+
+        entries = re.findall('<h3 id=(.*?<p class=.*?)</p>', html, re.DOTALL)
+        for i, e in enumerate(entries):
+            self.clear()
+            self.curr_id += 1
+            count += 1
+            self['id'] = self.curr_id
+            sname = slist( re.findall('<img src=".*?" data-lazy-src=".*?" class="thumb.*?" alt="(.*?)"', e), 0, '')
+            self['name'] = fdx.strip_markup(sname)[0]
+            desc1 = slist( re.findall('<span class="feed_desc ">(.*?)<span class="feed_desc_more">', e), 0, '')
+            desc2 = slist( re.findall('<span class="feed_desc_mrtxt">(.*?)</span>', e), 0, '')
+            self['desc'] = fdx.strip_markup(f'{desc1}{desc2}')[0]
+            self['link_home'] = slist( re.findall('<a class=" extdomain ext" href="(.*?)"', e), 0, '')
+            self['link_res'] = slist( re.findall('<a class="ext" href="(.*?)"', e), 0, '')
+            if self['link_res'] == '': continue
+            self['link_img'] = slist( re.findall('<img src=".*?" data-lazy-src="(.*?)" class="thumb.*?" alt=".*?"', e), 0, '')
+            self['location'] = slist( re.findall('<span class="location_new">(.*?)</span>', e), 0, '')
+            self['freq'] = slist( re.findall('<span class="fs-frequency">.*?title="Frequency"></i> <span class="eng_v">(.*?)</span></span>', e), 0, '')
+            self['rank'] = i
+            self['handler'] = 'rss'
+            self['parent_id'] = parent_id
+            self['is_node'] = 0
+
+            thumbnail_base = f"""{fdx.hash_url(self['link_res'])}.img"""
+            path_tmp = os.path.join(self.odir_thumbnails, thumbnail_base)
+            if not os.path.isfile(path_tmp): fdx.download_res(self['link_img'], ofile=path_tmp, verbose=True)
+            self['thumbnail'] = thumbnail_base
+            node_tmp.append(self.tuplify())
+
+        self.catalog_add_category(name, parent_id, count, icon)
+        self.results = self.results + node_tmp
+        return 0
+
+
+
+    def build_catalog(self, **kargs):
+        """ Build Feed catalog JSON cache from web resource """        
+        msg(_('Building catalog...'))
+        self.odir = kargs.get('odir', None)
+        if self.odir is None: return msg(FX_ERROR_IO, _('No output dir provided!'))
+        if not os.path.isdir(self.odir):
+            if os.path.exists(self.odir): msg(FX_ERROR_IO, _('Not a directory (%a)!'))
+            try: os.mkdir(self.odir)
+            except (OSError, IOError,) as e: return msg(FX_ERROR_IO, _('Error creating directory:'), e)
+
+        self.odir_thumbnails = os.path.join(self.odir, 'thumbnails')
+        if not os.path.isdir(self.odir_thumbnails):
+            if os.path.exists(self.odir_thumbnails): msg(FX_ERROR_IO, _('Not a directory (%a)!'))
+            try: os.mkdir(self.odir_thumbnails)
+            except (OSError, IOError,) as e: return msg(FX_ERROR_IO, _('Error creating thumbnails directory:'), e)
+                
+        self.curr_id = 0
+        self.results = []
+        self.catalog_download_category('World News', 'https://blog.feedspot.com/world_news_rss_feeds/', 'www')
+        self.catalog_download_category('US News', 'https://rss.feedspot.com/usa_news_rss_feeds/', 'rss')
+        self.catalog_download_category('Europe News', 'https://rss.feedspot.com/european_news_rss_feeds/', 'rss')
+        self.catalog_download_category('Indian News', 'https://rss.feedspot.com/indian_news_rss_feeds/', 'rss')
+        self.catalog_download_category('Asian News', 'https://rss.feedspot.com/asian_news_rss_feeds/', 'rss')
+        self.catalog_download_category('Chinese News', 'https://rss.feedspot.com/chinese_news_rss_feeds/?_src=tagcloud', 'rss')
+        self.catalog_download_category('UK News', 'https://rss.feedspot.com/uk_news_rss_feeds/?_src=tagcloud', 'rss')
+        self.catalog_download_category('Russian News', 'https://rss.feedspot.com/russian_news_rss_feeds/', 'rss')
+        
+        self.catalog_download_category('Technology', 'https://rss.feedspot.com/technology_rss_feeds/', 'electronics')
+        self.catalog_download_category('Science', 'https://rss.feedspot.com/science_rss_feeds/', 'science')
+        self.catalog_download_category('Music', 'https://rss.feedspot.com/music_rss_feeds/', 'audio')
+        self.catalog_download_category('Books', 'https://rss.feedspot.com/book_review_rss_feeds/', 'bookmark')
+        self.catalog_download_category('Movies', 'https://rss.feedspot.com/movie_rss_feeds/?_src=rss_directory', 'player')
+        self.catalog_download_category('Travel', 'https://rss.feedspot.com/travel_rss_feeds/', 'travel')
+        self.catalog_download_category('Food', 'https://rss.feedspot.com/food_rss_feeds/?_src=rss_directory', 'health')
+        self.catalog_download_category('Gaming', 'https://rss.feedspot.com/video_game_rss_feeds/', 'game')
+        self.catalog_download_category('Pets', 'https://rss.feedspot.com/pet_rss_feeds/?_src=rss_directory', 'heart')
+        self.catalog_download_category('Education', 'https://rss.feedspot.com/education_rss_feeds/?_src=rss_directory', 'education')
+        self.catalog_download_category('Art', 'https://rss.feedspot.com/art_rss_feeds/?_src=rss_directory', 'image')
+        self.catalog_download_category('Economics', 'https://rss.feedspot.com/economics_rss_feeds/?_src=rss_directory', 'money')
+        self.catalog_download_category('Sports', 'https://rss.feedspot.com/sports_news_rss_feeds/', 'sport')
+        self.catalog_download_category('Science Fiction', 'https://rss.feedspot.com/science_fiction_rss_feeds/', 'engineering')
+        self.catalog_download_category('Parenting', 'https://rss.feedspot.com/parenting_rss_feeds/?_src=rss_directory_p', 'heart')
+        self.catalog_download_category('Mental Health', 'https://rss.feedspot.com/mental_health_rss_feeds/?_src=rss_directory_m', 'community')
+
+
+        err = save_json(os.path.join(self.odir,'catalog.json'), self.results)
+        return err
+
+
+
+    def open(self, *args, **kargs):
+        """ Visit homepage """
+        link = scast(self.vals.get('link_home'), str, '')
+        if link is not None: err = fdx.ext_open('browser', link)
+        else: return msg(FX_ERROR_VAL, _('Empty URL!'))
+
+        if err == 0: return msg(_('Sent to browser (%a)'), link)
+        else: return err
 
 
 

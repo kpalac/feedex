@@ -265,8 +265,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
         elif self.type == FX_TAB_KEYWORDS:
             self.header_icon_name = 'system-run-symbolic'
-            self.table = FeedexGUITable(self, ResultGUITerm(main_win=self.MW))
-            self.table.result.table = 'keywords'
+            self.table = FeedexGUITable(self, ResultGUITerm(main_win=self.MW), table='keywords')
             self.table.view.set_tooltip_markup(_("""Keywords for a Document.
 Those are extracted using heuristic learning algo and used to create rules for ranking incomming items.
 Right-click for more options
@@ -282,8 +281,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
         elif self.type == FX_TAB_RANK:
             self.header_icon_name = 'applications-engineering-symbolic'
-            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True)
-            self.table.result.table = 'rules_rank'
+            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True, table='rules_rank')
             self.table.view.set_tooltip_markup(_("""Ranking for a Document using Rules learned after <b>adding Entries</b> and <b>reading Articles</b>
 <i>Ranking summary can be found at Document's footer in preview window</i>
 Right-click for more options
@@ -299,8 +297,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
         elif self.type == FX_TAB_LEARNED:
             self.header_icon_name = 'applications-engineering-symbolic'
-            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True)
-            self.table.result.table = 'rules_learned'
+            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True, table='rules_learned')
             self.table.view.set_tooltip_markup(_("""List of Rules learned after <b>adding Entries</b> and <b>reading Articles</b>
 <b>Name</b> - Displayed name, <i>not matched</i>, purely informational
 <b>Match string</b> - String matched against tokenized Entry with prefixes
@@ -369,7 +366,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 self.search_button.connect('button-press-event', self._on_button_press_header)
                 
                 if FEEDEX_FILTERS_PER_TABS[self.type].get('search') == 'catalog_combo':
-                    self.cat_import_button = f_button(_('Subscribe to Selected'), 'rss-symbolic', connect=self.MW.import_catalog, args=(self.table.result,), tooltip=_('Import selected Channels for subscription')  )
+                    self.cat_import_button = f_button(_('Subscribe to Selected'), 'rss-symbolic', connect=self.MW.act.import_catalog, args=(self.table.result.toggled_ids,), tooltip=_('Import selected Channels for subscription')  )
 
 
             elif FEEDEX_FILTERS_PER_TABS[self.type].get('search') == 'button':
@@ -399,7 +396,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                     elif f == 'time':
                         curr_widget = self.qtime_combo = f_time_combo(connect=self.on_date_changed, ellipsize=False, tooltip=f"""{_('Filter by date')}\n<i>{_('Searching whole database can be time consuming for large datasets')}</i>""")
                     elif f == 'cat':
-                        curr_widget = self.cat_combo = f_feed_combo(connect=self._on_filters_changed, ellipsize=False, with_feeds=True, tooltip="Choose Feed or Category to search")
+                        curr_widget = self.cat_combo = f_feed_combo(self.MW, connect=self._on_filters_changed, ellipsize=False, with_feeds=True, tooltip="Choose Feed or Category to search")
                     elif f == 'read':
                         curr_widget = self.read_combo = f_read_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Filter for Read/Unread news. Manually added entries are marked as read by default') )
                     elif f == 'flag':
@@ -526,24 +523,24 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
         if key_name == 'Delete':
             result = self.table.get_selection()
-            if isinstance(result, (ResultEntry, ResultContext,)): self.MW.on_del_entry(result)
+            if isinstance(result, (ResultEntry, ResultContext,)): self.MW.act.on_del_entry(result)
             elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_del_rule(result)
-            elif isinstance(result, ResultFlag): self.MW.on_del_flag(result)
-            elif isinstance(result, FeedexPlugin): self.MW.on_del_plugin(result)
+            elif isinstance(result, ResultFlag): self.MW.act.on_del_flag(result)
+            elif isinstance(result, ResultPlugin): self.MW.act.on_del_plugin(result)
 
 
         elif ctrl and key_name == self.config.get('gui_key_add','a'):
-            if isinstance(self.table.result, (ResultEntry, ResultContext,)): self.MW.on_edit_entry(None)
-            elif isinstance(self.table.result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_edit_rule(None)
-            elif isinstance(self.table.result, ResultFlag): self.MW.on_edit_flag(None)
-            elif isinstance(self.table.result, FeedexPlugin): self.MW.on_edit_plugin(None)
+            if isinstance(self.table.result, (ResultEntry, ResultContext,)): self.MW.act.on_edit_entry(None)
+            elif isinstance(self.table.result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.act.on_edit_rule(None)
+            elif isinstance(self.table.result, ResultFlag): self.MW.act.on_edit_flag(None)
+            elif isinstance(self.table.result, ResultPlugin): self.MW.act.on_edit_plugin(None)
 
         elif ctrl and key_name == self.config.get('gui_key_edit','e'):
             result = self.table.get_selection()
-            if isinstance(result, (ResultEntry, ResultContext,)): self.MW.on_edit_entry(result)
-            elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_edit_rule(result)
-            elif isinstance(result, ResultFlag): self.MW.on_edit_flag(result)
-            elif isinstance(result, FeedexPlugin): self.MW.on_edit_plugin(result)
+            if isinstance(result, (ResultEntry, ResultContext,)): self.MW.act.on_edit_entry(result)
+            elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.act.on_edit_rule(result)
+            elif isinstance(result, ResultFlag): self.MW.act.on_edit_flag(result)
+            elif isinstance(result, ResultPlugin): self.MW.act.on_edit_plugin(result)
 
         elif ctrl and key_name in ('F2',): pass
         
@@ -570,7 +567,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             if sel is not None: self.MW.load_preview_rule(sel)
             else: self.MW.startup_decor()
         
-        elif isinstance(self.table.result, FeedexCatItem): 
+        elif isinstance(self.table.result, ResultCatItem): 
             sel = self.table.get_selection()
             if sel is not None: 
                 if not sel.get('is_node',False): self.MW.load_preview_catalog(sel)
@@ -585,11 +582,11 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         """ Result activation handler """
         result = self.table.get_selection()
         if isinstance(result, (ResultEntry, ResultContext,)):
-            if scast(result['link'],str,'').strip() != '': self.MW.on_open_entry(result) 
+            if scast(result['link'],str,'').strip() != '': self.MW.act.on_open_entry(result) 
             else: self.MW.on_edit_entry(False, result)
-        elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_edit_rule(result)
-        elif isinstance(result, ResultFlag): self.MW.on_edit_flag(result)
-        elif isinstance(result, FeedexPlugin): self.MW.on_edit_plugin(result)
+        elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.act.on_edit_rule(result)
+        elif isinstance(result, ResultFlag): self.MW.act.on_edit_flag(result)
+        elif isinstance(result, ResultPlugin): self.MW.act.on_edit_plugin(result)
 
 
 
@@ -599,7 +596,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
     def _on_query_entry_menu(self, widget, menu, *args, **kargs):
         """ Basically adds "Clear History" option to menu """
         menu.append( f_menu_item(0, 'SEPARATOR', None) ) 
-        menu.append( f_menu_item(1, _('Clear Search History'), self.MW.on_clear_history, icon='edit-clear-all-symbolic'))
+        menu.append( f_menu_item(1, _('Clear Search History'), self.MW.act.on_clear_history, icon='edit-clear-all-symbolic'))
         menu.show_all()
 
 
@@ -739,8 +736,7 @@ Escape: \ (only if before wildcards and field markers)""") )
             self.search_filters['page_len'] = self.config.get('page_length',3000)
             self.search_filters['page'] = 1
 
-        if hasattr(self, 'catalog_field_combo'): self.search_filters['catalog_field'] = f_get_combo(self.catalog_field_combo)       
-        if hasattr(self, 'catalog_handler_combo'): self.search_filters['catalog_handler'] = f_get_combo(self.catalog_handler_combo)
+        if hasattr(self, 'catalog_field_combo'): self.search_filters['field'] = f_get_combo(self.catalog_field_combo)       
 
 
         debug(7, f'Search filters updated: {self.search_filters}')
@@ -879,7 +875,7 @@ Escape: \ (only if before wildcards and field markers)""") )
             QP = FeedexQueryInterface()
         elif self.type in (FX_TAB_CATALOG,):
             DB = None
-            QP = FeedexCatalogQuery(main_win=self.MW)
+            QP = FeedexCatalogQuery()
         else:
             DB = FeedexDatabase(connect=True)
             DB.connect_QP()
@@ -1091,7 +1087,7 @@ Escape: \ (only if before wildcards and field markers)""") )
 
         elif self.type == FX_TAB_CATALOG:
             self.final_status = _('Find Feeds...')
-            err = QP.query(qr, filters)
+            err = QP.query(qr, filters, load_all=True)
 
 
 
@@ -1112,6 +1108,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         
         if self.type in (FX_TAB_TREE, FX_TAB_TRENDS): self.block_search(_("Generating summary...") )
         elif self.type in (FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS, FX_TAB_LEARNED, FX_TAB_KEYWORDS, FX_TAB_RANK,): self.block_search(_("Getting data...") )
+        elif self.type == FX_TAB_CATALOG: self.block_search(_('Querying Feed Catalog...'))
         else: self.block_search(_("Searching...") )
 
         self.search_thread = threading.Thread(target=self.query_thr, args=(phrase, filters)   )
@@ -1179,13 +1176,10 @@ Escape: \ (only if before wildcards and field markers)""") )
         if self.busy: return 0
         if action == FX_ACTION_EDIT and self.mutable: 
             self.table.replace(item['id'], item)
-            self._on_changed_selection()
         elif action == FX_ACTION_ADD and self.mutable and self.prependable: 
             self.table.append(item)
-            self._on_changed_selection()
         elif action == FX_ACTION_DELETE and self.mutable: 
             self.table.delete(item['id'], item.get('deleted'))
-            self._on_changed_selection()
 
 
 
@@ -1202,388 +1196,6 @@ Escape: \ (only if before wildcards and field markers)""") )
 
 
 
-
-
-
-
-class ResultGUIEntry(ResultGUI, ResultEntry):
-    """ GUI Result for generating and storing table items """
-    def __init__(self, **kargs):
-        ResultEntry.__init__(self, replace_nones=True, **kargs)
-        ResultGUI.__init__(self, **kargs)
-        self.gui_fields = ('gui_ix', 'gui_icon', 'id', 'pubdate_short', 'pubdate', 'title', 'feed_name', 'feed_id', 'desc', 'author', 'flag_name',
-             'category', 'tags', 'read', 'importance', 'readability', 'weight', 'word_count', 'rank',
-             'count', 'adddate_str', 'pubdate_str', 'publisher', 'link', 'is_node', 'gui_color', 'gui_bold')
-        self.gui_types = (int, GdkPixbuf.Pixbuf, int,   str, int,   str, str, int, str, str, str, 
-                          str, str, int, float, float, float, int, float, 
-                          int, str, str, str, str, int,  str, int)
-        self.search_col = self.gindex('title')
-
-
-    def pre_prep_gui_vals(self, ix, **kargs):
-        self.gui_vals.clear()
-        self.gui_vals['gui_ix'] = ix
-        self.gui_vals['id'] = self.vals['id']
-        if self.vals['pubdate_short'] not in (None, ''):
-            self.gui_vals['pubdate_short'] = humanize_date(self.vals['pubdate_short'], self.MW.today, self.MW.yesterday, self.MW.year)
-        self.gui_vals['pubdate'] = self.vals['pubdate']
-        self.gui_vals['title'] = self.vals['title']
-        self.gui_vals['feed_name'] = self.vals['feed_name']
-        self.gui_vals['feed_id'] = self.vals['feed_id']
-        self.gui_vals['author'] = self.vals['author']
-        self.gui_vals['flag_name'] = self.vals['flag_name']
-        self.gui_vals['category'] = self.vals['category']
-        self.gui_vals['tags'] = self.vals['tags']
-        self.gui_vals['read'] = self.vals['read']
-        self.gui_vals['importance'] = self.vals['importance']
-        self.gui_vals['readability'] = self.vals['readability']
-        self.gui_vals['weight'] = self.vals['weight']
-        self.gui_vals['word_count'] = self.vals['word_count']
-        self.gui_vals['rank'] = self.vals['rank']
-        self.gui_vals['count'] = self.vals['count']
-        self.gui_vals['adddate_str'] = self.vals['adddate_str']
-        self.gui_vals['pubdate_str'] = self.vals['pubdate_str']
-        self.gui_vals['publisher'] = self.vals['publisher']
-        self.gui_vals['link'] = self.vals['link']
-        self.gui_vals['is_node'] = self.vals['is_node']
-
-
-    def prep_gui_vals(self, ix, **kargs):        
-        """ Prepares values for display and generates icon and style fields """
-        self.pre_prep_gui_vals(ix, **kargs)
-        self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
-        self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
-
-        if coalesce(self.vals['read'],0) > 0: self.gui_vals['gui_bold'] = 700
-        else: self.gui_vals['gui_bold'] = 400
-
-        if kargs.get('new_col',False): self.gui_vals['gui_color'] = self.config.get('gui_new_color','#0FDACA')
-        elif coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-            self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
-        elif coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
-
-
-
-
-class ResultGUITree(ResultGUIEntry):
-    """ GUI result for tree view """
-    def __init__(self, **kargs):
-        super().__init__(**kargs)
-        self.table = 'tree'
-        self.gui_markup_fields = ('title',)
-
-
-    def prep_gui_vals(self, ix, **kargs):
-
-        if self.vals['is_node'] == 1 and self.vals['id'] is None:
-
-            self.gui_vals.clear()
-            self.gui_vals['gui_ix'] = ix  
-            self.gui_vals['title'] = self.vals['title']
-            self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
-            self.gui_vals['is_node'] = 1
-
-            if self.vals['feed_id'] is not None: self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
-            elif self.vals['flag'] is not None: self.gui_vals['gui_icon'] = self.MW.icons['flag']
-            elif self.vals['pubdate_str'] is not None: self.gui_vals['gui_icon'] = self.MW.icons['calendar']
-
-            self.gui_vals['gui_bold'] = 800
-            self.gui_vals['title'] = f"""<b><u>{esc_mu(self.gui_vals['title'])} ({esc_mu(self.vals['children_no'])})</u></b>"""
-
-        else:
-            self.pre_prep_gui_vals(ix, **kargs)
-            self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
-            self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
-            self.gui_vals['title'] = esc_mu(self.gui_vals['title'])
-
-            if self.vals['is_node'] == 1:
-                self.gui_vals['gui_bold'] = 800
-                self.gui_vals['title'] = f"""<b><u>{esc_mu(self.gui_vals['title'])} ({esc_mu(self.vals['children_no'])})</u></b>"""
-            else:
-                if coalesce(self.vals['read'],0) > 0: self.gui_vals['gui_bold'] = 700
-                else: self.gui_vals['gui_bold'] = 400
-
-                if kargs.get('new_col',False): self.gui_vals['gui_color'] = self.config.get('gui_new_color','#0FDACA')
-                elif coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-                    self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
-                elif coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
-
-
-
-
-
-
-
-
-class ResultGUINote(ResultGUIEntry):
-    """ GUI result for note """
-    def __init__(self, **kargs):
-        ResultEntry.__init__(self, replace_nones=True, **kargs)
-        ResultGUI.__init__(self, **kargs)
-        self.table = 'notes'
-        self.gui_fields = ('gui_ix', 'gui_icon', 'id', 'pubdate_short', 'pubdate', 'title', 'feed_name', 'feed_id', 'entry', 'author', 'flag_name',
-             'category', 'tags', 'read', 'importance', 'readability', 'weight', 'word_count', 'rank',
-             'count', 'adddate_str', 'pubdate_str', 'publisher', 'link', 'is_node', 'gui_color',)
-        self.gui_types = (int, GdkPixbuf.Pixbuf, int,   str, int,   str, str, int, str, str, str, 
-                          str, str, int, float, float, float, int, float, 
-                          int, str, str, str, str, int,  str,)
-        self.gui_markup_fields = ('entry',)
-        self.search_col = self.gindex('entry')
-
-
-    def prep_gui_vals(self, ix, **kargs):        
-        """ Prepares values for display and generates icon and style fields """
-        self.pre_prep_gui_vals(ix, **kargs)
-
-        self.gui_vals['gui_icon'] = self.MW.icons['large'].get(self.vals["feed_id"], self.MW.icons['large']['default'])
-        
-        if self.vals.get('flag',0) > 0:
-            color = fdx.get_flag_color(self.vals.get('flag',0)) 
-            flag_str = f"""<b><span foreground="{color}">{esc_mu(self.vals.get("flag_name",''))}</span></b>: """
-        else: flag_str = ''    
-            
-        desc = ellipsize(scast(self.vals['desc'], str, ''), 250).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
-        title = scast(self.vals['title'], str, '').replace('\n',' ').replace('\r',' ').replace('\t', ' ')
-
-        self.gui_vals['entry'] = f"""---------------------------------------------------------------------------------
-{flag_str}<b>{esc_mu(title)}</b>
-{esc_mu(desc)}"""
-
-        if coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-            self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
-
-
-
-
-
-
-class ResultGUIContext(ResultGUI, ResultContext):
-    """ GUI result for context """
-    def __init__(self, **kargs):
-        ResultContext.__init__(self, replace_nones=True, **kargs)
-        ResultGUI.__init__(self, **kargs)
-
-        self.gui_fields = ('gui_ix', 'gui_icon', 'id', 'pubdate_short', 'pubdate', 'context', 'title', 'feed_name', 'feed_id', 'author', 'flag_name',
-             'category', 'tags', 'read', 'importance', 'readability', 'weight', 'word_count', 'rank',
-             'count', 'adddate_str', 'pubdate_str', 'publisher', 'link', 'gui_color',)
-        self.gui_types = (int, GdkPixbuf.Pixbuf, int,   str, int,   str, str, str, int, str, str, 
-                          str, str, int, float, float, float, int, float, 
-                          int, str, str, str, str,  str,)
-        self.gui_markup_fields = ('context','flag_name')
-        self.search_col = self.gindex('title')
-
-
-
-    def prep_gui_vals(self, ix, **kargs):
-        self.gui_vals.clear()
-        self.gui_vals['gui_ix'] = ix
-        self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
-        self.gui_vals['id'] = self.vals['id']
-        if self.vals['pubdate_short'] not in (None, ''):
-            self.gui_vals['pubdate_short'] = humanize_date(self.vals['pubdate_short'], self.MW.today, self.MW.yesterday, self.MW.year)
-        self.gui_vals['pubdate'] = self.vals['pubdate']
-        self.gui_vals['context'] = f"""{esc_mu(self.vals['context'][0][0])}<b>{esc_mu(self.vals['context'][0][1])}</b>{esc_mu(self.vals['context'][0][2])}"""
-        self.gui_vals['title'] = self.vals['title']
-        self.gui_vals['feed_name'] = self.vals['feed_name']
-        self.gui_vals['feed_id'] = self.vals['feed_id']
-        self.gui_vals['author'] = self.vals['author']
-        self.gui_vals['flag_name'] = self.vals['flag_name']
-        self.gui_vals['category'] = self.vals['category']
-        self.gui_vals['tags'] = self.vals['tags']
-        self.gui_vals['read'] = self.vals['read']
-        self.gui_vals['importance'] = self.vals['importance']
-        self.gui_vals['readability'] = self.vals['readability']
-        self.gui_vals['weight'] = self.vals['weight']
-        self.gui_vals['word_count'] = self.vals['word_count']
-        self.gui_vals['rank'] = self.vals['rank']
-        self.gui_vals['count'] = self.vals['count']
-        self.gui_vals['adddate_str'] = self.vals['adddate_str']
-        self.gui_vals['pubdate_str'] = self.vals['pubdate_str']
-        self.gui_vals['publisher'] = self.vals['publisher']
-        self.gui_vals['link'] = self.vals['link']
-
-        if coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-            self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
-        elif coalesce(self.vals['flag'],0) > 0: 
-            flag_col = fdx.get_flag_color(self.vals['flag'])
-            self.gui_vals['flag_name'] = f"""<span foreground="{flag_col}">{esc_mu(self.gui_vals['flag_name'])}</span>"""
-
-
-
-
-
-
-class ResultGUIRule(ResultGUI, ResultRule):
-    """ GUI result for rule """
-    def __init__(self, **kargs) -> None:
-        ResultRule.__init__(self, replace_nones=True, **kargs)
-        ResultGUI.__init__(self, **kargs)
-
-        self.gui_fields = ('gui_ix', 'id', 'name', 'string', 'weight', 'scase_insensitive', 'query_type', 'flag_name', 'field_name', 'feed_name', 
-                           'lang', 'matched', 'context_id', 'slearned', 'sadditive', 'flag', 'gui_color',)
-        self.gui_types = (int, int, str, str, float, str, str, str, str, str, str, int, int,   str, str, int, str,)
-        self.search_col = self.gindex('string')
-
-
-    def prep_gui_vals(self, ix, **kargs):
-        self.gui_vals.clear()
-        self.gui_vals['gui_ix'] = ix
-        self.gui_vals['id'] = self.vals['id']
-        self.gui_vals['name'] = self.name()
-        self.gui_vals['string'] = self.vals['string']
-        self.gui_vals['weight'] = self.vals['weight']
-        self.gui_vals['scase_insensitive'] = self.vals['scase_insensitive']
-        self.gui_vals['query_type'] = self.vals['query_type']
-        self.gui_vals['flag_name'] = self.vals['flag_name']
-        self.gui_vals['field_name'] = self.vals['field_name']
-        self.gui_vals['feed_name'] = self.vals['feed_name']
-        self.gui_vals['lang'] = self.vals['lang']
-        self.gui_vals['matched'] = self.vals['matched']
-        self.gui_vals['context_id'] = self.vals['context_id']        
-        self.gui_vals['slearned'] = self.vals['slearned']        
-        self.gui_vals['sadditive'] = self.vals['sadditive']        
-        self.gui_vals['flag'] = self.vals['flag']        
-        if coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
-
-
-
-
-class ResultGUIFlag(ResultGUI, ResultFlag):
-    """ GUI result for flag """
-    def __init__(self, **kargs):
-        ResultFlag.__init__(self, replace_nones=True, **kargs)
-        ResultGUI.__init__(self, **kargs)
-        self.gui_fields = ('gui_ix', 'id', 'name', 'desc', 'color', 'color_cli', 'gui_color',)
-        self.gui_types = (int, int,  str, str, str, str, str,)
-        self.search_col = self.gindex('name')
-
-    def prep_gui_vals(self, ix, **kargs):
-        self.gui_vals.clear()
-        self.gui_vals['gui_ix'] = ix
-        self.gui_vals['id'] = self.vals['id']
-        self.gui_vals['name'] = self.vals['name']
-        self.gui_vals['desc'] = self.vals['desc']
-        self.gui_vals['color'] = self.vals['color']
-        self.gui_vals['gui_color'] = self.vals['color']
-
-
-
-class ResultGUITerm(ResultGUI, ResultTerm):
-    """ GUI result for term list """
-    def __init__(self, **kargs):
-        ResultTerm.__init__(self, replace_nones=True, **kargs)
-        ResultGUI.__init__(self, **kargs)
-        self.gui_fields = ('gui_ix', 'term', 'weight', 'search_form',)
-        self.gui_types = (int, str, float, str,)
-        self.search_col = self.gindex('term')
-
-
-    def prep_gui_vals(self, ix, **kargs):
-        self.gui_vals.clear()
-        self.gui_vals['gui_ix'] = ix
-        self.gui_vals['term'] = self.vals['term']
-        self.gui_vals['weight'] = self.vals['weight']
-        self.gui_vals['search_form'] = self.vals['search_form']
-
-
-
-
-class ResultGUITimeSeries(ResultGUI, ResultTimeSeries):
-    """ GUI result for time series """
-    def __init__(self, **kargs):
-        ResultTimeSeries.__init__(self, replace_nones=True, **kargs)
-        ResultGUI.__init__(self, **kargs)
-        self.gui_fields = ('gui_ix', 'time', 'from', 'to', 'freq', 'gui_plot',)
-        self.gui_types = (int, str, str, str, float, str,)
-        self.gui_markup_fields = ('gui_plot',)
-        self.search_col = self.gindex('time')
-
-
-    def prep_gui_vals(self, ix, **kargs):
-        self.gui_vals.clear()
-        self.gui_vals['gui_ix'] = ix
-        self.gui_vals['time'] = self.vals['time']
-        self.gui_vals['from'] = self.vals['from']
-        self.gui_vals['to'] = self.vals['to']
-        self.gui_vals['freq'] = self.vals['freq']
-        
-        color = self.config.get('gui_hilight_color','blue')
-        unit = dezeroe(self.TB.result_max,1)/200
-        length = int(self.vals.get('freq',0)/unit)
-        magn = ""
-        for l in range(length): magn = f'{magn} ' 
-        magn = f'<span background="{color}">{magn}</span>'
-        self.gui_vals['gui_plot'] = magn
-
-
-
-
-
-class ResultGUIPlugin(ResultGUI, FeedexPlugin):
-    """ GUI representation for plugin """
-    def __init__(self, **kargs) -> None:
-        FeedexPlugin.__init__(self, **kargs)
-        ResultGUI.__init__(self, **kargs)
-        self.gui_fields = self.fields + ('gui_ix',)
-        self.gui_types = (int, str, str, str, str, int,)
-        self.search_col = self.gindex('name')
-
-
-
-    def prep_gui_vals(self, ix, **kargs):
-        self.gui_vals.clear()
-        self.gui_vals['gui_ix'] = ix
-        self.gui_vals['id'] = self.vals['id']
-
-        self.gui_vals['type'] = self.vals.get('stype','?')
-
-        self.gui_vals['name'] = scast(self.vals['name'], str, '')
-        self.gui_vals['command'] = scast(self.vals['command'], str, '')
-        self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, '').replace('\n',' ').replace('\r',' ').replace('\t',' '), 200)
-
-
-
-
-class ResultGUICatItem(ResultGUI, FeedexCatItem):
-    """ GUI representation for plugin """
-    def __init__(self, **kargs) -> None:
-        FeedexCatItem.__init__(self, **kargs)
-        ResultGUI.__init__(self, **kargs)
-        self.gui_fields = ('id', 'gui_icon', 'gui_toggle',  'name', 'desc', 'tags', 'location', 'popularity', 'freq', 'link_res', 'link_home',  'gui_bold', 'gui_ix', 'is_node', 'parent_id')
-        self.gui_types = (int,  GdkPixbuf.Pixbuf, bool,    str, str, str, str, int, str, str, str,   int,   int,   bool, int )
-        self.gui_markup_fields = ('name',)
-        self.toggled_field = self.get_index('toggled')
-
-
-    def prep_gui_vals(self, ix, **kargs):
-        self.gui_vals.clear()
-        self.gui_vals['gui_ix'] = ix
-        self.gui_vals['id'] = self.vals['id']
-        self.gui_vals['desc'] = self.vals['desc']
-        self.gui_vals['gui_toggle'] = self.vals['is_toggled']
-        self.gui_vals['name'] = esc_mu(self.vals['name'])
-        self.gui_vals['is_node'] = self.vals['is_node']
-
-        if self.vals['is_node']:
-            self.gui_vals['name'] = f"""<u>{self.gui_vals['name']}</u>"""
-            self.gui_vals['gui_bold'] = 800
-            self.gui_vals['gui_icon'] = self.MW.icons.get('doc')
-            self.gui_vals['parent_id'] = -1
-        else:
-            self.gui_vals['parent_id'] = self.vals['parent_id']
-            self.gui_vals['gui_bold'] = 400
-            if self.MW.catalog_icons.get(self.vals['thumbnail']) is None: 
-                if os.path.isfile(self.vals['thumbnail']):
-                    self.MW.catalog_icons[self.vals['thumbnail']] = GdkPixbuf.Pixbuf.new_from_file_at_size(self.vals['thumbnail'] , 16, 16)
-                else:
-                    self.MW.catalog_icons[self.vals['thumbnail']] = self.MW.icons['rss']
-            self.gui_vals['gui_icon'] = self.MW.catalog_icons.get(self.vals['thumbnail'])
-            self.gui_vals['tags'] = self.vals['tags']
-            self.gui_vals['location'] = self.vals['location']
-            self.gui_vals['popularity'] = self.vals['popularity']
-            self.gui_vals['freq'] = self.vals['freq']
-            self.gui_vals['link_res'] = self.vals['link_res']
-            self.gui_vals['link_home'] = self.vals['link_home']
 
         
 
@@ -1599,8 +1211,6 @@ class FeedexGUITable:
         self.MW = self.parent.MW
         self.config = self.MW.config
         self.icons = self.MW.icons
-
-        #if 'catalog' in self.MW.gui_cache['layouts'].keys(): del self.MW.gui_cache['layouts']['catalog']
 
         self.lock = threading.Lock()
 
@@ -1671,8 +1281,8 @@ class FeedexGUITable:
 
         if self.result.search_col:
             self.view.set_enable_search(True)
-            if self.is_tree: self.view.set_search_equal_func(self.MW.quick_find_case_ins_tree, self.view, self.result.search_col) 
-            else: self.view.set_search_equal_func(self.MW.quick_find_case_ins, self.result.search_col)
+            if self.is_tree: self.view.set_search_equal_func(quick_find_case_ins_tree, self.view, self.result.search_col) 
+            else: self.view.set_search_equal_func(quick_find_case_ins, self.result.search_col)
 
 
 
@@ -1710,6 +1320,7 @@ class FeedexGUITable:
             else: sort_col = None
 
             self.view.append_column( f_col( col_name, ctype, ix, sort_col=sort_col, note=note, yalign=yalign, color_col=self.color_col, attr_col=self.weight_col, start_width=width, name=field) )
+
 
         return 0
 
@@ -1997,48 +1608,45 @@ class FeedexGUITable:
 
 
 
+
+
+    def _on_toggled_node(self, model, path, iter, parent_id, btog):
+        if coalesce(model[iter][self.result.gindex('parent_id')],0) == parent_id:
+            id = model[iter][self.result.gindex('id')]
+            model[iter][self.result.gindex('gui_toggle')] = btog
+            if btog:
+                if id not in self.result.toggled_ids: self.result.toggled_ids.append(id)
+            else:
+                while id in self.result.toggled_ids: self.result.toggled_ids.remove(id)
+        return False
+
+
+
+    def _on_toggled(self, widget, path, *args):
+        """ Handle toggled signal and pass results to nodes if needed """
+        id = self.store[path][self.result.gindex('id')]
+        btog = not self.store[path][self.result.gindex('gui_toggle')]
+        self.store[path][self.result.gindex('gui_toggle')] = btog
+
+        if btog:
+            if id not in self.result.toggled_ids: self.result.toggled_ids.append(id)
+        else: 
+            while id in self.result.toggled_ids: self.result.toggled_ids.remove(id)
+        
+        if self.store[path][self.result.gindex('is_node')] == 1:
+            self.store.foreach(self._on_toggled_node, id, btog)
+
+
     def _untoggle_all_foreach(self, model, path, iter):
         model[iter][self.result.gindex('gui_toggle')] = False 
         return False
 
-    def _on_toggle_foreach_catalog(self, model, path, iter, parent_id, btoggle, id_ix):
-        if coalesce(model[iter][self.result.gindex('parent_id')],0) == parent_id:
-            model[iter][self.result.gindex('gui_toggle')] = btoggle
-            ix = model[iter][self.result.gindex('gui_ix')]
-            id = model[iter][self.result.gindex('id')]
-            self.results[ix][self.result.toggled_field] = btoggle
-            for i,r in enumerate(self.result.MW.catalog): 
-                if r[id_ix] == id: self.result.MW.catalog[i][self.result.toggled_field] = btoggle
-        return False
-    
-
-    def _on_toggled(self, widget, path, *args):
-        """ Handle toggled signal and pass results to catalog store """
-        ix = self.store[path][self.result.gindex('gui_ix')]
-        id_ix = self.result.get_index('id')
-        item = self.results[ix]
-        id = item[id_ix]
-        btoggle = not self.store[path][self.result.gindex('gui_toggle')]
-        self.store[path][self.result.gindex('gui_toggle')] = btoggle
-        self.results[ix][self.result.toggled_field] = btoggle
-        
-        if isinstance(self.result, FeedexCatItem): 
-            for i,r in enumerate(self.result.MW.catalog):
-                if self.result.MW.catalog[id_ix] == id:
-                    self.result.MW.catalog[i][self.result.toggled_field] = btoggle
-                    break
-
-            if item[self.result.get_index('is_node')]: self.store.foreach(self._on_toggle_foreach_catalog, id, btoggle, id_ix)
-
-
     def untoggle_all(self, *args, **kargs):
         """ Untoggle all checkboxes """
+        self.result.toggled_ids = []
         self.store.foreach(self._untoggle_all_foreach)
-        if type(self.results) is not list: list(self.results)
-        for i,r in enumerate(self.results): self.results[i][self.result.toggled_field] = False
-        if isinstance(self.result, FeedexCatItem): 
-            for i, r in enumerate(self.result.MW.catalog):
-                self.result.MW.catalog[i][self.result.toggled_field] = False
+
+
 
 
 
@@ -2062,101 +1670,6 @@ class FeedexGUITable:
 
 
 
-class CalendarDialog(Gtk.Dialog):
-    """ Date chooser for queries """
-    def __init__(self, parent, **kargs):
 
-        self.response = 0
-        self.result = {'from_date':None,'to_date':None, 'date_string':None}
-
-        Gtk.Dialog.__init__(self, title=_("Choose date range"), transient_for=parent, flags=0)
-        self.set_default_size(kargs.get('width',400), kargs.get('height',200))
-        box = self.get_content_area()
-
-        from_label = f_label(_('  From:'), justify=FX_ATTR_JUS_LEFT, selectable=False, wrap=False)
-        to_label = f_label(_('    To:'), justify=FX_ATTR_JUS_LEFT, selectable=False, wrap=False)
-
-        self.from_clear_button = Gtk.CheckButton.new_with_label(_('Empty'))
-        self.from_clear_button.connect('toggled', self.clear_from)
-        self.to_clear_button = Gtk.CheckButton.new_with_label(_('Empty'))
-        self.to_clear_button.connect('toggled', self.clear_to)
-
-        accept_button = f_button(_('Accept'),'object-select-symbolic', connect=self.on_accept)
-        cancel_button = f_button(_('Cancel'),'window-close-symbolic', connect=self.on_cancel)
-
-        self.cal_from = Gtk.Calendar()
-        self.cal_to = Gtk.Calendar()
-        self.cal_from.connect('day-selected', self.on_from_selected)
-        self.cal_to.connect('day-selected', self.on_to_selected)
-
-
-
-        top_box = Gtk.HBox(homogeneous = False, spacing = 0)
-        bottom_box = Gtk.HBox(homogeneous = False, spacing = 0)
-
-        left_box = Gtk.VBox(homogeneous = False, spacing = 0)
-        right_box = Gtk.VBox(homogeneous = False, spacing = 0)
-
-        box.pack_start(top_box, False, False, 1)
-        box.pack_start(bottom_box, False, False, 1)
-
-        bottom_box.pack_start(cancel_button, False, False, 1)
-        bottom_box.pack_end(accept_button, False, False, 1)
-
-        top_box.pack_start(left_box, False, False, 1)
-        top_box.pack_start(right_box, False, False, 1)
-
-        left_box.pack_start(from_label, False, False, 1)
-        left_box.pack_start(self.cal_from, False, False, 1)
-        left_box.pack_start(self.from_clear_button, False, False, 1)
-
-        right_box.pack_start(to_label, False, False, 1)
-        right_box.pack_start(self.cal_to, False, False, 1)
-        right_box.pack_start(self.to_clear_button, False, False, 1)
-
-        self.show_all()
-        self.on_to_selected()
-        self.on_from_selected()
-
-    def on_accept(self, *args):
-        self.response = 1
-        if not self.from_clear_button.get_active():
-            (year, month, day) = self.cal_from.get_date()
-            self.result['from_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
-        else: self.result['from_date'] = None
-
-        if not self.to_clear_button.get_active():
-            (year, month, day) = self.cal_to.get_date()
-            self.result['to_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
-        else: self.result['to_date'] = None
-
-        self.result['date_string'] = f"""{coalesce(self.result['from_date'], '...')} - {coalesce(self.result['to_date'], '...')}"""
-        self.close()
-
-    def on_cancel(self, *args):
-        self.response = 0
-        self.result = {'from_date':None,'to_date':None, 'date_string':None}
-        self.close()
-        
-    def clear_from(self, *args):
-
-        if self.cal_from.get_sensitive():
-            self.cal_from.set_sensitive(False)
-        else:
-            self.cal_from.set_sensitive(True)
-
-    def clear_to(self, *args):
-        if self.cal_to.get_sensitive():
-            self.cal_to.set_sensitive(False)
-        else:
-            self.cal_to.set_sensitive(True)
-
-    def on_from_selected(self, *args):
-        (year, month, day) = self.cal_from.get_date()
-        self.result['from_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
-
-    def on_to_selected(self, *args):
-        (year, month, day) = self.cal_to.get_date()
-        self.result['to_date'] = f'{scast(year,str,"")}/{scast(month+1,str,"")}/{scast(day,str,"")}'
 
 

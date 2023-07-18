@@ -178,7 +178,7 @@ class FeedexRule(SQLContainerEditable):
     def do_update(self, **kargs):
         """ Apply edit changes to DB """
         if not self.updating: return 0
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
 
         if kargs.get('validate', True): 
             err = self.validate()
@@ -223,7 +223,7 @@ class FeedexRule(SQLContainerEditable):
 
     def update(self, idict, **kargs):
         """ Quick update with a value dictionary"""
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
         err = self.add_to_update(idict)
         if err == 0: err = self.do_update(validate=True)
         return err
@@ -233,7 +233,7 @@ class FeedexRule(SQLContainerEditable):
 
     def delete(self, **kargs):
         """ Delete rule by ID """
-        if not self.exists: return -8, _('Rule %a not found!'), id
+        if not self.exists: return FX_ERROR_NOT_FOUND
 
         err = self.DB.run_sql_lock("delete from rules where id = :id and learned <> 1", {'id':self.vals['id']} )
         if err != 0: return err

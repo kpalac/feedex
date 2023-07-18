@@ -34,6 +34,8 @@ Usage: <b>feedex [parameters|filters] [actions]</b>
         -C, --read-category [ID|NAME]           Get all entries for a specified Category
         -q, --query [Phrase]                    Query entries with search phrase (see --help-query option for details)
 
+        -qc [PHRASE], --query-catalog [PHRASE]  Query Feed Catalog for Channels to import
+        
         --csv                                   Output in CSV format (no beautifiers)
         --long                                  Show long output for queries
         --headlines                             Output only date, title and channel
@@ -225,7 +227,14 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --rel-in-time [ID]                      Entry's relevance as a time series - like --term-in -time for entry's keywords (filters like in --query)
                                                 --limit=INT        Limit results to INT-best (inproves performance)
 
+        -qc [PHRASE], --query-catalog [PHRASE]  Query Feed Catalog for Channels to import 
+                                                They can then be imported by using <b>--import-from-catalog [COMMA_SEPARATED_ID_LIST]</b> option
+                                                --category=[ID|NAME]    filter results by categories. Enter empty query to list all categories
+                                                --field=[NAME]          query only certain fields:
+                                                                            name, desc, location, tags  
+                   
                                                 
+                   
     <b>Handlers:</b>
         Every Feed has a protocol handler specified:
         <b>rss</b>      RSS protocol (needs a valid URL)
@@ -311,7 +320,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --batch_size=INT                        The size of processed entries before committing
 
         
-        --download-catalogue [OUTPUT DIR]       Download feed catalogue from blog.feedspot.com. For development and testing
+        --download-catalog [OUTPUT DIR]         Download feed catalog from blog.feedspot.com. For development and testing
 
                                                     
     <b>Database:</b>
@@ -868,26 +877,28 @@ They are stored in flags SQL table. Field description:
 FEEDEX_HELP_SCRIPTING=_("""
 <b>Feedex: Scripting</b>
 
-If Feed's handler is specified as <b>script</b> a user-specified command from <b>script_file</b> field (<b>feeds</b> table) is ran on fetching.
-Its output, assumed to be a <b>JSON string</b> (see below), is then parsed and loaded for processing just like RSS. Errors should be handled within
-the script, as STDERR is not analysed. User should take special care for the script not to cause unacceptable lattency or infinite loop, as fetching
-process waits for output and blocks while waiting.
+If Feed's handler is specified as <b>script</b> a user-specified command from <b>script_file</b> field (<b>feeds</b> table) is executed on fetching.
+Feedex then reads contents of <b>temp file</b> (expected to be in JSON format) and treats it as incomming feed data.
+Temp file path is passed as <b>%T</b> parameter to command or <b>FEEDEX_TEMP_FILE</b> env variable. 
+Script must populate it with a valid JSON structure (see below)
+It is also up to the script to prevent hanging, infinite loops and errors as Feedex will wait for the script to finish.
+                        
+Feed data can be read from another temp file (<b>FEEDEX_TEMP_FILE_FEED</b> env variable or <b>%I</b> argument).
+It is encoded in JSON format. 
 
-Several parameters can be passed in the command and be replaced by variables:
+Following arguments can be passed in the command and be replaced by variables:
 
+    <b>%T</b>   Transfer temp file path (raw feed data in JSON)
+    <b>%I</b>   Input temp file path (feed data in JSON)
     <b>%A</b>   User Agent (feed-specific or global)
     <b>%E</b>   Last saved ETag
     <b>%M</b>   Last saved 'Modified' tag
-    <b>%L</b>   Feed's login
-    <b>%P</b>   Feed's password
-    <b>%D</b>   Feed's auth domain
     <b>%U</b>   Feed's URL
     <b>%F</b>   Feed's ID
     <b>%%</b>   % character
 
-<i>Environment variable FEEDEX_FEED_JSON is added containing JSON string of processed channel for use in the script</i>                        
                         
-<b>Output JSON string should have specific format:</b>
+<b>JSON structure in transfer file should have specific format:</b>
 
 {
 <i>#HTTP return headers...</i>
@@ -983,34 +994,48 @@ Fields are:
 FEEDEX_HELP_PLUGINS = _("""
 <b>Feedex: Plugins</b>
 
-Plugins allow user to run scripts/commands on various Feedex items. 
-When executing a plugin command certain substitutions will be made:
+Plugins allow user to run scripts/commands on various Feedex items:
+
+    -   Selected text (useful e.g. for custom browser searches)
+    -   Query results  (useful for exporting results to other formats)
+    -   Feedex entities (e.g. selected entry, feed, or category) 
+
+                        
+Data in JSON format is transferred using temp file whose path is transferred to script by:
+
+    <b>%T</b>                       parameter in command line argument
+    <b>FEEDEX_TMP_FILE</b>          environment variable
+
+                        
+If plugin processes text selection, data is transferred to script by:
+
+    <b>%S</b>                       parameter in command line argument
+    <b>FEEDEX_SELECTED_TEXT</b>     environment variable
+                        
+
+When executing a plugin command substitutions will be made:
                         
     <b>%%</b>                       Percent (%) character
                         
-    <b>%[FIELD_NAME]%</b>           Value from item's field (for search result, channel and category plugins)
-                                        e.g. %desc% will be substituted for description
+    <b>%t</b>                       Table type for result list               
 
-    <b>%selected_text%</b>          Text selected from preview. Useful e.g. for sending text to browsers
-
-                        
-    <b>%choose_file_save%</b>       File chooser dialog for a new file will be displayed and chosen filename will be substituted for this string        
-    <b>%choose_file_open%</b>       File chooser dialog for an existing file will be displayed and chosen file will be substituted for this string        
-    <b>%choose_dir_open%</b>        Folder chooser dialog will be displayed and chosen folder will be substituted for this string        
+    <b>%choose_file_save%</b>       File chooser dialog for a new file will be displayed 
+                                    and chosen filename will be substituted for this string        
+    <b>%choose_file_open%</b>       File chooser dialog for an existing file will be displayed 
+                                    and chosen file will be substituted for this string        
+    <b>%choose_dir_open%</b>        Folder chooser dialog will be displayed 
+                                    and chosen folder will be substituted for this string        
 
                         
 Following environment variables are available:
 
-    <b>FEEDEX_TABLE_TYPE</b>            Result table type (e.g. entries, feeds, rules, terms, time_series, keywords)
-    <b>FEEDEX_RESULT_FIELDS_JSON</b>    JSON string containing container orderred container field name list
-    <b>FEEDEX_RESULTS_JSON</b>          JSON string containing query results for relevant plugin
-    <b>FEEDEX_ITEM_JSON</b>             JSON string for item like entry/term/channel/category
-    <b>FEEDEX_SELECTED_TEXT</b>         String with selected text                     
+    <b>FEEDEX_TABLE</b>             Result table type (e.g. entries, feeds, rules, terms, time_series, keywords)
+    <b>FEEDEX_FIELDS</b>            Semicolon-separated list of result fields
+                                 
 
-                        
 Output from executed command will be send to status bar. 
 Pipes and redirecting are not allowed.
                         
-Plugin examples can be found in data/examples/plugins folder.
+Plugin examples can be found in data-examples-plugins folder.
 
 """)

@@ -75,7 +75,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
         self.connect("key-press-event", self._on_key_press)
 
         self.feed_tree.set_enable_search(True)
-        self.feed_tree.set_search_equal_func(self.MW.quick_find_case_ins_tree, self.feed_tree, self.feed.gindex('name'))
+        self.feed_tree.set_search_equal_func(quick_find_case_ins_tree, self.feed_tree, self.feed.gindex('name'))
  
         self.feed_tree.set_enable_tree_lines(True)
         self.feed_tree.set_level_indentation(20)
@@ -99,14 +99,14 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
             item = self.get_selection()
             if item is not None and item.gget('gui_action') == 0: 
                 item.populate(fdx.find_f_o_c(item.gget('id'), load=True))
-                self.MW.on_del_feed(item)
+                self.MW.act.on_del_feed(item)
 
 
         elif ctrl and key_name == self.config.get('gui_key_edit','e'):
             item = self.get_selection()
             if item is not None and item.gget('gui_action') == 0: 
                 item.populate(fdx.find_f_o_c(item.gget('id'), load=True))
-                self.MW.on_feed_cat('edit', item)
+                self.MW.act.on_feed_cat('edit', item)
         
         elif ctrl and key_name in ('F2',): pass
         
@@ -221,7 +221,6 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
         if target is None: return -1
         if target.gget('gui_action') != 0: return -1
         item = FeedexFeed(self.MW.DB, id=self.copy_selected['id'])
-        #item = item.convert(FeedexFeed, self.MW.DB, id=item['id'])
         err = item.order_insert(target.get('id'), with_cat=True)
         if err == 0:
             self.copy_selected.clear()
@@ -366,7 +365,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
 
         if kargs.get('load',True):
             self.MW.DB.load_icons()
-            self.MW.icons = get_icons(fdx.feeds_cache, fdx.icons_cache)
+            self.MW.act.get_icons()
 
         adj = self.feed_tree.get_vadjustment()
         self.vadj_val = adj.get_value()
@@ -455,6 +454,8 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
         if self.MW.curr_upper is not None:
             self.redecorate(self.MW.curr_upper.table.curr_feed_filters, self.MW.curr_upper.table.feed_sums)
 
+
+        if kargs.get('load',True): self.MW.act.reload_cat_combos()
 
 
     def _tree_changed(self, *args, **kargs):

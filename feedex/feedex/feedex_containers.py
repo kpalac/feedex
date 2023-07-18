@@ -9,6 +9,11 @@ from feedex_headers import *
 
 
 
+
+
+
+
+
 class SQLContainer:
     """ Container class for SQL table. It helps to cleanly interface with SQL, output SQL statements 
         and keep data tidy. Lifts the burden of dealing with long lists with only indices as indicators,
@@ -530,7 +535,7 @@ class FeedexFlag(SQLContainerEditable):
     def validate(self, **kargs):
         """ Validate current values """
         err = self.validate_types()
-        if err != 0: return -7, _('Invalid data type for %a'), err
+        if err != 0: return FX_ERROR_VAL, _('Invalid data type for %a'), err
 
         if self.vals['id'] in fdx.flags_cache.keys() and self.vals['id'] != self.backup_vals['id']: return -7, _('ID taken by another flag')
         if self.vals['name'] is None or self.vals['name'] == '': return -7, _('Flag name cannot be empty!')
@@ -544,7 +549,7 @@ class FeedexFlag(SQLContainerEditable):
     def do_update(self, **kargs):
         """ Apply edit changes to DB """
         if not self.updating: return 0, _('Nothing to do')
-        if not self.exists: return -8, _('Flag %a not found!'), id
+        if not self.exists: return FX_ERROR_NOT_FOUND
 
         if kargs.get('validate', True): 
             err = self.validate()
@@ -594,7 +599,7 @@ class FeedexFlag(SQLContainerEditable):
 
     def update(self, idict, **kargs):
         """ Quick update with a value dictionary"""
-        if not self.exists: return -8
+        if not self.exists: return FX_ERROR_NOT_FOUND
         err = self.add_to_update(idict, allow_id=True)
         if err == 0: err = self.do_update(validate=True)
         return err
@@ -657,3 +662,8 @@ class FeedexFlag(SQLContainerEditable):
 
 
 
+
+
+
+
+    

@@ -18,7 +18,7 @@ from shutil import copyfile
 from random import randint
 import json
 import threading
-
+import socket
 
 # Downloaded
 import feedparser
@@ -47,14 +47,14 @@ from feedex_containers import SQLContainer, SQLContainerEditable, ResultEntry, R
 from smallsem import SmallSem
 from feedex_nlp import FeedexLP
 
-from feedex_feed import FeedexFeed
+from feedex_feed import FeedexFeed, FeedexCatalog, ResultCatItem
 from feedex_entry import FeedexEntry
 from feedex_rule import FeedexRule
 
 from feedex_handlers import FeedexRSSHandler, FeedexHTMLHandler, FeedexScriptHandler
 
 
-from feeder_query import FeedexQuery, FeedexQueryInterface
+from feeder_query import FeedexQuery, FeedexQueryInterface, FeedexCatalogQuery
 from feeder import FeedexDatabase, FeedexDatabaseError, FeedexDataError
 
 from feedex_cli import FeedexCLI

@@ -109,6 +109,7 @@ class FeedexCLI:
         line_end = ''
         intline = ''
         vals = []
+
         cont.populate(result)
 
         if self.output not in ('csv',):
@@ -118,7 +119,7 @@ class FeedexCLI:
 
             if coalesce(cont.vals.get('is_node'),0) == 1:
                 return f"""{intline}
-{TCOLS['WHITE_BOLD']}===================================== {coalesce(cont.vals.get('name'), cont.vals['title'], '<???>')} ({cont.vals['children_no']}) ============================================================================{self.STERM_NORMAL}"""
+{TCOLS['WHITE_BOLD']}===================================== {coalesce(cont.vals.get('name'), cont.vals.get('title'), '<???>')} ({cont.vals['children_no']}) ============================================================================{self.STERM_NORMAL}"""
             
 
             if coalesce(cont.vals.get('deleted'),0) >= 1 or coalesce(cont.vals.get('is_deleted'),0) >= 1:
@@ -285,7 +286,18 @@ class FeedexCLI:
             elif isinstance(table, ResultHistoryItem):
                 footer = f"""{result_no} {_('history items')}"""
 
+            elif isinstance(table, ResultCatItem):
+                footer = f"""{result_no} {_('catalog items found')}"""
+                line = True
+                if self.display_cols is not None:
+                    err = self._resolve_display_cols(self.display_cols, table)
+                    if err != 0: return err
+                    mask = self.display_cols
+                elif self.output in ('long', 'csv'): mask = FEEDEX_CATALOG_TABLE
+                else: mask = FEEDEX_CATALOG_TABLE_SHORT
+
             else: footer = f"""{result_no} {_('results')}"""
+
 
             header = ''
             for c in coalesce(mask, table.vals.keys()): 
@@ -412,6 +424,18 @@ class FeedexCLI:
         summarize = kargs.get('summarize')
         if summarize is not None: entry.summarize(summarize, separator="(...)\n")
 
+        links_str = ''
+        for l in scast(entry.vals.get('images'), str, '').splitlines() +\
+              scast(entry.vals.get('links'), str, '').splitlines() +\
+              scast(entry.vals.get('enclosures'), str, '').splitlines():
+            
+            ll = fdx.parse_res_link(l, gui=False)
+            if ll is None: continue
+            links_str = f"""{links_str}
+{ll.get('desc','')}"""
+
+
+
         disp_str = f"""
 {_('Feed or Category')} (feed_id): <b>{entry.vals['feed_id']} ({fdx.get_feed_name(entry['feed_id'], with_id=False)})</b>  
 ----------------------------------------------------------------------------------------------------------
@@ -421,11 +445,9 @@ class FeedexCLI:
 ----------------------------------------------------------------------------------------------------------
 {_('Text')} (text): <b>{scast(entry.vals['text'], str, '')}</b>
 ----------------------------------------------------------------------------------------------------------
-{_('Links and enclosures:')}
-<b>{entry.vals['links']}
-{entry.vals['enclosures']}</b>
-{_('Images')}:
-<b>{entry.vals['images']}</b>
+{_('Images, Links and Enclosures:')}
+{links_str}
+
 {_('Comments')}:       <b>{entry.vals['comments']}</b>
 ----------------------------------------------------------------------------------------------------------
 {_('Category')}:       <b>{entry.vals['category']}</b>

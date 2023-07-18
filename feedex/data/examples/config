@@ -1,6 +1,11 @@
 # Example configuration for Feedex News Reader
 
 
+# Profile name connected with this configuration
+# If specified, GUI session will be treated as separate from default
+#profile_name = Feedex
+
+
 # Display language
 lang = 
 
@@ -59,15 +64,13 @@ save_perm_redirects = False
 mark_deleted = True
 ignore_modified = True
 user_agent = UniversalFeedParser/5.0.1 +http://feedparser.org/
+fetch_timeout = 20  # Timeout for fetching remote resources
 
 
 # This UA wil be used for resource download if default fails
 #fallback_user_agent = Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0
 
 # GUI options
-# Ignore image handling and download for performance
-ignore_images = False
-
 gui_new_color = #0f0fdadacaca
 gui_deleted_color = #bababdbdb6b6
 gui_hilight_color = #00000000ffff

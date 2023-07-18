@@ -20,11 +20,8 @@ class FeedexMainWin(Gtk.Window):
     
         self.config = kargs.get('config', fdx.config)
 
-        self.gui_cache = validate_gui_cache( load_json(FEEDEX_GUI_ATTR_CACHE, {}) ) #Load cached GUI settings/layouts/tabs from previous session
-        self.gui_plugins = validate_gui_plugins( load_json(FEEDEX_GUI_PLUGINS, FX_DEFAULT_PLUGINS, create_file=True) ) # Load and validate plugin list
-
         # Main DB interface - init and check for lock and/or DB errors
-        self.DB = FeedexDatabase( db_path=kargs.get('db_path', self.config.get('db_path')), ignore_images=self.config.get('ignore_images', False), allow_create=True)
+        self.DB = FeedexDatabase( db_path=kargs.get('db_path', self.config.get('db_path')), allow_create=True)
         try:
             self.DB.connect(defaults=True, default_feeds=False)
             self.DB.load_all()
@@ -51,6 +48,17 @@ class FeedexMainWin(Gtk.Window):
                 sys.exit(4)
     
         self.DB.unlock()
+
+        # Init action coordinator
+        self.act = FeedexGUIActions(self)
+
+        # Load and init paths, caches and profile-dependent data
+        self.set_profile()
+        self.gui_cache = self.act.validate_gui_cache( load_json(self.gui_cache_path, {}) ) #Load cached GUI settings/layouts/tabs from previous session
+        self.gui_plugins = self.act.validate_gui_plugins( load_json(self.gui_plugins_path, FX_DEFAULT_PLUGINS, create_file=True) ) # Load and validate plugin list
+        self.act.get_icons()
+        self.cat_icons = {}
+
 
         # Timer related ...
         self.sec_frac_counter = 0
@@ -79,8 +87,6 @@ class FeedexMainWin(Gtk.Window):
         self.prev_entry = {}
         self.curr_prev = None
 
-        # Image handling
-        self.icons = get_icons(fdx.feeds_cache, fdx.icons_cache)
 
         # Action flags for caching and comparing with main bus
         self.busy = fdx.busy # Mainly for spinner display
@@ -91,18 +97,19 @@ class FeedexMainWin(Gtk.Window):
         # Places
         self.curr_place = FX_PLACE_LAST
 
+        # Downloaded item list
+        self.downloaded = []
+
         # Start threading and main window
         Gdk.threads_init()
-        Gtk.Window.__init__(self, title=f"Feedex {FEEDEX_VERSION}")
+        Gtk.Window.__init__(self, title='Feedex')
         self.lock = threading.Lock()
+        GLib.timeout_add(interval=250, function=self._on_timer)
 
         self.set_border_width(10)
         self.set_icon(self.icons['main'])
         self.set_resizable(True)
         self.set_position(Gtk.WindowPosition.CENTER)
-
-        GLib.timeout_add(interval=250, function=self._on_timer)
-
 
 
 
@@ -117,18 +124,16 @@ class FeedexMainWin(Gtk.Window):
 
 
         # Header bar and top menus
-        hbar = Gtk.HeaderBar()
-        hbar.set_show_close_button(True)
-        hbar.props.title = f"Feedex {FEEDEX_VERSION}"
-        
-        if self.config.get('profile_name') is not None: hbar.props.subtitle = f"{self.config.get('profile_name')}"
+        self.hbar = Gtk.HeaderBar()
+        self.hbar.set_show_close_button(True)
+        self.win_decor()
         
         self.hbar_button_menu = Gtk.MenuButton()
         self.hbar_button_menu.set_popup(self.main_menu())
         self.hbar_button_menu.set_tooltip_markup(_("""Main Menu"""))
         hbar_button_menu_icon = Gtk.Image.new_from_icon_name('open-menu-symbolic', Gtk.IconSize.BUTTON)
         self.hbar_button_menu.add(hbar_button_menu_icon)         
-        self.set_titlebar(hbar)
+        self.set_titlebar(self.hbar)
 
         self.button_new = Gtk.MenuButton()
         self.button_new.set_popup(self.add_menu())
@@ -136,7 +141,7 @@ class FeedexMainWin(Gtk.Window):
         button_new_icon = Gtk.Image.new_from_icon_name('list-add-symbolic', Gtk.IconSize.BUTTON)
         self.button_new.add(button_new_icon)
         
-        self.button_feeds_download   = f_button(None,'rss-symbolic', connect=self.on_load_news_all, tooltip=f'<b>{_("Fetch")}</b> {_("news for all Channels")}')
+        self.button_feeds_download   = f_button(None,'rss-symbolic', connect=self.act.on_load_news_all, tooltip=f'<b>{_("Fetch")}</b> {_("news for all Channels")}')
        
         self.button_search = Gtk.MenuButton()
         self.button_search.set_popup(self.new_tab_menu())
@@ -274,11 +279,11 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         main_top_box.pack_start(lstatus_box, False, False, 3)
         self.add(main_top_box)
 
-        hbar.pack_start(self.button_feeds_download)
-        hbar.pack_start(self.button_new)
-        hbar.pack_start(self.button_search)
+        self.hbar.pack_start(self.button_feeds_download)
+        self.hbar.pack_start(self.button_new)
+        self.hbar.pack_start(self.button_search)
         
-        hbar.pack_end(self.hbar_button_menu)
+        self.hbar.pack_end(self.hbar_button_menu)
 
 
 
@@ -338,28 +343,27 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         if hasattr(self, 'div_horiz'): self.gui_cache['div_horiz'] = self.div_horiz.get_position()
         if hasattr(self, 'div_vert2'): self.gui_cache['div_vert2'] = self.div_vert2.get_position()
 
-        # Save current tabs if preferred
-        if self.config.get('gui_startup_page',0) == 4:
-            self.gui_cache['tabs'] = []
+        # Save current tabs
+        self.gui_cache['tabs'] = []
             
-            for i in range(self.upper_notebook.get_n_pages()):
-                if i == 0: continue
-                tb = self.upper_notebook.get_nth_page(i)
+        for i in range(self.upper_notebook.get_n_pages()):
+            if i == 0: continue
+            tb = self.upper_notebook.get_nth_page(i)
                 
-                if not tb.save_to_cache: continue
+            if not tb.save_to_cache: continue
 
-                if hasattr(tb, 'query_entry'): phrase = tb.query_entry.get_text()
-                else: phrase = None
-                if hasattr(tb, 'search_filters'):
-                    tb.get_search_filters()
-                    search_filters = tb.search_filters
-                else: search_filters = {}
-                title = tb.header.get_label()
+            if hasattr(tb, 'query_entry'): phrase = tb.query_entry.get_text()
+            else: phrase = None
+            if hasattr(tb, 'search_filters'):
+                tb.get_search_filters()
+                search_filters = tb.search_filters
+            else: search_filters = {}
+            title = tb.header.get_label()
 
-                tab_dc = {'type':tb.type, 'title':title, 'phrase': phrase, 'filters':search_filters}
-                self.gui_cache['tabs'].append(tab_dc)
+            tab_dc = {'type':tb.type, 'title':title, 'phrase': phrase, 'filters':search_filters}
+            self.gui_cache['tabs'].append(tab_dc)
 
-        err = save_json(FEEDEX_GUI_ATTR_CACHE, self.gui_cache)
+        err = save_json(self.gui_cache_path, self.gui_cache)
         if err == 0: debug(7, 'Saved GUI attributes: ', self.gui_cache)
 
 
@@ -437,7 +441,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                     if tb is None: continue
                     if tb.uid == uid:
                         tb.finish_search()
-                        if hasattr(tb, 'query_combo'): self.reload_history_all()
+                        if hasattr(tb, 'query_combo'): self.act.reload_history_all()
                         break
 
             elif code == FX_ACTION_FINISHED_FILTERING:
@@ -452,7 +456,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
             elif code == FX_ACTION_HANDLE_IMAGES:
                 if self.prev_entry.get('id') == m[1]: 
-                    self.handle_images(self.prev_entry.get('id', None), f"""{self.prev_entry.get('images','')}\n{self.links}""")
+                    self.handle_images(self.prev_entry.get('id', None), f"""{self.prev_entry.get('images','')}\n{self.prev_links}""")
 
             elif code == FX_ACTION_BLOCK_FETCH:
                 self.button_feeds_download.set_sensitive(False)
@@ -496,8 +500,11 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         key_name = Gdk.keyval_name(key)
         state = event.state
         ctrl = (state & Gdk.ModifierType.CONTROL_MASK)        
-        if ctrl and key_name == self.config.get('gui_key_new_entry','n'): self.on_edit_entry(None)
-        elif ctrl and key_name == self.config.get('gui_key_new_rule','r'): self.on_edit_rule(None)
+        if ctrl and key_name == self.config.get('gui_key_new_entry','n'): self.act.on_edit_entry(None)
+        elif ctrl and key_name == self.config.get('gui_key_new_rule','r'): self.act.on_edit_rule(None)
+        elif ctrl and key_name == self.config.get('gui_key_search','s'): 
+            if hasattr(self.curr_upper, 'query_entry'): self.curr_upper.query_entry.grab_focus()
+            elif hasattr(self.curr_upper, 'search_button'): self.curr_upper.on_query() 
         elif ctrl and key_name in ('F2',): 
             event.button = 3
             self.main_alt_menu(event)
@@ -526,36 +533,36 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
     def export_menu(self, *args):
         menu = Gtk.Menu()
-        menu.append( f_menu_item(1, _('Export Feed data to JSON'), self.export_feeds, icon='application-rss+xml-symbolic'))  
-        menu.append( f_menu_item(1, _('Export Rules to JSON'), self.export_rules, icon='view-list-compact-symbolic'))  
-        menu.append( f_menu_item(1, _('Export Flags to JSON'), self.export_flags, icon='marker-symbolic'))  
-        menu.append( f_menu_item(1, _('Export Plugins to JSON'), self.export_plugins, icon='extension-symbolic'))  
+        menu.append( f_menu_item(1, _('Export Feed data to JSON'), self.act.export_feeds, icon='application-rss+xml-symbolic'))  
+        menu.append( f_menu_item(1, _('Export Flags to JSON'), self.act.export_flags, icon='marker-symbolic'))  
+        menu.append( f_menu_item(1, _('Export Rules to JSON'), self.act.export_rules, icon='view-list-compact-symbolic'))  
+        menu.append( f_menu_item(1, _('Export Plugins to JSON'), self.act.export_plugins, icon='extension-symbolic'))  
         return menu
 
     def import_menu(self, *args):
         menu = Gtk.Menu()
-        menu.append( f_menu_item(1, _('Import Feed data from JSON'), self.import_feeds, icon='application-rss+xml-symbolic'))  
-        menu.append( f_menu_item(1, _('Import Rules data from JSON'), self.import_rules, icon='view-list-compact-symbolic'))  
-        menu.append( f_menu_item(1, _('Import Flags data from JSON'), self.import_flags, icon='marker-symbolic'))  
-        menu.append( f_menu_item(1, _('Import Plugin data from JSON'), self.import_plugins, icon='extension-symbolic'))  
+        menu.append( f_menu_item(1, _('Import Feed data from JSON'), self.act.import_feeds, icon='application-rss+xml-symbolic'))  
+        menu.append( f_menu_item(1, _('Import Flags data from JSON'), self.act.import_flags, icon='marker-symbolic'))  
+        menu.append( f_menu_item(1, _('Import Rules data from JSON'), self.act.import_rules, icon='view-list-compact-symbolic'))  
+        menu.append( f_menu_item(1, _('Import Plugin data from JSON'), self.act.import_plugins, icon='extension-symbolic'))  
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Import Entries from JSON'), self.import_entries, icon='document-import-symbolic'))  
+        menu.append( f_menu_item(1, _('Import Entries from JSON'), self.act.import_entries, icon='document-import-symbolic'))  
         return menu
 
     def db_menu(self, *args):
         menu = Gtk.Menu()
-        menu.append( f_menu_item(1, _('Maintenance...'), self.on_maintenance, icon='system-run-symbolic', tooltip=_("""Maintenance can improve performance for large databases by doing cleanup and reindexing.
+        menu.append( f_menu_item(1, _('Maintenance...'), self.act.on_maintenance, icon='system-run-symbolic', tooltip=_("""Maintenance can improve performance for large databases by doing cleanup and reindexing.
 It will also take some time to perform""") ))  
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Clear cache'), self.on_clear_cache, icon='edit-clear-all-symbolic', tooltip=_("""Clear downloaded temporary files with images/thumbnails to reclaim disk space""") ) )
+        menu.append( f_menu_item(1, _('Clear cache'), self.act.on_clear_cache, icon='edit-clear-all-symbolic', tooltip=_("""Clear downloaded temporary files with images/thumbnails to reclaim disk space""") ) )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Database statistics'), self.on_show_stats, icon='drive-harddisk-symbolic') )
+        menu.append( f_menu_item(1, _('Database statistics'), self.act.on_show_stats, icon='drive-harddisk-symbolic') )
         return menu
 
     def log_menu(self, *args):
         menu = Gtk.Menu()
-        menu.append( f_menu_item(1, _('View session log'), self.on_show_session_log, icon='text-x-generic-symbolic') )
-        menu.append( f_menu_item(1, _('View main log'), self.on_view_log, icon='text-x-generic-symbolic') )
+        menu.append( f_menu_item(1, _('View session log'), self.act.on_show_session_log, icon='text-x-generic-symbolic') )
+        menu.append( f_menu_item(1, _('View main log'), self.act.on_view_log, icon='text-x-generic-symbolic') )
         return menu
 
 
@@ -566,7 +573,7 @@ It will also take some time to perform""") ))
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Plugins'), self.add_tab, kargs={'type':FX_TAB_PLUGINS, 'do_search':True}, icon='extension-symbolic', tooltip=_('Open a new tab showing Plugins') ) )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Preferences'), self.on_prefs, icon='preferences-system-symbolic') )
+        menu.append( f_menu_item(1, _('Preferences'), self.act.on_prefs, icon='preferences-system-symbolic') )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(3, _('Export...'), self.export_menu(), icon='document-export-symbolic'))
         menu.append( f_menu_item(3, _('Import...'), self.import_menu(), icon='document-import-symbolic'))  
@@ -575,15 +582,15 @@ It will also take some time to perform""") ))
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(3, _('Logs...'), self.log_menu(), icon='text-x-generic-symbolic'))  
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('About Feedex...'), self.on_show_about, icon='help-about-symbolic') )
+        menu.append( f_menu_item(1, _('About Feedex...'), self.act.on_show_about, icon='help-about-symbolic') )
         menu.show_all()
         return menu
 
     def add_menu(self, *args):
         menu = Gtk.Menu()
-        menu.append( f_menu_item(1, _('Add Channel from URL'), self.on_add_from_url, icon='application-rss+xml-symbolic', tooltip=f'<b>{_("Add Channel")}</b> {_("from URL")}' )  )
+        menu.append( f_menu_item(1, _('Add Channel from URL'), self.act.on_add_from_url, icon='application-rss+xml-symbolic', tooltip=f'<b>{_("Add Channel")}</b> {_("from URL")}' )  )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Add Entry'), self.on_edit_entry, args=(None,), icon='list-add-symbolic', tooltip=_('Add new Entry') ))   
+        menu.append( f_menu_item(1, _('Add Entry'), self.act.on_edit_entry, args=(None,), icon='list-add-symbolic', tooltip=_('Add new Entry') ))   
         menu.show_all()
         return menu
 
@@ -652,7 +659,7 @@ It will also take some time to perform""") ))
         if len(av_plugins) > 0:
             menu = Gtk.Menu()
             for p in av_plugins:
-                menu.append( f_menu_item(1, p[FX_PLUGIN_TABLE.index('name')], self.on_run_plugin, args=(p[FX_PLUGIN_TABLE.index('id')], item,), tooltip=scast(p[FX_PLUGIN_TABLE.index('desc')], str, '') ))
+                menu.append( f_menu_item(1, p[FX_PLUGIN_TABLE.index('name')], self.act.on_run_plugin, args=(p[FX_PLUGIN_TABLE.index('id')], item,), tooltip=scast(p[FX_PLUGIN_TABLE.index('desc')], str, '') ))
             return menu
         else: return None
 
@@ -667,16 +674,16 @@ It will also take some time to perform""") ))
 
         if tab.type == FX_TAB_RULES:
             menu = Gtk.Menu()
-            menu.append( f_menu_item(1, _('Add Rule'), self.on_edit_rule, args=(None,), icon='list-add-symbolic') )
+            menu.append( f_menu_item(1, _('Add Rule'), self.act.on_edit_rule, args=(None,), icon='list-add-symbolic') )
         elif tab.type == FX_TAB_FLAGS:
             menu = Gtk.Menu()
-            menu.append( f_menu_item(1, _('Add Flag'), self.on_edit_flag, args=(None,), icon='list-add-symbolic') )
+            menu.append( f_menu_item(1, _('Add Flag'), self.act.on_edit_flag, args=(None,), icon='list-add-symbolic') )
         elif tab.type == FX_TAB_PLUGINS:
             menu = Gtk.Menu()
-            menu.append( f_menu_item(1, _('Add Plugin'), self.on_edit_plugin, args=(None,), icon='list-add-symbolic') )
+            menu.append( f_menu_item(1, _('Add Plugin'), self.act.on_edit_plugin, args=(None,), icon='list-add-symbolic') )
         elif tab.type in (FX_TAB_CONTEXTS, FX_TAB_SEARCH, FX_TAB_NOTES, FX_TAB_TREE, FX_TAB_SIMILAR,) or (tab.type == FX_TAB_PLACES and self.curr_place != FX_PLACE_TRASH_BIN):
             menu = Gtk.Menu()
-            menu.append( f_menu_item(1, _('Add Entry'), self.on_edit_entry, args=(None,), icon='list-add-symbolic') )
+            menu.append( f_menu_item(1, _('Add Entry'), self.act.on_edit_entry, args=(None,), icon='list-add-symbolic') )
             if tab.table.result_no > 0: plugin_filter.append(FX_PLUGIN_RESULTS)
         elif tab.type not in (FX_TAB_FEEDS,):
             if tab.table.result_no > 0: plugin_filter.append(FX_PLUGIN_RESULTS)
@@ -691,9 +698,9 @@ It will also take some time to perform""") ))
             
             if coalesce(item.get('is_deleted'),0) == 0:
                 mark_menu = Gtk.Menu()
-                mark_menu.append( f_menu_item(1, _('Read (+1)'), self.on_mark, args=('read', item,), icon='bookmark-new-symbolic', tooltip=_("Number of reads if counted towards this entry keyword's weight when ranking incoming articles") ) )
-                mark_menu.append( f_menu_item(1, _('Unread'), self.on_mark, args=('unread', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Unread document does not contriute to ranking rules") ) )
-                mark_menu.append( f_menu_item(1, _('Unimportant'), self.on_mark, args=('unimp', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Mark this as unimportant and learn negative rules") ) )
+                mark_menu.append( f_menu_item(1, _('Read (+1)'), self.act.on_mark, args=('read', item,), icon='bookmark-new-symbolic', tooltip=_("Number of reads if counted towards this entry keyword's weight when ranking incoming articles") ) )
+                mark_menu.append( f_menu_item(1, _('Unread'), self.act.on_mark, args=('unread', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Unread document does not contriute to ranking rules") ) )
+                mark_menu.append( f_menu_item(1, _('Unimportant'), self.act.on_mark, args=('unimp', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Mark this as unimportant and learn negative rules") ) )
                 menu.append( f_menu_item(3, _('Mark as...'), mark_menu, icon='bookmark-new-symbolic') )
 
                 flag_menu = Gtk.Menu()
@@ -703,18 +710,18 @@ It will also take some time to perform""") ))
                     fl_desc = esc_mu(v[1])
                     if fl_color in (None, ''): fl_color = self.config.get('gui_default_flag_color','blue')
                     if fl_name in (None, ''): fl_name = f'{_("Flag")} {fl}'
-                    flag_menu.append( f_menu_item(1, fl_name, self.on_mark, args=(fl, item,), color=fl_color, icon='marker-symbolic', tooltip=fl_desc) )
-                flag_menu.append( f_menu_item(1, _('Unflag Entry'), self.on_mark, args=('unflag', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Remove Flags from Entry") ) )
+                    flag_menu.append( f_menu_item(1, fl_name, self.act.on_mark, args=(fl, item,), color=fl_color, icon='marker-symbolic', tooltip=fl_desc) )
+                flag_menu.append( f_menu_item(1, _('Unflag Entry'), self.act.on_mark, args=('unflag', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Remove Flags from Entry") ) )
                 flag_menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 flag_menu.append( f_menu_item(1, _('Show Flags...'), self.add_tab, kargs={'type':FX_TAB_FLAGS, 'do_search':True}, icon='marker-symbolic', tooltip=_('Open a new tab showing Flags') ) )
                 menu.append( f_menu_item(3, _('Flag as...'), flag_menu, icon='marker-symbolic', tooltip=f"""{_("Flag is a user's marker/bookmark for a given article independent of ranking")}\n<i>{_("You can setup different flag colors in Preferences")}</i>""") )
                 
-                menu.append( f_menu_item(1, _('Edit Entry'), self.on_edit_entry, args=(item,), icon='edit-symbolic') )
-                menu.append( f_menu_item(1, _('Delete'), self.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
+                menu.append( f_menu_item(1, _('Edit Entry'), self.act.on_edit_entry, args=(item,), icon='edit-symbolic') )
+                menu.append( f_menu_item(1, _('Delete'), self.act.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
 
             elif coalesce(item.get('is_deleted'),0) > 0:
-                menu.append( f_menu_item(1, _('Restore'), self.on_restore_entry, args=(item,), icon='edit-redo-rtl-symbolic') )
-                menu.append( f_menu_item(1, _('Delete permanently'), self.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
+                menu.append( f_menu_item(1, _('Restore'), self.act.on_restore_entry, args=(item,), icon='edit-redo-rtl-symbolic') )
+                menu.append( f_menu_item(1, _('Delete permanently'), self.act.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
 
             menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
@@ -738,7 +745,7 @@ It will also take some time to perform""") ))
             detail_menu.append( f_menu_item(1, _('Show Ranking for Entry'), self.add_tab, kargs={'type':FX_TAB_RANK, 'top_entry':item, 'do_search':True}, icon='applications-engineering-symbolic') )
             if fdx.debug_level not in (0, None): 
                 detail_menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                detail_menu.append( f_menu_item(1, _('Technical details...'), self.on_show_detailed, args=('entry', item,), icon='system-run-symbolic', tooltip=_("Show all entry's technical data") ) )
+                detail_menu.append( f_menu_item(1, _('Technical details...'), self.act.on_show_detailed, args=('entry', item,), icon='system-run-symbolic', tooltip=_("Show all entry's technical data") ) )
             menu.append( f_menu_item(3, _('Details...'), detail_menu, icon='zoom-in-symbolic') ) 
 
             plugin_filter.append(FX_PLUGIN_ENTRY)
@@ -754,8 +761,8 @@ It will also take some time to perform""") ))
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             if item['id'] is not None:
-                menu.append( f_menu_item(1, _('Edit Rule'), self.on_edit_rule, args=(item,), icon='edit-symbolic') )
-                menu.append( f_menu_item(1, _('Delete Rule'), self.on_del_rule, args=(item,), icon='edit-delete-symbolic') )
+                menu.append( f_menu_item(1, _('Edit Rule'), self.act.on_edit_rule, args=(item,), icon='edit-symbolic') )
+                menu.append( f_menu_item(1, _('Delete Rule'), self.act.on_del_rule, args=(item,), icon='edit-delete-symbolic') )
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Search for this Rule'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'query':item['string'], 'filters':{'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Show this Rule\'s Contexts'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS, 'query':item['string'], 'filters':{'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='view-list-symbolic'))  
@@ -801,32 +808,32 @@ It will also take some time to perform""") ))
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             if item['id'] is not None:
-                menu.append( f_menu_item(1, _('Edit Flag'), self.on_edit_flag, args=(item,), icon='edit-symbolic') )
-                menu.append( f_menu_item(1, _('Delete Flag'), self.on_del_flag, args=(item,), icon='edit-delete-symbolic') )
+                menu.append( f_menu_item(1, _('Edit Flag'), self.act.on_edit_flag, args=(item,), icon='edit-symbolic') )
+                menu.append( f_menu_item(1, _('Delete Flag'), self.act.on_del_flag, args=(item,), icon='edit-delete-symbolic') )
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Search for this Flag'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'filters':{'flag':item['id']}}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Time Series search for this Flag'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'flag':item['id']}}, icon='histogram-symbolic'))  
 
 
 
-        elif isinstance(item, FeedexPlugin):
+        elif isinstance(item, ResultPlugin):
 
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             if item['id'] is not None:
-                menu.append( f_menu_item(1, _('Edit Plugin'), self.on_edit_plugin, args=(item,), icon='edit-symbolic') )
-                menu.append( f_menu_item(1, _('Delete Plugin'), self.on_del_plugin, args=(item,), icon='edit-delete-symbolic') )
+                menu.append( f_menu_item(1, _('Edit Plugin'), self.act.on_edit_plugin, args=(item,), icon='edit-symbolic') )
+                menu.append( f_menu_item(1, _('Delete Plugin'), self.act.on_del_plugin, args=(item,), icon='edit-delete-symbolic') )
 
 
 
-        elif isinstance(item, FeedexCatItem):
+        elif isinstance(item, ResultCatItem):
 
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             if item['id'] is not None:
-                menu.append( f_menu_item(1, _('Visit Homepage'), self.on_go_home, args=(item,), icon='user-home-symbolic') )
+                menu.append( f_menu_item(1, _('Visit Homepage'), self.act.on_go_home, args=(item,), icon='user-home-symbolic') )
 
 
 
@@ -842,8 +849,8 @@ It will also take some time to perform""") ))
 
                 if not fdx.busy and tab.type == FX_TAB_FEEDS:
                     menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                    menu.append( f_menu_item(1, _('Add Channel'), self.on_feed_cat, args=('new_channel', None), icon='list-add-symbolic') )
-                    menu.append( f_menu_item(1, _('Add Category'), self.on_feed_cat, args=('new_category', None), icon='folder-new-symbolic') )
+                    menu.append( f_menu_item(1, _('Add Channel'), self.act.on_feed_cat, args=('new_channel', None), icon='list-add-symbolic') )
+                    menu.append( f_menu_item(1, _('Add Category'), self.act.on_feed_cat, args=('new_category', None), icon='folder-new-symbolic') )
                     
                     menu.append( f_menu_item(0, 'SEPARATOR', None) )
                     if item['is_category'] == 1: menu.append( f_menu_item(1, _('Move Category...'), self.feed_tab.copy_feed, icon='edit-cut-symbolic') ) 
@@ -861,35 +868,35 @@ It will also take some time to perform""") ))
                 
 
                 if item['is_category'] != 1:
-                    menu.append( f_menu_item(1, _('Go to Channel\'s Homepage'), self.on_go_home, args=(item,), icon='user-home-symbolic') )
+                    menu.append( f_menu_item(1, _('Go to Channel\'s Homepage'), self.act.on_go_home, args=(item,), icon='user-home-symbolic') )
         
                     if not fdx.busy:
                         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                        menu.append( f_menu_item(1, _('Fetch from selected Channel'), self.on_load_news_feed, args=(item,), icon='rss-symbolic') )
-                        menu.append( f_menu_item(1, _('Update metadata for Channel'), self.on_update_feed, args=(item,), icon='system-run-symbolic') )
-                        menu.append( f_menu_item(1, _('Update metadata for All Channels'), self.on_update_feed_all, icon='system-run-symbolic') )
+                        menu.append( f_menu_item(1, _('Fetch from selected Channel'), self.act.on_load_news_feed, args=(item,), icon='rss-symbolic') )
+                        menu.append( f_menu_item(1, _('Update metadata for Channel'), self.act.on_update_feed, args=(item,), icon='system-run-symbolic') )
+                        menu.append( f_menu_item(1, _('Update metadata for All Channels'), self.act.on_update_feed_all, icon='system-run-symbolic') )
                         menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
-                        menu.append( f_menu_item(1, _('Edit Channel'), self.on_feed_cat, args=('edit', item,), icon='edit-symbolic') )
-                        menu.append( f_menu_item(1, _('Mark Channel as healthy'), self.on_mark_healthy, args=(item,), icon='go-jump-rtl-symbolic', tooltip=_("This will nullify error count for this Channel so it will not be ommited on next fetching") ) )
+                        menu.append( f_menu_item(1, _('Edit Channel'), self.act.on_feed_cat, args=('edit', item,), icon='edit-symbolic') )
+                        menu.append( f_menu_item(1, _('Mark Channel as healthy'), self.act.on_mark_healthy, args=(item,), icon='go-jump-rtl-symbolic', tooltip=_("This will nullify error count for this Channel so it will not be ommited on next fetching") ) )
                         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                        menu.append( f_menu_item(1, _('Remove Channel'), self.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
+                        menu.append( f_menu_item(1, _('Remove Channel'), self.act.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
                         if fdx.debug_level not in (0, None): 
                             menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                            menu.append( f_menu_item(1, _('Technical details...'), self.on_show_detailed, args=('feed', item,), icon='zoom-in-symbolic', tooltip=_("Show all technical information about this Channel") ) )
+                            menu.append( f_menu_item(1, _('Technical details...'), self.act.on_show_detailed, args=('feed', item,), icon='zoom-in-symbolic', tooltip=_("Show all technical information about this Channel") ) )
 
                     plugin_filter.append(FX_PLUGIN_FEED)
 
                 elif not fdx.busy:
-                    menu.append( f_menu_item(1, _('Edit Category'), self.on_feed_cat, args=('edit',item,), icon='edit-symbolic') )
-                    menu.append( f_menu_item(1, _('Remove Category'), self.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
+                    menu.append( f_menu_item(1, _('Edit Category'), self.act.on_feed_cat, args=('edit',item,), icon='edit-symbolic') )
+                    menu.append( f_menu_item(1, _('Remove Category'), self.act.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
 
                     plugin_filter.append(FX_PLUGIN_CATEGORY)
 
 
             elif item['deleted'] == 1 and tab.type == FX_TAB_FEEDS:
-                menu.append( f_menu_item(1, _('Restore...'), self.on_restore_feed, args=(item,), icon='edit-redo-rtl-symbolic') )
-                menu.append( f_menu_item(1, _('Remove Permanently'), self.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
+                menu.append( f_menu_item(1, _('Restore...'), self.act.on_restore_feed, args=(item,), icon='edit-redo-rtl-symbolic') )
+                menu.append( f_menu_item(1, _('Remove Permanently'), self.act.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
 
 
 
@@ -900,7 +907,7 @@ It will also take some time to perform""") ))
             
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            menu.append( f_menu_item(1, _('Empty Trash'), self.on_empty_trash, icon='edit-delete-symbolic') )
+            menu.append( f_menu_item(1, _('Empty Trash'), self.act.on_empty_trash, icon='edit-delete-symbolic') )
 
         else:
 
@@ -912,14 +919,14 @@ It will also take some time to perform""") ))
             elif tab.type == FX_TAB_LEARNED:
                 if menu is None: menu = Gtk.Menu()
                 else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                menu.append( f_menu_item(1, _('Delete Learned Rules'), self.del_learned_rules, icon='dialog-warning-symbolic', tooltip=_('Remove all learned rules from database. Be careful!') ) )
-                menu.append( f_menu_item(1, _('Relearn All Rules'), self.relearn_rules, icon='applications-engineering-symbolic', tooltip=_('Relearn rules from all read/marked items') ) )
+                menu.append( f_menu_item(1, _('Delete Learned Rules'), self.act.del_learned_rules, icon='dialog-warning-symbolic', tooltip=_('Remove all learned rules from database. Be careful!') ) )
+                menu.append( f_menu_item(1, _('Relearn All Rules'), self.act.relearn_rules, icon='applications-engineering-symbolic', tooltip=_('Relearn rules from all read/marked items') ) )
 
 
             if tab.type not in (FX_TAB_FEEDS, FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS,) and tab.table.result_no > 0:
                 port_menu = Gtk.Menu()
-                port_menu.append( f_menu_item(1, _('Save results to CSV'), self.export_results, args=('csv',), icon='x-office-spreadsheet-symbolic', tooltip=_('Save results from current tab') ))  
-                port_menu.append( f_menu_item(1, _('Export results to JSON'), self.export_results, args=('json_dict',), icon='document-export-symbolic', tooltip=_('Export results from current tab') ))  
+                port_menu.append( f_menu_item(1, _('Save results to CSV'), self.act.export_results, args=('csv',), icon='x-office-spreadsheet-symbolic', tooltip=_('Save results from current tab') ))  
+                port_menu.append( f_menu_item(1, _('Export results to JSON'), self.act.export_results, args=('json_dict',), icon='document-export-symbolic', tooltip=_('Export results from current tab') ))  
             
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(3, _('Export...'), port_menu, icon='document-export-symbolic') )
@@ -1010,7 +1017,7 @@ It will also take some time to perform""") ))
         menu.append( f_menu_item(3, _('New Tab...'), self.new_tab_menu(), icon='tab-new-symbolic') )
         menu.append( f_menu_item(3, _('Add...'), self.add_menu(), icon='list-add-symbolic') )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Fetch...'), self.on_load_news_all, icon='rss-symbolic', tooltip=f'<b>{_("Fetch")}</b> {_("news for all Channels")}' )  )
+        menu.append( f_menu_item(1, _('Fetch...'), self.act.on_load_news_all, icon='rss-symbolic', tooltip=f'<b>{_("Fetch")}</b> {_("news for all Channels")}' )  )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(3, _('System...'), self.main_menu(), icon='preferences-system-symbolic') )
 
@@ -1033,14 +1040,14 @@ It will also take some time to perform""") ))
         """ Adds selected phrase to rules (dialog)"""
         self.new_rule['string'] = args[-1]
         self.new_rule['name'] = args[-1]
-        self.on_edit_rule(None)
+        self.act.on_edit_rule(None)
 
 
 
 
 
 
-###########################################################3
+###########################################################
 #
 #       Tab Handling
 #
@@ -1113,7 +1120,7 @@ It will also take some time to perform""") ))
 
         self._show_upn_page(tab.uid)
 
-        if hasattr(tp, 'query_entry'): tab.query_entry.grab_focus()
+        if hasattr(tab, 'query_entry'): tab.query_entry.grab_focus()
 
 
 
@@ -1175,7 +1182,7 @@ It will also take some time to perform""") ))
             self.feed_tab.redecorate((), {})
 
         if self.curr_upper.top_entry_prev: self.load_preview(self.curr_upper.top_entry, footer=self.curr_upper.prev_footer)
-        elif isinstance(self.curr_upper.table.result, (ResultEntry, ResultContext, ResultRule, FeedexCatItem,)): self.curr_upper._on_changed_selection()
+        elif isinstance(self.curr_upper.table.result, (ResultEntry, ResultContext, ResultRule, ResultCatItem,)): self.curr_upper._on_changed_selection()
         else: self.startup_decor()
 
         self._set_adj()
@@ -1191,6 +1198,8 @@ It will also take some time to perform""") ))
 #
 
 
+
+
     def load_preview(self, result, *args, **kargs):
         """ Generates result preview when result cursor changes """
         adj = self.preview_box.get_vadjustment()
@@ -1204,8 +1213,13 @@ It will also take some time to perform""") ))
         publisher = esc_mu(result.get('publisher',''))
         contributors = esc_mu(result.get('contributors',''))
         category = esc_mu(result.get('category',''))
-        desc = esc_mu(result.get("desc",''))
-        text = esc_mu(result.get("text",''))
+
+        desc = result.get("desc",'')
+        desc = esc_mu(desc)
+
+        text = result.get("text",'')
+        text = esc_mu(text)
+
 
         # Hilight query using snippets
         col = self.config.get('gui_hilight_color','blue')
@@ -1231,22 +1245,20 @@ It will also take some time to perform""") ))
                 desc = desc.replace(s, f'<span foreground="{col}">{s}</span>')
                 text = text.replace(s, f'<span foreground="{col}">{s}</span>')
 
-        link_text = ''
-        l_text = scast(result.get('link'), str, '').replace('<','').replace('>','')
-        if l_text.endswith('/'): l_label = slist(l_text.split('/'), -2, l_text)
-        else: l_label = slist(l_text.split('/'), -1, l_text)
-        l_text = esc_mu(l_text)
-        l_label = esc_mu(l_label)
-        if l_text != '': link_text=f"""<a href="{l_text}" title="{_('Click to open link')} : <b>{l_text}</b>">{l_label}</a>"""
         
-        self.links = ''
-        for l in result.get('links','').splitlines() + result.get('enclosures','').splitlines():
-            if l.strip() == '' or l == result.get('link'): continue
-            self.links = f'{self.links}{l}\n'
+        self.prev_links = ''
+        link_list = []
+        link_text = ''
+        for i,l in enumerate([scast(result.get('link'), str, '')] + \
+                            scast(result.get('links'), str, '').splitlines() + \
+                            scast(result.get('enclosures'), str, '').splitlines()):
+            if i != 0: self.prev_links = f'{self.prev_links}{l}\n'
+            if l in link_list: continue
+            link_list.append(l)
             l_text = l.replace('<','').replace('>','')
             if l_text.endswith('/'): l_label = slist(l_text.split('/'), -2, l_text)
             else: l_label = slist(l_text.split('/'), -1, l_text)
-            l_label = ellipsize(l_label, 75)
+            l_label = ellipsize(    l_label, 75)
             l_text = esc_mu(l_text)
             l_label = esc_mu(l_label)
             link_text = f"""{link_text}
@@ -1296,9 +1308,11 @@ It will also take some time to perform""") ))
 {stat_str}
 """)
 
+        self.handle_images(result.get('id', None), f"""{result.get('images','')}\n{self.prev_links}""")
 
-        if not self.config.get('ignore_images',False):
-            self.handle_images(result.get('id', None), f"""{result.get('images','')}\n{self.links}""")
+
+
+
 
 
 
@@ -1384,7 +1398,7 @@ It will also take some time to perform""") ))
         self.prev_entry = {}
 
         for c in self.prev_images.get_children(): self.prev_images.remove(c)
-        try: image = Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_size(result['thumbnail'], 64, 64))
+        try: image = Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_size(os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'thumbnails', result['thumbnail']), 64, 64))
         except: image = Gtk.Image.new_from_icon_name('rss-symbolic', Gtk.IconSize.DIALOG)
 
         self.prev_images.pack_start(image, True, True, 0)
@@ -1423,79 +1437,92 @@ It will also take some time to perform""") ))
 
 
 
-    def handle_image(self, widget, event, url, title, alt, user_agent):
+    def _on_image_clicked(self, widget, event, res, user_agent):
         """ Wrapper for showing full-size image in chosen external viewer """
         if event.button == 1:
-            hash_obj = hashlib.sha1(url.encode())
-            filename = os.path.join(self.DB.cache_path, f'{hash_obj.hexdigest()}_large.img' )
-            if not os.path.isfile(filename):                
-                err, plhdr = fdx.download_res(url, ofile=filename, mimetypes=FEEDEX_IMAGE_MIMES, user_agent=user_agent)
-                if err != 0: return err
+            if res.get('file') is not None: filename = res['file']
+            else: 
+                filename = os.path.join(self.DB.cache_path, f"""{res['url_hash']}_large.img""" )
+                if not os.path.isfile(filename):
+                    err, _dummy = fdx.download_res(res['url'], ofile=filename, mimetypes=FEEDEX_IMAGE_MIMES, user_agent=user_agent)
+                    if err != 0: return err
 
-            err = fdx.ext_open('image_viewer', filename, title=title, alt=alt, file=True)
+            err = fdx.ext_open('image_viewer', filename, title=res.get('title',''), alt=res.get('alt',''), file=True)
             if err != 0: return err
+
         return 0
 
 
-    def download_images(self, id, user_agent, queue):
-        """ Image download wrapper for separate thread"""
-        for i in queue:
-            url = i[0]
-            filename = i[1]
-            create_thumbnail(url, filename, user_agent=user_agent)
 
+
+
+
+    def _handle_images_thr(self, id, user_agent, queue):
+        """ Image download wrapper for separate thread"""
+        for res in queue:
+            if res['url'] in self.downloaded: continue
+            self.downloaded.append(res['url'])
+            download_thumbnail(res['url'], res['thumbnail'], user_agent=user_agent)
+        fdx.bus_append((FX_ACTION_HANDLE_IMAGES, id,))
+
+
+    def _handle_local_im_thr(self, id, res, *args, **kargs):
+        """ Generate thumbnail for local resource """
+        local_thumbnail(res['file'], res['thumbnail'])
         fdx.bus_append((FX_ACTION_HANDLE_IMAGES, id,))
 
 
 
 
     def handle_images(self, id:int, string:str, **kargs):
-        """ Handle preview images """
+        """ Handle preview images: detect thumbnails and load them to preview boxes or send requests for downloads """
+
+        if id != self.prev_entry.get('id', None): return 0
+
         for c in self.prev_images.get_children():
             self.prev_images.remove(c)
 
-        urls = []
         boxes = []
+        im_file = os.path.join(self.DB.img_path, f"""{id}.img""")
+        if os.path.isfile(im_file):
+            tn_file = os.path.join(self.DB.cache_path, f"""{id}.img""")
+            res = {'file': im_file, 'thumbnail': tn_file, 'title':'', 'alt':''}
+            if not os.path.isfile(tn_file):
+                t = threading.Thread(target=self._handle_local_im_thr, args=(self.prev_entry['id'], res))
+                t.start()
+            else:
+                box = f_imagebox(res)
+                if box is not None: 
+                    box.connect("button-press-event", self._on_image_clicked, res, None)
+                    boxes.append(box)
+
+
+        urls = []
         download_q = []
         for i in string.splitlines():
-            im = process_res_links(i, self.DB.cache_path)
-            if im == 0: continue
-            if im['url'] in urls: continue
-            if im['url'] in fdx.download_errors: continue
+            res = fdx.parse_res_link(i)
+            if res is None: continue
+            if res['url'] in urls: continue
+            if res['url'] in fdx.download_errors: continue
+            urls.append(res['url'])
 
-            urls.append(im['url'])
-            if os.path.isfile(im['filename']) and os.path.getsize(im['filename']) > 0:
-                pass
+            res['thumbnail'] = os.path.join(self.DB.cache_path, res['thumbnail'])
+            if os.path.isfile(res['thumbnail']):
+                res['size'] = os.path.getsize(res['thumbnail'])
+                if res['size'] > 0 and res['size'] < MAX_DOWNLOAD_SIZE:
+                    box = f_imagebox(res)
+                    if box is not None: 
+                        box.connect("button-press-event", self._on_image_clicked, res, self.prev_entry.get('user_agent'))
+                        boxes.append(box)
             else:
-                download_q.append((im['url'], im['filename']))
-                continue
+                download_q.append(res)
 
-            if id != self.prev_entry.get('id', None): continue
-
-            eventbox = Gtk.EventBox()
-            try:
-                pixb = GdkPixbuf.Pixbuf.new_from_file(im['filename'])
-                image = Gtk.Image.new_from_pixbuf(pixb)
-            except GLib.Error as e:
-                fdx.add_error(im['url'])
-                msg(FX_ERROR_HANDLER, _('Image error: %a'), e)
-                continue
-            
-            image.set_tooltip_markup(f"""{im.get('tooltip')}
-Click to open in image viewer""")
-
-            eventbox.add(image)
-            eventbox.connect("button-press-event", self.handle_image, im['url'], im['title'], im['alt'], self.prev_entry.get('user_agent'))
-            image.show()
-            eventbox.show()
-            boxes.append(eventbox)
 
         if len(download_q) > 0:
-            t = threading.Thread(target=self.download_images, args=(self.prev_entry['id'], self.prev_entry.get('user_agent'), download_q))
+            t = threading.Thread(target=self._handle_images_thr, args=(self.prev_entry['id'], self.prev_entry.get('user_agent'), download_q))
             t.start()
 
-        for b in boxes:
-            self.prev_images.pack_start(b, True, True, 3)
+        for b in boxes: self.prev_images.pack_start(b, True, True, 3)
 
 
 
@@ -1503,1210 +1530,6 @@ Click to open in image viewer""")
 
 
 
-
-
-
-
-
-
-
-
-#########################################################3
-# DIALOGS ADN ACTIONS FROM MENUS OR BUTTONS
-
-
-
-        
-
-
-
-
-    def on_load_news_feed(self, *args):
-        if not self._fetch_lock(): return 0
-        t = threading.Thread(target=self.load_news_thr, args=(args[-1],))
-        t.start()
-
-    def on_load_news_all(self, *args):
-        if not self._fetch_lock(): return 0
-        t = threading.Thread(target=self.load_news_thr, args=(None,))
-        t.start()
-
-    def on_load_news_background(self, *args):
-        if not self._fetch_lock(): return 0
-        t = threading.Thread(target=self.load_news_thr, args=(0,))
-        t.start()
-
-    def _fetch_lock(self, *args):
-        """ Handle fetching lock gracefully """
-        if self.DB.locked_fetching(just_check=True):
-            dialog = YesNoDialog(self, _("Database is Locked for Fetching"), f"<b>{_('Database is Locked for Fetching! Proceed and unlock?')}</b>", 
-                                subtitle=_("Another instance may be fetching news right now. If not, proceed with operation. Proceed?"), emblem='system-lock-screen-symbolic')
-            dialog.run()
-            if dialog.response == 1:
-                dialog.destroy()
-                err = self.DB.unlock_fetching()
-                if err == 0:
-                    msg(_('Database manually unlocked for fetching...') )
-                    return True
-                else: return False
-            else:
-                dialog.destroy()
-                return False
-        else: return True
-
-
-    def load_news_thr(self, *args):
-        """ Fetching news/articles from feeds """
-        msg(_('Checking for news ...'))
-        fdx.busy = True
-        fdx.bus_append(FX_ACTION_BLOCK_FETCH)
-
-        item = args[-1]
-        if item is None:
-            feed_id=None
-            ignore_interval = True
-            ignore_modified = self.config.get('ignore_modified',True)
-        elif item == 0:
-            feed_id=None
-            ignore_interval = False
-            ignore_modified = self.config.get('ignore_modified',True)
-        elif isinstance(item, SQLContainer):
-            if item['is_category'] != 1:
-                feed_id = item['id']
-                ignore_interval = True
-                ignore_modified = True
-            else: 
-                fdx.busy = False
-                fdx.bus_append(FX_ACTION_UNBLOCK_FETCH)
-                return -1
-        else: 
-            fdx.busy = False
-            return -1
-
-        DB = FeedexDatabase(connect=True)
-        DB.fetch(id=feed_id, force=ignore_modified, ignore_interval=ignore_interval)
-
-
-        if DB.new_items > 0:
-
-            self.new_items = scast(self.new_items, int, 0) + DB.new_items
-            self.new_n = scast(self.new_n, int, 1) + 1
-            self.feed_tab.redecorate_new()
-
-            if self.config.get('gui_desktop_notify', True):
-                fx_notifier = DesktopNotifier(parent=self, icons=fdx.icons_cache)
-
-                if self.config.get('gui_notify_group','feed') == 'number':
-                    fx_notifier.notify(f'{DB.new_items} {_("new articles fetched...")}', None, -3)
-                else:
-
-                    filters = {'last':True,
-                    'group':self.config.get('gui_notify_group','feed'), 
-                    'depth':self.config.get('gui_notify_depth',5)
-                    }
-                    DB.Q.query('', filters , rev=False, print=False, allow_group=True)
-                    fx_notifier.load(DB.Q.results)
-                    fx_notifier.show()
-
-        DB.close()
-        fdx.busy = False
-        fdx.bus_append(FX_ACTION_UNBLOCK_FETCH)
-        fdx.bus_append(FX_ACTION_RELOAD_FEEDS)
-
-
-
-
-
-    def on_update_feed(self, *args):
-        """ Wrapper for feed updating """
-        item = args[-1]
-        if item['is_category'] == 1: return 0
-        if not self._fetch_lock(): return 0
-        msg(_('Updating channel...'))
-        t = threading.Thread(target=self.update_feed_thr, args=(item['id'],))
-        t.start()
-
-
-
-    def on_update_feed_all(self, *args):
-        if not self._fetch_lock(): return 0
-        msg(_('Updating all channels...'))
-        t = threading.Thread(target=self.update_feed_thr, args=(None,))
-        t.start()
-
-
-    def update_feed_thr(self, *args):
-        """ Updates metadata for all/selected feed """
-        fdx.busy = True
-        fdx.bus_append(FX_ACTION_BLOCK_FETCH)
-
-        feed_id = args[-1]
-        DB = FeedexDatabase(connect=True)
-        DB.fetch(id=feed_id, update_only=True, force=True)
-
-        icons = get_icons(fdx.feeds_cache, fdx.icons_cache)      
-        self.lock.acquire()
-        self.icons = icons
-        self.lock.release()
-
-        DB.close()
-        fdx.busy = False
-        fdx.bus_append(FX_ACTION_UNBLOCK_FETCH)
-        fdx.bus_append(FX_ACTION_RELOAD_FEEDS)
-
-
-
-
-    def add_from_url_thr(self, item):
-        """ Add from URL - threading """
-        msg(_('Adding Channel...') )
-        fdx.busy = True
-        fdx.bus_append(FX_ACTION_BLOCK_FETCH)
-
-        DB = FeedexDatabase(connect=True)
-        item.set_interface(DB)
-        err = item.add_from_url()
-        
-        if DB.new_items > 0:
-            self.new_items = scast(self.new_items, int, 0) + DB.new_items
-            self.new_n = scast(self.new_n, int, 1) + 1
-            self.feed_tab.redecorate_new()
-        
-        self.lock.acquire()
-        if err == 0: self.new_feed_url.clear()
-        self.lock.release()
-
-        DB.close()
-        fdx.busy = False
-        fdx.bus_append(FX_ACTION_UNBLOCK_FETCH)
-        fdx.bus_append(FX_ACTION_RELOAD_FEEDS)
-
-
-
-    def on_add_from_url(self, *args):
-        """ Adds a new feed from URL - dialog """
-        if fdx.busy: return 0
-        if not self._fetch_lock(): return 0
-
-        item = FeedexFeed(self.DB)
-        item.strict_merge(self.new_feed_url)
-
-        dialog = NewFromURL(self, item)
-        dialog.run()
-        self.new_feed_url = item.vals.copy()
-        if dialog.response == 1:
-            if not self._fetch_lock(): return 0
-            t = threading.Thread(target=self.add_from_url_thr, args=(item,))
-            t.start()
-        dialog.destroy()
-
-
-
-
-
-
-
-
-
-    def on_edit_entry(self, *args):
-        """ Add / Edit Entry """
-        item = args[-1]
-        if item is None:
-            new = True
-            item = FeedexEntry(self.DB)
-            item.strict_merge(self.new_entry)
-        else: 
-            item = item.convert(FeedexEntry, self.DB, id=item['id'])
-            if not item.exists: return -1
-            new = False
-
-        dialog = EditEntry(self, item, new=new)
-        dialog.run()
-        if new: self.new_entry = item.vals.copy()
-        if dialog.response == 1:
-            if new: msg(_('Adding entry...') )
-            else: msg(_('Writing changes to Entry...') )
-            fdx.busy = True
-            t = threading.Thread(target=self.edit_entry_thr, args=(new, item) )
-            t.start()
-        dialog.destroy()
-
-
-
-    def edit_entry_thr(self, new:bool, item:FeedexEntry):
-        """ Add/Edit Entry low-level interface for threading """
-        DB = FeedexDatabase(connect=True)
-        item.set_interface(DB)
-
-        if new:
-            err = item.add()
-            if err == 0:
-                fdx.bus_append( (FX_ACTION_ADD, item.vals.copy(), FX_TT_ENTRY, ) )
-                self.lock.acquire()
-                self.new_entry.clear()
-                self.lock.release()
-        else:
-            err = item.do_update()
-            if err == 0: fdx.bus_append( (FX_ACTION_EDIT, item.vals.copy(), FX_TT_ENTRY, ) )
-        
-        DB.close()
-        fdx.busy = False
-
-
-
-
-
-
-    def on_del_entry(self, *args):
-        """ Deletes selected entry"""
-        item = args[-1]
-        if item['deleted'] != 1: dialog = YesNoDialog(self, _('Delete Entry'), f'{_("Are you sure you want to delete")} <i><b>{esc_mu(item.name())}</b></i>?')
-        else: dialog = YesNoDialog(self, _('Delete Entry permanently'), f'{_("Are you sure you want to permanently delete")} <i><b>{esc_mu(item.name())}</b></i> {_("and associated rules?")}')
-        dialog.run()
-        if dialog.response == 1: self.on_mark('delete', item)
-        dialog.destroy()
-
-
-    def on_restore_entry(self, *args):
-        """ Restore entry """
-        item = args[-1]
-        dialog = YesNoDialog(self, _('Restore Entry'), f'{_("Are you sure you want to restore")} <i><b>{esc_mu(item.name())}</b></i>?')
-        dialog.run()
-        if dialog.response == 1: self.on_mark('restore', item)
-        dialog.destroy()
-
-
-
-    def mark_thr(self, mode, item):
-        """ Marks entry as read """
-        DB = FeedexDatabase(connect=True)
-        item = item.convert(FeedexEntry, DB, id=item['id'])
-        if not item.exists:
-            fdx.busy = False
-            return -1
-
-        if mode == 'read': 
-            if coalesce(item['read'],0) < 0: idict = {'read': scast(item['read'],int,0)+1}
-            else: idict = {'read': scast(item['read'],int,0)+1}
-        elif mode == 'unimp': idict = {'read': -1}
-        elif mode == 'unread': idict = {'read': 0}
-        elif mode == 'unflag': idict = {'flag': 0}
-        elif mode == 'restore': idict = {'deleted': 0}
-        elif mode == 'delete' : idict = {}
-        elif type(mode) is int: idict = {'flag': mode}
-        else:
-            fdx.busy = False
-            return -1
-
-        if mode == 'delete': err = item.delete()
-        else: err = item.update(idict)
-        
-        DB.close()
-        fdx.busy = False
-        if err == 0: fdx.bus_append( (FX_ACTION_EDIT, item.vals.copy(), FX_TT_ENTRY,) )
-
-
-
-    def on_mark(self, *args):
-        item = args[-1]
-        mode = args[-2]
-        fdx.busy = True
-        msg(_('Updating ...') )
-        t = threading.Thread(target=self.mark_thr, args=(mode, item,))
-        t.start()
-
-
-    def open_entry_thr(self, item, *args):
-        """ Wrappper for opening entry and learning in a separate thread """
-        DB = FeedexDatabase(connect=True)
-        item = item.convert(FeedexEntry, DB, id=item['id'])
-        item.open()
-        DB.close()
-        fdx.busy = False
-        fdx.bus_append((FX_ACTION_EDIT, item.vals.copy(), FX_TT_ENTRY,))
-        msg(_('Done...'))
-
-
-
-    def on_open_entry(self, *args, **kargs):
-        """ Run in browser and learn """
-        fdx.busy = True
-        msg(_('Opening ...'))
-        item = args[-1]
-        t = threading.Thread(target=self.open_entry_thr, args=(item,))
-        t.start()
-
-
-
-
-
-
-
-
-    def on_feed_cat(self, *args):
-        """ Edit feed/category """
-        if not self._fetch_lock(): return 0        
-        item = args[-1]
-        action = args[-2]
-
-        if action == 'new_category':
-            new = True
-            item = FeedexFeed(self.DB)
-            item.merge(self.new_category)
-            dialog = EditCategory(self, item, new=new)
-
-        elif action == 'new_channel': 
-            new = True
-            item = FeedexFeed(self.DB)
-            item.merge(self.new_feed)
-            dialog = EditFeed(self, item, new=new)
-
-        elif action == 'edit':
-            item = item.convert(FeedexFeed, self.DB, id=item['id'])
-            new = False
-            if not item.exists: return -1
-            if item['is_category'] == 1: dialog = EditCategory(self, item, new=new)
-            else: dialog = EditFeed(self, item, new=new)
-
-        dialog.run()
-        if action == 'new_category': self.new_category = item.vals.copy()
-        elif action == 'new_channel': self.new_feed = item.vals.copy()
-
-        if dialog.response == 1:
-            if new: err = item.add(validate=False)
-            else:
-                if item['is_category'] == 1: err = item.do_update(validate=True)
-                else: err = item.do_update(validate=False)
-
-            if err == 0:
-                if action == 'new_category': self.new_category.clear()
-                elif action == 'new_channel': self.new_feed.clear()
-
-                self.feed_tab.reload()
-
-        dialog.destroy()
-
-
-
-
-
-
-    def on_del_feed(self, *args):
-        """ Deletes feed or category """
-        if not self._fetch_lock(): return 0
-        item = args[-1]
-
-        if coalesce(item['is_category'],0) == 0 and coalesce(item['deleted'],0) == 0:
-            dialog = YesNoDialog(self, _('Delete Channel'), f'{_("Are you sure you want to delete")} <i><b>{esc_mu(item.name())}</b></i>{_("?")}')
-
-        elif coalesce(item['is_category'],0) == 0 and coalesce(item['deleted'],0) == 1:
-            dialog = YesNoDialog(self, _('Delete Channel permanently'), f'{_("Are you sure you want to permanently delete")} <i><b>{esc_mu(item.name())}</b></i>{_("?")}')
-
-        elif coalesce(item['is_category'],0) == 1 and coalesce(item['deleted'],0) == 0:
-            dialog = YesNoDialog(self, _('Delete Category'), f'{_("Are you sure you want to delete")} <i><b>{esc_mu(item.name())}</b></i> {_("category?")}')
-
-        elif coalesce(item['is_category'],0) == 1 and coalesce(item['deleted'],0) == 1:
-            dialog = YesNoDialog(self, _('Delete Category'), f'{_("Are you sure you want to permanently delete")} <i><b>{esc_mu(item.name())}</b></i> {_("category?")}')
-
-        dialog.run()
-        if dialog.response == 1:
-            item = item.convert(FeedexFeed, self.DB, id=item['id'])
-            err = item.delete()
-            if err == 0: self.feed_tab.reload()
-        
-        dialog.destroy()
-
-
-
-
-
-    def on_restore_feed(self, *args):
-        """ Restores selected feed/category """
-        if not self._fetch_lock(): return 0
-        item = args[-1]
-
-        if coalesce(item['is_category'],0) == 1: dialog = YesNoDialog(self, _('Restore Category'), f'{_("Restore ")}<i><b>{esc_mu(item.name())}</b></i>{_(" Category?")}')
-        else: dialog = YesNoDialog(self, _('Restore Channel'), f'{_("Restore ")}<i><b>{esc_mu(item.name())}</b></i>{_(" Channel?")}')
-        dialog.run()
-
-        if dialog.response == 1:
-            item = item.convert(FeedexFeed, self.DB, id=item['id'])
-            err = item.update({'deleted': 0}) 
-            if err == 0: self.feed_tab.reload()
-        
-        dialog.destroy()
-
-
-
-
-
-    def on_empty_trash(self, *args):
-        """ Empty all Trash items """
-        dialog = YesNoDialog(self, _('Empty Trash'), f'<b>{_("Do you really want to permanently remove Trash content?")}</b>', emblem='edit-delete-symbolic')
-        dialog.run()
-        if dialog.response == 1:
-            err = self.DB.empty_trash()
-            if err == 0: self.feed_tab.reload()
-        dialog.destroy()
-
-
-    def reload_history_all(self, *args):
-        """ Reloads history in all tabs containing query combo """
-        for i in range(self.upper_notebook.get_n_pages()):
-            tab = self.upper_notebook.get_nth_page(i)
-            if tab is None: continue
-            if hasattr(tab, 'query_combo'): tab.reload_history()
-
-    def on_clear_history(self, *args):
-        """ Clears search history """
-        dialog = YesNoDialog(self, _('Clear Search History'), _('Are you sure you want to clear <b>Search History</b>?'), emblem='edit-clear-all-symbolic' )           
-        dialog.run()
-        if dialog.response == 1:
-            err = self.DB.clear_history()
-            if err == 0: self.reload_history_all()
-        dialog.destroy()
-
-
-
-    def on_mark_healthy(self, *args):
-        """ Marks a feed as healthy -> zeroes the error count """
-        if not self._fetch_lock(): return 0
-        item = args[-1]
-        item = item.convert(FeedexFeed, self.DB, id=item['id'])
-        err = item.update({'error': 0})
-        if err == 0: self.feed_tab.reload()
-
-
-
-
-
-
-
-
-    
-
-    def on_del_rule(self, *args):
-        """ Deletes rule - wrapper """
-        item = args[-1]
-
-        dialog = YesNoDialog(self, _('Delete Rule'), f'{_("Are you sure you want to permanently delete ")}<b><i>{esc_mu(item.name())}</i></b>{_(" Rule?")}')           
-        dialog.run()
-        if dialog.response == 1:
-            item = item.convert(FeedexRule, self.DB, id=item['id'])
-            err = item.delete() 
-            if err == 0:
-                if self.rules_tab != -1: self._get_upn_page_obj(self.rules_tab).apply(FX_ACTION_DELETE, item.vals.copy())
-        dialog.destroy()
-
-        
-
-
-    def on_edit_rule(self, *args):
-        """ Edit / Add Rule with dialog """
-        item = args[-1]
-
-        if item is None:
-            new = True
-            item = FeedexRule(self.DB)
-            item.strict_merge(self.new_rule)
-        else: 
-            new = False
-            item = item.convert(FeedexRule, self.DB, id=item['id'])
-            if not item.exists: return -1
-
-        dialog = EditRule(self, item, new=new)
-        dialog.run()
-        if new: self.new_rule = item.vals.copy()
-        if dialog.response == 1:
-            if new: err = item.add(validate=False)
-            else: err = item.do_update(validate=False)
-
-            if err == 0:
-                if self.rules_tab != -1: 
-                    if new: 
-                        self.new_rule.clear()
-                        self._get_upn_page_obj(self.rules_tab).apply(FX_ACTION_ADD, item.vals.copy())
-                    else: self._get_upn_page_obj(self.rules_tab).apply(FX_ACTION_EDIT, item.vals.copy())
-        dialog.destroy()
-
-
-
-
-
-    def on_del_flag(self, *args):
-        """ Deletes flag - wrapper """
-        item = args[-1]
-
-        dialog = YesNoDialog(self, _('Delete Flag'), f'{_("Are you sure you want to permanently delete ")}<b><i>{esc_mu(item.name())}</i></b>{_(" Flag?")}')           
-        dialog.run()
-        if dialog.response == 1:
-            item = item.convert(FeedexFlag, self.DB, id=item['id'])
-            err = item.delete()
-            if err == 0:
-                if self.flags_tab != -1: self._get_upn_page_obj(self.flags_tab).apply(FX_ACTION_DELETE, item.vals.copy())
-        dialog.destroy()
-
-        
-
-    def on_edit_flag(self, *args):
-        """ Edit / Add Flag with dialog """
-        item = args[-1]
-
-        if item is None:
-            new = True
-            item = FeedexFlag(self.DB)
-            item.strict_merge(self.new_flag)
-        else: 
-            new = False
-            item = item.convert(FeedexFlag, self.DB, id=item['id'])
-            if not item.exists: return -1
-
-        dialog = EditFlag(self, item, new=new)
-        dialog.run()
-        if new: self.new_flag = item.vals.copy()
-        if dialog.response == 1:
-            if new: err = item.add(validate=False) 
-            else: err = item.do_update(validate=False)
-
-            if err == 0:
-                if self.flags_tab != -1:
-                    if new:
-                        self._get_upn_page_obj(self.flags_tab).apply(FX_ACTION_ADD, item.vals.copy()) 
-                        self.new_flag.clear()
-                    else: self._get_upn_page_obj(self.flags_tab).apply(FX_ACTION_EDIT, item.vals.copy())
-        dialog.destroy()   
-
-
-
-
-
-
-
-
-    def on_del_plugin(self, *args):
-        """ Delete plugin """
-        item = args[-1]
-        item.get_by_id(item['id'])
-        item.main_win = self
-
-        dialog = YesNoDialog(self, _('Delete Plugin'), f'{_("Are you sure you want to remove ")}<b><i>{esc_mu(item.name())}</i></b>{_(" Plugin?")}', buttons=2)           
-        dialog.run()
-        if dialog.response == 1:
-            err = item.delete()
-            if err == 0:
-                if self.plugins_tab != -1: self._get_upn_page_obj(self.plugins_tab).apply(FX_ACTION_DELETE, item.vals.copy())
-        dialog.destroy()
-
-
-
-    def on_edit_plugin(self, *args):
-        """ Edit/Add Plugin with Dialog"""
-        item = args[-1]
-
-        if item is None:
-            new = True
-            item = FeedexPlugin(main_win=self)
-            item.strict_merge(self.new_plugin)
-        else: 
-            new = False
-            item.get_by_id(item['id'])
-            if not item.exists: return -1
-
-        dialog = EditPlugin(self, item, new=new)
-        dialog.run()
-        if new: self.new_plugin = item.vals.copy()
-        if dialog.response == 1:
-            if new: err = item.add(validate=False) 
-            else: err = item.edit(validate=False)
-
-            if err == 0:
-                if self.plugins_tab != -1:
-                    if new:
-                        self._get_upn_page_obj(self.plugins_tab).apply(FX_ACTION_ADD, item.vals.copy()) 
-                        self.new_plugin.clear()
-                    else: self._get_upn_page_obj(self.plugins_tab).apply(FX_ACTION_EDIT, item.vals.copy())
-        dialog.destroy()   
-
-        
-
-    def on_run_plugin(self, *args):
-        """ Execute plugin in context """
-        plugin = FeedexPlugin(id=args[-2], main_win=self)
-        if not plugin.exists: return -1
-        item = args[-1]
-        plugin.run(item)
-
-
-
-
-
-    def on_go_home(self, *args):
-        """ Executes browser on channel home page """
-        item = args[-1]
-        if isinstance(item, FeedexCatItem): item.open()
-        else:
-            item = item.convert(FeedexFeed, self.DB, id=item['id'])
-            item.open()
-
-
-
-
-    def on_prefs(self, *args):
-        """ Run preferences dialog """
-        restart = False
-        dialog = PreferencesDialog(self)
-        dialog.run()
-        if dialog.response == 1:
-            restart = dialog.result.get('restart',False)            
-            reload = dialog.result.get('reload',False)
-            reload_lang = dialog.result.get('reload_lang',False)            
-            dialog.result.pop('restart')
-            dialog.result.pop('reload')
-            dialog.result.pop('reload_lang')
-
-            new_config = fdx.save_config(FEEDEX_CONFIG, config=dialog.result)
-            if new_config != -1:
-                if reload_lang:
-                    if self.config.get('lang') not in (None,'en'):
-                        lang = gettext.translation('feedex', languages=[self.config.get('lang')])
-                        lang.install(FEEDEX_LOCALE_PATH)
-                if reload:
-                    self.DB.load_all()
-                if restart:
-                    dialog.destroy()
-                    dialog2 = BasicDialog(self, _('Restart Required'), _('Restart is required for all changes to be applied.'), button_text=_('OK'), emblem='dialog-warning-symbolic' )
-                    dialog2.run()
-                    dialog2.destroy()
-
-                self.config = fdx.parse_config(None, config_str=new_config)
-                
-        if not restart: dialog.destroy()
-
-
-
-
-
-    def on_view_log(self, *args):
-        """ Shows dialog for reviewing log """
-        log_str = ''
-        try:        
-            with open(self.config.get('log',''), 'r') as f: log_str = f.read()
-        except OSError as e:
-            return msg(FX_ERROR_IO, f'{_("Error reading log file (%a)")} {e}', self.config.get('log',''))
-
-        dialog = BasicDialog(self, _('Main Log'), log_str, width=600, height=500, justify=FX_ATTR_JUS_LEFT, selectable=True, scrolled=True, markup=False)
-        dialog.run()
-        dialog.destroy()
-
-
-
-
-
-
-    def on_show_detailed(self, *args):
-        """ Shows dialog with entry's detailed technical info """
-        mode = args[-2]
-        item = args[-1]
-        if mode == 'entry': item = item.convert(FeedexEntry, self.DB, id=item['id'])
-        elif mode == 'feed': item = item.convert(FeedexFeed, self.DB, id=item['id'])
-        else: return -1
-        if not item.exists: return -1
-
-        dialog = BasicDialog(self, _('Tech details'), esc_mu(item.__str__()), width=600, height=500, justify=FX_ATTR_JUS_LEFT, selectable=True, scrolled=True)
-        dialog.run()
-        dialog.destroy()
-
-
-
-
-
-    def on_show_stats(self, *args):
-        """ Shows dialog with SQLite DB statistics """
-        stats = self.DB.stats()
-        stats_str = f"""
-
-{_('Statistics for database')}: <b>{stats['db_path']}</b>
-
-{_('FEEDEX version')}:          <b>{stats['version']}</b>
-
-{_('Main database size')}:      <b>{stats['db_size']}</b>
-{_('Index size')}:              <b>{stats['ix_size']}</b>
-{_('Cache size')}:              <b>{stats['cache_size']}</b>
-
-{_('Total size')}:              <b>{stats['total_size']}</b>
-
-
-
-{_('Entry count')}:             <b>{stats['doc_count']}</b>
-{_('Last entry ID')}:           <b>{stats['last_doc_id']}</b>
-
-{_('Learned rule count')}:      <b>{stats['rule_count']}</b>
-{_('Manual rule count')}:       <b>{stats['user_rule_count']}</b>
-
-{_('Feed count')}:              <b>{stats['feed_count']}</b>
-{_('Category count')}:          <b>{stats['cat_count']}</b>
-
-{_('Last news update')}:        <b>{stats['last_update']}</b>
-{_('First news update')}:       <b>{stats['first_update']}</b>
-
-"""
-        if stats['lock']: 
-            stat_str = f"""{stat_str}
-{_('DATABASE LOCKED')}"""
-        if stats['fetch_lock']: 
-            stat_str = f"""{stat_str}
-{_('DATABASE LOCKED FOR FETCHING')}"""
-
-        if stats['due_maintenance']: 
-            stat_str = f"""{stat_str}
-{_('DATABASE MAINTENANCE ADVISED')}
-{_('Use')} <b>feedex --db-maintenance</b> {_('command')}
-
-"""
-
-        dialog = BasicDialog(self, _("Database Statistics"), stats_str, width=600, height=500, pixbuf=self.icons.get('db'), justify=FX_ATTR_JUS_LEFT, selectable=True)
-        dialog.run()
-        dialog.destroy()
-
-
-
-    def on_show_session_log(self, *args):
-        """ Show dialog with current session log """
-        dialog = BasicDialog(self, _('Session log'), self.log_string, width=600, height=500, justify=FX_ATTR_JUS_LEFT, selectable=True, scrolled=True)
-        dialog.run()
-        dialog.destroy()
-
-
-
-    def on_show_about(self, *args):
-        """ Shows 'About...' dialog """
-        about_str=f"""
-<b>FEEDEX v. {FEEDEX_VERSION}</b>
-
-{FEEDEX_DESC}
-<i>{FEEDEX_SUBDESC}</i>
-
-{_('Release')}: {FEEDEX_RELEASE}
-
-<i>{_('Author')}: {FEEDEX_AUTHOR}
-{FEEDEX_CONTACT}</i>
-
-{_('Website')}: <a href="{esc_mu(FEEDEX_WEBSITE)}">{esc_mu(FEEDEX_WEBSITE)}</a>
-
-
-"""        
-        dialog = BasicDialog(self, _('About...'), about_str, image='feedex.png', selectable=True)
-        dialog.run()
-        dialog.destroy()
-
-
-
-
-
-
-
-    def on_show_rules_for_entry(self, *args, **kargs):
-        """ Show dialog with rules matched for entry """
-        item = args[-1]
-        item = item.convert(FeedexEntry, self.DB, id=item['id'])
-        if not item.exists: return -1
-                                    
-        dialog = DisplayMatchedRules(self, item)
-        dialog.run()
-        dialog.destroy() 
-
-
-
-    def show_learned_rules(self, *args):
-        """ Shows learned rules with weights in a separate window """
-        dialog = DisplayRules(self)
-        dialog.run()
-        dialog.destroy()
-
-
-
-
-    def on_show_keywords(self, *args, **kargs):
-        """ Shows keywords for entry """
-        item = args[-1]
-        item = item.convert(FeedexEntry, self.DB, id=item['id'])
-        if not item.exists: return -1
-
-        dialog = DisplayKeywords(self, item, width=600, height=500)
-        dialog.run()
-        dialog.destroy()
-
-
-
-
-
-
-
-
-
-##########################################
-#   DB Maintenance Stuff
-
-    def on_maintenance_thr(self, *args, **kargs):
-        """ DB Maintenance thread """
-        DB = FeedexDatabase(connect=True)
-        err = DB.maintenance()
-        DB.close()
-        fdx.bus_append(FX_ACTION_UNBLOCK_DB)
-        fdx.busy = False
-
-
-    def on_maintenance(self, *args, **kargs):
-        """ BD Maintenance """
-        if fdx.busy: return -1
-        if not self._fetch_lock(): return 0
-        
-        dialog = YesNoDialog(self, _('DB Maintenance'), _('Are you sure you want to DB maintenance? This may take a long time...'), emblem='system-run-symbolic' )  
-        dialog.run()
-        if dialog.response == 1:
-            fdx.bus_append(FX_ACTION_BLOCK_DB)
-            fdx.busy = True
-            t = threading.Thread(target=self.on_maintenance_thr)
-            t.start()
-        dialog.destroy()
-
-
-
-    def on_clear_cache_thr(self, *args, **kargs):
-        DB = FeedexDatabase(connect=True)
-        DB.clear_cache(-1)
-        DB.close()
-        fdx.busy = False
-        fdx.bus_append(FX_ACTION_UNBLOCK_DB)
-
-
-    def on_clear_cache(self, *args, **kargs):
-        """ Clear image cache """
-        if fdx.busy: return -1
-        dialog = YesNoDialog(self, _('Clear Cache'), _('Do you want to delete all downloaded and cached images/thumbnails?'),  emblem='edit-clear-all-symbolic')
-        dialog.run()
-        if dialog.response == 1:
-            fdx.bus_append(FX_ACTION_BLOCK_DB)
-            fdx.busy = True
-            t = threading.Thread(target=self.on_clear_cache_thr)
-            t.start()
-        dialog.destroy()
-
-    
-    def del_learned_rules(self, *args):
-        """ Wrapper for deleting learned rules from DB """
-        if fdx.busy: return -1
-        if not self._fetch_lock(): return 0
-        dialog = YesNoDialog(self, _('Delete Learned Rules?'), _('Do you want delete all learned rules used for ranking?'), 
-                             subtitle=_('<i>This action is permanent. Relearning rules can be time consuming</i>'),  emblem='dialog-warning-symbolic')
-        dialog.run()
-        if dialog.response == 1:
-            dialog.destroy()
-            dialog2 = YesNoDialog(self, _('Delete Learned Rules?'), _('Are you sure?'), emblem='dialog-warning-symbolic')
-            dialog2.run()
-            if dialog2.response == 1:
-                err = self.DB.delete_learned_rules()
-                if err == 0: 
-                    if self.learned_rules_tab != -1: self._get_upn_page_obj(self.learned_rules_tab).query(None)
-            dialog2.destroy()
-        else: dialog.destroy()
-        
-
-
-
-    def relearn_rules_thr(self, *args):
-        DB = FeedexDatabase(connect=True)
-        DB.recalculate(learn=True, rank=False, index=False)
-        DB.close()
-        if self.learned_rules_tab != -1: self._get_upn_page_obj(self.learned_rules_tab).query(None)
-        fdx.busy = False
-        fdx.bus_append(FX_ACTION_UNBLOCK_DB)
-
-
-    def relearn_rules(self, *args):
-        """ Wrapper for relearning rules """
-        if fdx.busy: return -1
-        if not self._fetch_lock(): return 0
-        dialog = YesNoDialog(self, _('Relearn Ranking Rules?'), _('Do you want to relearn rules for Ranking from read/marked entries?'), 
-                             subtitle=_('<i>This may take a long time</i>'),  emblem='applications-engineering-symbolic')
-        dialog.run()
-        if dialog.response == 1:
-            fdx.bus_append(FX_ACTION_BLOCK_DB)
-            fdx.busy = True
-            t = threading.Thread(target=self.relearn_rules_thr)
-            t.start()
-        dialog.destroy()
-
-
-
-
-
-
-
-
-    ####################################################
-    # Porting
-    #           Below are wrappers for porting data
-
-
-    def chooser(self, parent, *args, **kargs):
-        """ File chooser for porting """
-        action = kargs.get('action', 'open_file')
-        start_dir = kargs.get('start_dir', os.getcwd())
-
-        if action == 'save':
-            header = kargs.get('header',_('Save as...'))
-            dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.SAVE)
-            dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
-        elif action == 'open_file':
-            header = kargs.get('header',_('Open File'))
-            dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.OPEN)
-            dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
-        elif action == 'open_dir':
-            header = kargs.get('header',_('Open Folder'))
-            dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.SELECT_FOLDER)
-            dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
-
-        dialog.set_current_folder(kargs.get('start_dir', os.getcwd()))
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            filename = dialog.get_filename()
-        else: filename = False
-        dialog.destroy()
-
-        if action == 'save':
-            if os.path.isfile(filename):
-                dialog = YesNoDialog(self, f'{_("Overwrite?")}', f'{_("File ")}<b>{esc_mu(filename)}</b>{_(" already exists!   Do you want to overwrite it?")}')
-                dialog.run()
-                if dialog.response == 1: os.remove(filename)
-                else: filename = False
-                dialog.destroy()
-            elif os.path.isdir(filename):
-                msg(FX_ERROR_IO, _('Target %a is a directory!'), filename)
-                filename = False
-
-        if filename in ('',None,False,): filename = False
-        else: self.gui_cache['last_dir'] = os.path.dirname(filename)
-
-        return filename
-
-
-
-
-    def export_feeds(self, *args):
-        filename = self.chooser(self, action='save', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Export Feed data to...') )
-        if filename is False: return 0
-        feedex_cli = FeedexCLI()
-        feedex_cli.output = 'json_dict'
-        feedex_cli.ofile = filename
-        self.DB.Q.list_feeds(all=True)
-        feedex_cli.out_table(self.DB.Q)
-
-
-    def export_rules(self, *args):
-        filename = self.chooser(self, action='save', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Export Rules to...') )
-        if filename is False: return 0
-        feedex_cli = FeedexCLI()
-        feedex_cli.output = 'json_dict'
-        feedex_cli.ofile = filename
-        self.DB.Q.list_rules()
-        feedex_cli.out_table(self.DB.Q)
-
-
-
-    def export_flags(self, *args):
-        filename = self.chooser(self, action='save', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Export Flags to...') )
-        if filename is False: return 0
-        feedex_cli = FeedexCLI()
-        feedex_cli.output = 'json_dict'
-        feedex_cli.ofile = filename
-        self.DB.Q.list_flags(all=True)
-        feedex_cli.out_table(self.DB.Q)
-
-    def export_plugins(self, *args):
-        filename = self.chooser(self, action='save', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Export Plugins to...') )
-        if filename is False: return 0
-        save_json(filename, self.gui_plugins)
-
-
-
-
-    def import_feeds(self, *args):
-        if not self._fetch_lock(): return 0
-        if fdx.busy: return -1
-
-        filename = self.chooser(self, action='open_file', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Import Feeds from...') )
-        if filename is False: return 0
-
-        err = self.DB.import_feeds(filename)
-        if err == 0: 
-            self.feed_tab.reload()
-
-            dialog = YesNoDialog(self, _('Update Feed Data'), _('New feed data has been imported. Download Metadata now?') )
-            dialog.run()
-            if dialog.response == 1: self.on_update_feed_all()
-            dialog.destroy()
-
-
-    def import_rules(self, *args):
-        if not self._fetch_lock(): return 0
-        if fdx.busy: return -1
-
-        filename = self.chooser(self, action='open_file', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Import Rules from...') )
-        if filename is False: return 0
-
-        err = self.DB.import_rules(filename)
-        if err == 0: 
-            if self.rules_tab != -1: self._get_upn_page_obj(self.rules_tab).query('',{})
-
-
-    def import_flags(self, *args):
-        if not self._fetch_lock(): return 0
-        if fdx.busy: return -1
-
-        filename = self.chooser(self, action='open_file', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Import Flags from...') )
-        if filename is False: return 0
-
-        err = self.DB.import_flags(filename)
-        if err == 0: 
-            if self.flags_tab != -1: self._get_upn_page_obj(self.flags_tab).query('',{})
-
-
-
-    def import_entries_thr(self, efile, **kargs):
-        DB = FeedexDatabase(connect=True)
-        err = DB.import_entries(efile=efile)
-        DB.close()
-        fdx.busy = False
-        fdx.bus_append(FX_ACTION_UNBLOCK_DB)
-
-
-    def import_entries(self, *args):
-        filename = self.chooser(self, action='open_file', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Import Entries from...') )
-        if filename is False: return 0
-        if not self._fetch_lock(): return 0
-        fdx.busy = True
-        fdx.bus_append(FX_ACTION_BLOCK_DB)
-        t = threading.Thread(target=self.import_entries_thr, args=(filename,))
-        t.start()
-
-
-
-    def import_plugins(self, *args):
-        filename = self.chooser(self, action='open_file', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Import Plugins from...') )
-        if filename is False: return 0
-
-        new_plugins = validate_gui_plugins( load_json(filename, [], create_file=False) )
-        if len(new_plugins) > 0:
-            self.gui_plugins = list(self.gui_plugins)
-            max_id = len(self.gui_plugins) + 1
-            for p in new_plugins:
-                p[FX_PLUGIN_TABLE.index('id')] = max_id
-                max_id += 1
-                self.gui_plugins.append(p)
-            
-            err = save_json(FEEDEX_GUI_PLUGINS, self.gui_plugins)
-            if err == 0: 
-                if self.plugins_tab != -1: self._get_upn_page_obj(self.plugins_tab).query('',{})
-                msg(_('Plugins imported successfully...'))
-
-
-
-
-    def export_results(self, *args, **kargs):
-        """ Export results from current tab to JSON for later import """
-        if self.curr_upper.type in (FX_TAB_RULES, FX_TAB_FLAGS): return 0
-        format = args[-1]
-
-        if not isinstance(self.curr_upper.table.result, (ResultEntry, ResultContext, ResultTerm, ResultTimeSeries,)): return -1
-        if isinstance(self.curr_upper.table.result, ResultEntry): result = ResultEntry()
-        elif isinstance(self.curr_upper.table.result, ResultContext): result = ResultContext()
-        elif isinstance(self.curr_upper.table.result, ResultTerm): result = ResultTerm()
-        elif isinstance(self.curr_upper.table.result, ResultTimeSeries): result = ResultTimeSeries()
-        else: return 0
-
-        query = FeedexQueryInterface()        
-        query.result =  result
-        query.results = self.curr_upper.table.results
-        query.result_no = len(query.results)
-        query.result_no2 = 0
-        
-        if query.result_no == 0:
-            msg(_('Nothing to export.') )
-            return 0
-        
-        if kargs.get('filename') is None:
-            filename = self.chooser(self, action='save', start_dir=self.gui_cache.get('last_dir', os.getcwd()), header=_('Export to...') )
-        else:
-            filename = kargs.get('filename')
-        
-        if filename in (False,None): return 0
-
-        feedex_cli = FeedexCLI()
-        feedex_cli.output = format
-        feedex_cli.ofile = filename
-        feedex_cli.out_table(query)
-
-
-
-    def import_catalog_thr(self, item, **args):
-        """ Import feeds from catalog - threading """
-        DB = FeedexDatabase(connect=True)
-        item.DB = DB
-        item.feed.set_interface(DB)
-        item.do_import()
-        DB.close()
-        fdx.busy = False
-        fdx.bus_append(FX_ACTION_UNBLOCK_DB)
-        fdx.bus_append(FX_ACTION_RELOAD_FEEDS)
-
-
-    def import_catalog(self, *args, **kargs):
-        """ Import feeds from Catalog """
-        item = args[-1]
-        if not isinstance(item, FeedexCatItem): return 0
-        item.prep_import()
-        if item.queue_len == 0: return 0
-
-        dialog = YesNoDialog(self, _('Subscribe...'), f"""{_('Subscribe to')} <b>{item.queue_len}</b> {_('Channels?')}""", emblem='rss-symbolic')
-        dialog.run()
-        if dialog.response == 1:
-            if not self._fetch_lock(): return 0
-            fdx.busy = True
-            fdx.bus_append(FX_ACTION_BLOCK_DB)
-            t = threading.Thread(target=self.import_catalog_thr, args=(item,))
-            t.start()
-        dialog.destroy()
-
-
-
-
-
-
-#################################################
-#       UTILITIES
-#
-
-    def quick_find_case_ins(self, model, column, key, rowiter, *args):
-        """ Guick find 'equals' fundction - case insensitive """
-        column=args[-1]
-        row = model[rowiter]
-        if key.lower() in scast(list(row)[column], str, '').lower(): return False
-        return True
-
-    def quick_find_case_ins_tree(self, model, column, key, rowiter, *args):
-        """ Quick find 'equals' function - basically case insensitivity """
-        column = args[-1]
-        tree = args[-2]
-        row = model[rowiter]
-        if key.lower() in scast(list(row)[column], str, '').lower(): return False
-
-        # Search in child rows.  If one of the rows matches, expand the row so that it will be open in later checks.
-        for inner in row.iterchildren():
-            if key.lower() in scast(list(inner)[column], str, '').lower():
-                tree.expand_to_path(row.path)
-                return False
-        return True
 
 
 
@@ -2749,6 +1572,23 @@ Click to open in image viewer""")
         self.preview_label.set_markup(startup_text)
 
 
+
+
+    def win_decor(self, *args):
+        """ Decorate main window """
+        self.hbar.props.title = f"Feedex {FEEDEX_VERSION}"
+        if self.profile_name != '': self.hbar.props.subtitle = f"{self.profile_name}"
+        self.hbar.show_all()
+
+    def set_profile(self, *args):
+        """ Setup path to caches, plugins etc. """
+        self.profile_name = self.config.get('profile_name','')
+        if self.profile_name == '': 
+            self.gui_cache_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex_gui_cache.json')
+            self.gui_plugins_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex_plugins.json')
+        else:
+            self.gui_cache_path = os.path.join(FEEDEX_SHARED_PATH, f'feedex_gui_cache_{fdx.hash_url(self.profile_name)}.json')
+            self.gui_plugins_path = os.path.join(FEEDEX_SHARED_PATH, f'feedex_plugins_{fdx.hash_url(self.profile_name)}.json')
 
 
 

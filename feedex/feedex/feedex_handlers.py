@@ -63,6 +63,7 @@ class FeedexRSSHandler:
             self.ifeed = feed.copy()
         else: raise FeedexTypeError(FX_ERROR, _('Invalid type of input feed! Should be a SQLContainer or dict!'))
 
+        # Set up http headers from saved feed data
         headers = {}
         headers['etag'] = self.ifeed.get('etag')
         headers['modified'] = self.ifeed.get('modified')
@@ -97,11 +98,22 @@ class FeedexRSSHandler:
     def _do_download(self, url:str, **kargs):
         """ Method for downloading specifically - to be overwritten for child classes/ different HTTP-based protocols"""
         try:
-            return feedparser.parse(url, **self.http_headers)
+            timeout = scast(self.config.get('fetch_timeout'), int, 0)
+            if timeout != 0:
+                old_timeout = socket.getdefaulttimeout()
+                socket.setdefaulttimeout(timeout)
+            
+            raw = feedparser.parse(url, **self.http_headers)
+            if timeout != 0: socket.setdefaulttimeout(old_timeout)
+            
+            return raw
+        
         except Exception as e:
             self.error = True
             msg(FX_ERROR_HANDLER, _('Download error: %a'), e)
             return {}
+
+
 
 
 
@@ -320,23 +332,22 @@ class FeedexRSSHandler:
         for i in self.images:
             href = scast( slist(i, 2, None), str, '')
             feed_id = scast( slist(i, 0, 0), str, '0')
-            icon_filename = os.path.join(self.DB.icon_path, f'feed_{feed_id}.ico' )
+            icon = os.path.join(self.DB.icon_path, f'feed_{feed_id}.ico' )
             if href not in (None, 0):
                 debug(3, f'Downloading image for feed {feed_id} from {href}...')                
-                fdx.download_res(href, ofile=icon_filename, user_agent=self.agent)
+                fdx.download_res(href, ofile=icon, user_agent=self.agent)
             
             # Fallback to catalog icons
-            if not os.path.isfile(icon_filename):
+            if not os.path.isfile(icon):
                 feed_url = ''
                 for f in fdx.feeds_cache:
                     if f[self.feed.get_index('id')] == feed_id: 
                         feed_url = f[self.feed.get_index('url')]
                         break
                 if feed_url != '':
-                    hash_obj = hashlib.sha1(feed_url.encode())
-                    thumbnail_filename = os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'thumbnails', f"""{hash_obj.hexdigest()}.img""")
-                    if os.path.isfile(thumbnail_filename):
-                        try: copyfile(thumbnail_filename, icon_filename)
+                    thumbnail = os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'thumbnails', f"""{fdx.hash_url(feed_url)}.img""")
+                    if os.path.isfile(thumbnail):
+                        try: copyfile(thumbnail, icon)
                         except (IOError, OSError,) as e: msg(FX_ERROR_IO, f"""{_('Error copying thumbnail for feed')} {feed_id}: %a""", e)
 
 
@@ -356,18 +367,18 @@ class FeedexRSSHandler:
         self.feed.clear()
         # Get image urls for later download
         self.images = []
-        if not kargs.get('ignore_images', False):
-            icon = self.feed_raw['feed'].get('icon',None)
-            if icon is not None:
-                self.images.append([feed['id'], None, icon, None])
+
+        icon = self.feed_raw['feed'].get('icon',None)
+        if icon is not None:
+            self.images.append([feed['id'], None, icon, None])
+        else:
+            logo = self.feed_raw['feed'].get('logo',None)
+            if logo is not None:
+                self.images.append([feed['id'], None, logo, None])
             else:
-                logo = self.feed_raw['feed'].get('logo',None)
-                if logo is not None:
-                    self.images.append([feed['id'], None, logo, None])
-                else:
-                    image = self.feed_raw['feed'].get('image',None)
-                    if image is not None:
-                        self.images.append([feed['id'], None, image.get('href',None), image.get('title',None)])
+                image = self.feed_raw['feed'].get('image',None)
+                if image is not None:
+                    self.images.append([feed['id'], None, image.get('href',None), image.get('title',None)])
 
         # Overwrite Nones in current data and populate feed
         self.feed['id']                       = feed['id']
@@ -403,9 +414,9 @@ class FeedexRSSHandler:
         self.feed['name']                     = coalesce(feed['name'], self.feed_raw['feed'].get('title', None))
         self.feed['version']                  = self.feed_raw.get('version',None)
 
-        if not kargs.get('ignore_images', False):
-            err = self._get_images()
-            if err != 0: return err
+
+        err = self._get_images()
+        if err != 0: return err
         return 0
 
 
@@ -569,9 +580,21 @@ class FeedexScriptHandler:
             msg(FX_ERROR_HANDLER, _('No script file or command provided!'))
             return {}
 
+
+        # Setup transfer files' names
+        tmp_file = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")
+        while os.path.isfile(tmp_file): tmp_file = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")       
+
+        tmp_file_in = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")
+        while os.path.isfile(tmp_file_in): tmp_file_in = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")       
+
+        # Send feed data to infile
+        save_json(tmp_file_in, self.ifeed.vals())
+
         # Setup running environ
         run_env = os.environ.copy()
-        run_env['FEEDEX_FEED_JSON'] = None
+        run_env['FEEDEX_TMP_FILE'] = tmp_file
+        run_env['FEEDEX_TMP_FILE_FEED'] = tmp_file_in
 
         # Substitute command line params ...
         rstr = random_str(string=command)
@@ -579,35 +602,42 @@ class FeedexScriptHandler:
         
         for i, arg, in enumerate(command):
             arg = arg.replace('%%',rstr)
+            arg = arg.replace('%T', tmp_file)
+            arg = arg.replace('%I', tmp_file_in)
             arg = arg.replace('%A', self.http_headers.get('agent'))
             arg = arg.replace('%E', self.http_headers.get('etag'))
             arg = arg.replace('%M', self.http_headers.get('modified'))
-            arg = arg.replace('%L', self.http_headers.get('login'))
-            arg = arg.replace('%P', self.http_headers.get('password'))
-            arg = arg.replace('%D', self.http_headers.get('domain'))
             arg = arg.replace('%U', self.ifeed.get('url'))
             arg = arg.replace('%F', self.ifeed.get('id'))
             arg = arg.replace(rstr, '%')
             command[i] = arg
 
-        debug(3, f"""Runing script: {' '.join(command)}""")
+        json_str = None
 
+        debug(3, f"""Runing script: {' '.join(command)}""")
         try:
-            comm_pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=run_env)
-            json_str = comm_pipe.stdout.read()
-        except OSError as e:
+            pr = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=run_env)
+            pr.wait()
+            json_str = load_json(tmp_file, None)
+        except Exception as e:
             self.error = True
             msg(FX_ERROR_HANDLER, _("Error executing script: %a"), e)
-            return {}
+        finally:
+            try: 
+                os.remove(tmp_file)
+                os.remove(tmp_file_in)
+            except (OSError, IOError,) as e: 
+                msg(FX_ERROR_IO, _('Error removing temp files!'), e)
 
+        
         debug(3, f'Output: {json_str}')
 
-        try:
-            return json.loads(json_str)
-        except (OSError, json.JSONDecodeError,) as e:
+        if json_str is None:
             self.error = True
-            msg(FX_ERROR_HANDLER, _("Error decoding JSON: %a"), e)
             return {}
+        else: return json_str
+
+
         
 
 
