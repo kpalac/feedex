@@ -376,7 +376,11 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
         # Update store ...
         # Places tree ...
         new_row = self.feed_store_tmp.append(None, self._feed_store_item({'gui_action':1, 'name':_('New'), 'gui_icon':'new', 'id':FX_PLACE_LAST, 'gui_row_id':'P 1'}) )
-        self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Previous Update'), 'gui_icon':'calendar', 'id':FX_PLACE_PREV_LAST}) )
+        nnew_row = self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Previous Update'), 'gui_icon':'calendar', 'handler':'0', 'id':FX_PLACE_PREV_LAST, 'gui_row_id':'FS'}) )
+        for f in fdx.fetches_cache:
+            self.feed_store_tmp.append(nnew_row, self._feed_store_item({'gui_action':1, 'name':f[FETCH_TABLE.index('date')], 'gui_icon':'rss', 'id':-f[FETCH_TABLE.index('ord')]}) )
+        if self.MW.gui_cache.get('feeds_expanded',{}).get('FS',False): expanded.append(nnew_row)
+
         self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Last Hour'), 'gui_icon':'calendar', 'id':FX_PLACE_LAST_HOUR}) )
         self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Today'), 'gui_icon':'calendar', 'id':FX_PLACE_TODAY}) )
         self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('This Week'), 'gui_icon':'calendar', 'id':FX_PLACE_LAST_WEEK}) )

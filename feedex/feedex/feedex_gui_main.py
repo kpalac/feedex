@@ -21,33 +21,8 @@ class FeedexMainWin(Gtk.Window):
         self.config = kargs.get('config', fdx.config)
 
         # Main DB interface - init and check for lock and/or DB errors
-        self.DB = FeedexDatabase( db_path=kargs.get('db_path', self.config.get('db_path')), allow_create=True)
-        try:
-            self.DB.connect(defaults=True, default_feeds=False)
-            self.DB.load_all()
-            self.DB.cache_icons()
-            self.DB.connect_LP()
-            self.DB.connect_QP()
-        except (FeedexDatabaseError, FeedexDataError,) as e:
-            dialog = BasicDialog(None, _("Feedex: Critical Error!"), _('Error occurred that precludes execution.\nApplication could not be started. I am sorry for inconvenienve :('), 
-                            subtitle=f'\n<i>{_("See application log for further details")}</i>', emblem='dialog-error-symbolic')
-            dialog.run()
-            dialog.destroy()            
-            sys.exit(e.code)
-            
-        if self.DB.locked(timeout=2):
-            dialog = YesNoDialog(None, _("Feedex: Database is Locked"), f"<b>{_('Database is Locked! Proceed and unlock?')}</b>", emblem='system-lock-screen-symbolic',
-                                        subtitle=_("Another instance can be performing operations on Database or Feedex did not close properly last time. Proceed anyway?"))
-            dialog.run()
-            if dialog.response == 1:
-                self.DB.unlock()
-                dialog.destroy()
-            else:
-                dialog.destroy()
-                self.DB.close()
-                sys.exit(4)
-    
-        self.DB.unlock()
+        self.connect_db(None) 
+        fdx.db_lock = False
 
         # Init action coordinator
         self.act = FeedexGUIActions(self)
@@ -73,7 +48,7 @@ class FeedexMainWin(Gtk.Window):
 
         # Keeping track of new items
         self.new_items = scast( self.gui_cache.get('new_items'), int, 0 )
-        self.new_n = scast( self.gui_cache.get('new_n'), int, 1 ) # Last nth unread update
+        self.new_n = scast( self.gui_cache.get('new_n'), int, 0 ) # Last nth unread update
 
         # Caches for attempted new item add
         self.new_feed_url = {}
@@ -85,6 +60,7 @@ class FeedexMainWin(Gtk.Window):
         self.new_plugin = {}
         # ... and for preview
         self.prev_entry = {}
+        self.prev_entry_links = []
         self.curr_prev = None
 
 
@@ -155,7 +131,7 @@ class FeedexMainWin(Gtk.Window):
         self.rules_tab = -1
         self.flags_tab = -1
         self.plugins_tab = -1
-        self.learned_rules_tab = -1
+        self.learned_tab = -1
         self.catalog_tab = -1
         self.curr_upper = None
         
@@ -215,9 +191,102 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         self.feed_tab = FeedexFeedTab(self)
 
         # Build layout        
-        main_box = Gtk.VBox(homogeneous=False)
+        self.main_box = Gtk.VBox(homogeneous=False)
+        self.setup_layout()
+
+        main_top_box = Gtk.VBox()
+        main_top_box.pack_start(self.main_box, True, True, 3)
+        main_top_box.pack_start(lstatus_box, False, False, 3)
+        self.add(main_top_box)
+
+        self.hbar.pack_start(self.button_feeds_download)
+        self.hbar.pack_start(self.button_new)
+        self.hbar.pack_start(self.button_search)
+        
+        self.hbar.pack_end(self.hbar_button_menu)
+
+
+
+        self.connect("destroy", self._on_close)
+        self.connect("key-press-event", self._on_key_press)
+
+        self.set_default_size(self.gui_cache.get('win_width'), self.gui_cache.get('win_height'))
+        if self.gui_cache.get('win_maximized', False): self.maximize()
+        
+        self.connect('window-state-event', self._on_state_event)
+        self.connect('delete-event', self._on_delete_event)
+
+
+
+        # Launch startup tabs
+        self.add_tab({'type':FX_TAB_PLACES, 'query':FX_PLACE_LAST, 'filters': {}, 'do_search':True})
+
+        for i, tb in enumerate(self.gui_cache.get('tabs',[])):
+            if tb in (None, (), []): continue
+            self.add_tab({'type':tb.get('type',FX_TAB_SEARCH), 'query':tb.get('phrase',''), 'filters':tb.get('filters',{}), 'title':tb.get('title')})
+
+        self.upper_notebook.set_current_page(0)
  
-        # Set up layout    
+
+        # Run onboarding after DB creation
+        if self.DB.created: self.add_tab({'type':FX_TAB_CATALOG, 'do_search':True})
+
+
+
+
+
+
+#####################################################################################
+#
+#       DB Connection
+#
+
+    def connect_db(self, parent, **kargs):
+        """ Establish database connection and elegantly handle errors """
+        db_path = kargs.get('db_path', self.config.get('db_path'))
+        self.DB = FeedexDatabase(db_path=db_path, allow_create=True, main_conn=True)
+        try:
+            self.DB.connect(defaults=True, default_feeds=False, unlock=kargs.get('unlock'))
+            self.DB.load_all()
+            self.DB.cache_icons()
+            self.DB.connect_LP()
+            self.DB.connect_QP()
+
+
+        except FeedexDatabaseLockedError as e:
+            
+            dialog = YesNoDialog(parent, _("Feedex: Database is Locked"), f"<b>{_('Database is Locked! Proceed and unlock?')}</b>", emblem='system-lock-screen-symbolic',
+                                 subtitle=_("Another instance can be performing operations on Database or Feedex did not close properly last time. Proceed anyway?"))
+            dialog.run()
+            dialog.destroy()
+            if dialog.response == 1:
+                self.connect_db(unlock=True)
+            else:
+                self.DB.close()
+                sys.exit(e.code)
+                
+        except Exception as e:
+
+            if not isinstance(e, FeedexError): err_msg = f'<span foreground="red">{esc_mu(str(e))}</span>'
+            else: err_msg = gui_msg(e.bus_message)
+
+            dialog = BasicDialog(parent, _("Feedex: Critical Error!"), f"""{_('Error occurred while connecting')} <b>{db_path}</b> \n{_('Application could not be started. I am sorry for inconvenience :(')}""", 
+                            subtitle=f'<small>{err_msg}</small>', emblem='dialog-error-symbolic')
+            dialog.run()
+            dialog.destroy()
+            def_db_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex.db')
+            if db_path == def_db_path: sys.exit(e.code)
+            else: self.connect_db(db_path=def_db_path)
+
+
+#######################################################################################
+#
+#       Layout 
+#
+
+    def setup_layout(self, *args, **kargs):
+        """ Sets up layout according to cache data """
+
         if self.config.get('gui_layout',0) in (1,2):
             self.div_horiz = Gtk.VPaned()
             self.div_vert = Gtk.HPaned()
@@ -236,7 +305,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 self.div_vert.pack1(self.div_horiz, resize=True, shrink=True)
                 self.div_vert.pack2(self.feed_tab, resize=True, shrink=True)
 
-            main_box.add(self.div_vert)
+            self.main_box.add(self.div_vert)
 
             self.div_horiz.set_position(self.gui_cache['div_horiz'])
             self.div_vert.set_position(self.gui_cache['div_vert'])
@@ -269,47 +338,12 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 if self.gui_cache['div_vert2'] >= self.gui_cache['div_vert']:
                     self.gui_cache['div_vert'], self.gui_cache['div_vert2'] = self.gui_cache['div_vert2'], self.gui_cache['div_vert']
 
-            main_box.add(self.div_vert)
+            self.main_box.add(self.div_vert)
 
             self.div_vert.set_position(self.gui_cache['div_vert'])
             self.div_vert2.set_position(self.gui_cache['div_vert2'])
 
-        main_top_box = Gtk.VBox()
-        main_top_box.pack_start(main_box, True, True, 3)
-        main_top_box.pack_start(lstatus_box, False, False, 3)
-        self.add(main_top_box)
 
-        self.hbar.pack_start(self.button_feeds_download)
-        self.hbar.pack_start(self.button_new)
-        self.hbar.pack_start(self.button_search)
-        
-        self.hbar.pack_end(self.hbar_button_menu)
-
-
-
-        self.connect("destroy", self._on_close)
-        self.connect("key-press-event", self._on_key_press)
-
-        self.set_default_size(self.gui_cache.get('win_width'), self.gui_cache.get('win_height'))
-        if self.gui_cache.get('win_maximized', False): self.maximize()
-        
-        self.connect('window-state-event', self._on_state_event)
-        self.connect('delete-event', self._on_delete_event)
-
-
-
-        # Launch startup tabs
-        self.add_tab({'type':FX_TAB_PLACES, 'query':FX_PLACE_LAST, 'do_search':True})
-
-        for i, tb in enumerate(self.gui_cache.get('tabs',[])):
-            if tb in (None, (), []): continue
-            self.add_tab({'type':tb.get('type',FX_TAB_SEARCH), 'query':tb.get('phrase',''), 'filters':tb.get('filters',{}), 'title':tb.get('title')})
-
-        self.upper_notebook.set_current_page(0)
- 
-
-        # Run onboarding after DB creation
-        if self.DB.created: self.add_tab({'type':FX_TAB_CATALOG, 'do_search':True})
 
 
 
@@ -412,7 +446,8 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 mssg = gui_msg(*m)
                 self.status_bar.set_markup(mssg)
                 self.log_string = f"""{self.log_string}\n{mssg}"""
-            
+                self._check_spinner()
+
             elif code == FX_ACTION_RELOAD_FEEDS: self.feed_tab.reload()
 
             elif code == FX_ACTION_BLOCK_DB:
@@ -456,7 +491,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
             elif code == FX_ACTION_HANDLE_IMAGES:
                 if self.prev_entry.get('id') == m[1]: 
-                    self.handle_images(self.prev_entry.get('id', None), f"""{self.prev_entry.get('images','')}\n{self.prev_links}""")
+                    self.handle_images(self.prev_entry.get('id', None), self.prev_entry_links)
 
             elif code == FX_ACTION_BLOCK_FETCH:
                 self.button_feeds_download.set_sensitive(False)
@@ -478,19 +513,20 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             fdx.bus_del(0)
 
         # Update processing spinner and handle main bus flag chnges
-        if fdx.busy is not self.busy:
-            self.busy = fdx.busy
-            if self.busy:
-                self.status_spinner.show()
-                self.status_spinner.start()
-            else:
-                self.status_spinner.stop()
-                self.status_spinner.hide()
+        if fdx.busy is not self.busy: self._check_spinner()
  
         return True
 
 
 
+    def _check_spinner(self):
+        self.busy = fdx.busy
+        if fdx.busy:
+            self.status_spinner.show()
+            self.status_spinner.start()
+        else:
+            self.status_spinner.stop()
+            self.status_spinner.hide()
 
 
 
@@ -556,6 +592,8 @@ It will also take some time to perform""") ))
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Clear cache'), self.act.on_clear_cache, icon='edit-clear-all-symbolic', tooltip=_("""Clear downloaded temporary files with images/thumbnails to reclaim disk space""") ) )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        menu.append( f_menu_item(1, _('Unlock fetching'), self.act.on_unlock_fetching, icon='system-lock-screen-symbolic', tooltip=_("""Manually unlock DB for fetching""") ) )
+        menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Database statistics'), self.act.on_show_stats, icon='drive-harddisk-symbolic') )
         return menu
 
@@ -570,6 +608,7 @@ It will also take some time to perform""") ))
         menu = Gtk.Menu()
         menu.append( f_menu_item(1, _('Rules'), self.add_tab, kargs={'type':FX_TAB_RULES, 'do_search':True}, icon='view-list-compact-symbolic', tooltip=_('Open a new tab showing Saved Rules') ) )
         menu.append( f_menu_item(1, _('Flags'), self.add_tab, kargs={'type':FX_TAB_FLAGS, 'do_search':True}, icon='marker-symbolic', tooltip=_('Open a new tab showing Flags') ) )
+        menu.append( f_menu_item(1, _('Learned Keywords'), self.add_tab, kargs={'type':FX_TAB_LEARNED, 'do_search':True}, icon='applications-engineering-symbolic', tooltip=_('Open a new tab showing Learned Keywords for recommendations') ) )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Plugins'), self.add_tab, kargs={'type':FX_TAB_PLUGINS, 'do_search':True}, icon='extension-symbolic', tooltip=_('Open a new tab showing Plugins') ) )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -605,15 +644,11 @@ It will also take some time to perform""") ))
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Search'), self.add_tab, kargs={'type':FX_TAB_SEARCH}, icon='edit-find-symbolic', tooltip=_('Search entries') ))  
         menu.append( f_menu_item(1, _('Search (wide view)'), self.add_tab, kargs={'type':FX_TAB_NOTES}, icon='format-unordered-list-symbolic', tooltip=_('Search entries in extended view') ))  
-
-        menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Trending'), self.add_tab, kargs={'type':FX_TAB_TRENDING}, icon='globe-symbolic', tooltip=_('Show trending Articles') ))  
-        menu.append( f_menu_item(1, _('Trends'), self.add_tab, kargs={'type':FX_TAB_TRENDS}, icon='comment-symbolic', tooltip=_('Show most talked about terms for Articles') ))  
-
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Show Contexts for a Term'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS}, icon='view-list-symbolic', tooltip=_('Search for Term Contexts') ))  
         menu.append( f_menu_item(1, _('Show Time Series for a Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'...-...':True, 'logic':'phrase', 'group':'monthly'}}, icon='histogram-symbolic', tooltip=_('Generate time series plot') ))  
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        menu.append( f_menu_item(1, _('Trends'), self.add_tab, kargs={'type':FX_TAB_TRENDS}, icon='comment-symbolic', tooltip=_('Show most talked about terms for Articles') ))  
         menu.append( f_menu_item(1, _('Search for Related Terms'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'filters':{'...-...':True, 'logic':'phrase'}}, icon='emblem-shared-symbolic', tooltip=_('Search for Related Terms from read/opened entries') ))  
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Find New Feeds'), self.add_tab, kargs={'type':FX_TAB_CATALOG, 'do_search':True, 'filters':{'depth':100, 'field':None} }, icon='rss-symbolic'))  
@@ -740,14 +775,6 @@ It will also take some time to perform""") ))
             menu.append( f_menu_item(3, _('Search...'), search_menu, icon='emblem-shared-symbolic') ) 
             menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
-            detail_menu = Gtk.Menu()
-            detail_menu.append( f_menu_item(1, _('Show Keywords for Entry'), self.add_tab, kargs={'type':FX_TAB_KEYWORDS, 'top_entry':item, 'do_search':True, 'filters':{'depth':50} }, icon='system-run-symbolic') )
-            detail_menu.append( f_menu_item(1, _('Show Ranking for Entry'), self.add_tab, kargs={'type':FX_TAB_RANK, 'top_entry':item, 'do_search':True}, icon='applications-engineering-symbolic') )
-            if fdx.debug_level not in (0, None): 
-                detail_menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                detail_menu.append( f_menu_item(1, _('Technical details...'), self.act.on_show_detailed, args=('entry', item,), icon='system-run-symbolic', tooltip=_("Show all entry's technical data") ) )
-            menu.append( f_menu_item(3, _('Details...'), detail_menu, icon='zoom-in-symbolic') ) 
-
             plugin_filter.append(FX_PLUGIN_ENTRY)
             plugin_filter.append(FX_PLUGIN_RESULT)        
             
@@ -755,7 +782,7 @@ It will also take some time to perform""") ))
 
 
 
-        elif isinstance(item, ResultRule) and tab.type != FX_TAB_LEARNED:
+        elif isinstance(item, ResultRule):
             
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -843,9 +870,9 @@ It will also take some time to perform""") ))
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             if coalesce(item['deleted'],0) == 0:
-                menu.append( f_menu_item(1, _('Show from newest...'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'do_search':True, 'filters':{'feed_or_cat':item['id'], '...-...':True}}, icon='edit-find-symbolic', tooltip=_("Show articles for this Channel or Category sorted from newest") ) )
-                menu.append( f_menu_item(1, _('Show from newest (wide view)...'), self.add_tab, kargs={'type':FX_TAB_NOTES, 'do_search':True, 'filters':{'feed_or_cat':item['id'], '...-...':True}}, icon='format-unordered-list-symbolic', tooltip=_("Show articles sorted from newest in an extended view") ) )
-                menu.append( f_menu_item(1, _('Summary...'), self.add_tab, kargs={'type':FX_TAB_TREE, 'do_search':True, 'filters':{'feed_or_cat':item['id'], 'last':True, 'group':'daily', 'fallback_sort':'trends'}}, icon='view-filter-symbolic', tooltip=_("Show item's Summary Tree ranked by Trends") ) )
+                menu.append( f_menu_item(1, _('Show from newest...'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'do_search':True, 'filters':{'feed_or_cat':item['id'], '...-...':True, 'rank':FX_RANK_LATEST}}, icon='edit-find-symbolic', tooltip=_("Show articles for this Channel or Category sorted from newest") ) )
+                menu.append( f_menu_item(1, _('Show from newest (wide view)...'), self.add_tab, kargs={'type':FX_TAB_NOTES, 'do_search':True, 'filters':{'feed_or_cat':item['id'], '...-...':True, 'rank':FX_RANK_LATEST}}, icon='format-unordered-list-symbolic', tooltip=_("Show articles sorted from newest in an extended view") ) )
+                menu.append( f_menu_item(1, _('Summary...'), self.add_tab, kargs={'type':FX_TAB_TREE, 'do_search':True, 'filters':{'feed_or_cat':item['id'], 'last':True, 'group':'daily', 'rank':FX_RANK_TREND}}, icon='view-filter-symbolic', tooltip=_("Show item's Summary Tree ranked by Trends") ) )
 
                 if not fdx.busy and tab.type == FX_TAB_FEEDS:
                     menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -910,17 +937,12 @@ It will also take some time to perform""") ))
             menu.append( f_menu_item(1, _('Empty Trash'), self.act.on_empty_trash, icon='edit-delete-symbolic') )
 
         else:
-
-            if tab.type == FX_TAB_RULES:
-                if menu is None: menu = Gtk.Menu()
-                else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                menu.append( f_menu_item(1, _('Show Learned Rules'), self.add_tab, kargs={'type':FX_TAB_LEARNED, 'top_entry':item, 'do_search':True}, icon='applications-engineering-symbolic', tooltip=_('Display rules learned from User\'s habits along with weights') ) )
             
-            elif tab.type == FX_TAB_LEARNED:
+            if tab.type == FX_TAB_LEARNED:
                 if menu is None: menu = Gtk.Menu()
                 else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                menu.append( f_menu_item(1, _('Delete Learned Rules'), self.act.del_learned_rules, icon='dialog-warning-symbolic', tooltip=_('Remove all learned rules from database. Be careful!') ) )
-                menu.append( f_menu_item(1, _('Relearn All Rules'), self.act.relearn_rules, icon='applications-engineering-symbolic', tooltip=_('Relearn rules from all read/marked items') ) )
+                menu.append( f_menu_item(1, _('Delete Learned Keywords'), self.act.del_learned_keywords, icon='dialog-warning-symbolic', tooltip=_('Remove all learned rules from database. Be careful!') ) )
+                menu.append( f_menu_item(1, _('Relearn All Keywords'), self.act.relearn_keywords, icon='applications-engineering-symbolic', tooltip=_('Relearn rules from all read/marked items') ) )
 
 
             if tab.type not in (FX_TAB_FEEDS, FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS,) and tab.table.result_no > 0:
@@ -979,6 +1001,13 @@ It will also take some time to perform""") ))
         summ_menu.append( f_menu_item(1, _('10%'), self._on_summarize, kargs={'level':10} ) )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(3, _('Summarize...'), summ_menu, icon='filter-symbolic')) 
+        menu.append( f_menu_item(0, 'SEPARATOR', None) )
+        menu.append( f_menu_item(1, _('Show Details...'), self._on_show_details, icon='system-run-symbolic')) 
+        if fdx.debug_level not in (0, None):
+            entry = ResultEntry()
+            entry.strict_merge(self.prev_entry) 
+            menu.append( f_menu_item(0, 'SEPARATOR', None) )
+            menu.append( f_menu_item(1, _('Technical details...'), self.act.on_show_detailed, args=('entry', entry,), icon='system-run-symbolic', tooltip=_("Show all entry's technical data") ) )
         
         if not (selection == () or len(selection) != 3):
             text = widget.get_text()
@@ -1042,7 +1071,50 @@ It will also take some time to perform""") ))
         self.new_rule['name'] = args[-1]
         self.act.on_edit_rule(None)
 
+    def _on_show_details(self, *args, **kargs):
+        """ Denerate detail string for entry preview """
+        entry = FeedexEntry(self.DB, id=self.prev_entry.get('id',-1))
+        if not entry.exists: return 0
+        
+        disp_str = ''
 
+        entry.ling(index=False, rank=False, learn=True, save_terms=False)
+        kwd_str = ''
+        for k in entry.terms: kwd_str = f"""{kwd_str}{esc_mu(k['form'])} (<i>{round(k['weight'],3)}</i>); """
+
+        if kwd_str != '': disp_str = f"""{disp_str}
+------------------------------------------------------------------------------------------------------------
+<b>{_('Keywords')}:</b> {kwd_str}
+"""
+        
+        importance, flag, flag_dist, results = entry.ling(index=False, rank=True, to_disp=True)
+        if len(results) > 0:        
+            rule = ResultRule()
+            rule_str = ''
+            for r in results:
+                rule.populate(r)
+                rule_str = f"""{rule_str}
+<span foreground="{fdx.get_flag_color(rule.get('flag',0))}"><b>{esc_mu(rule.name())}</b></span> ({_('Matched:')}<b>x{rule['matched']}</b>, {_('Weight:')} <b>{rule['weight']:.4f}</b>, {_('Flag:')} <b>{esc_mu(fdx.get_flag_name(rule['flag']))}</b>)"""
+            disp_str = f"""{disp_str}
+------------------------------------------------------------------------------------------------------------
+<b>{_('Matched rules')}:</b>
+{rule_str}
+
+
+{_('Calculated Importance:')} <b>{importance:.3f}</b>, {_('Calculated Flag:')} <b>{flag:.0f}</b>
+{_('Boost from matched rules:')} <b>{entry.vals['weight']:.3f}</b>
+--------------------------------------------------------------------------------------------------------
+<b>{_('Flag distriution:')}</b>"""
+
+            for f,v in flag_dist.items(): disp_str = f"""{disp_str} <span foreground="{fdx.get_flag_color(f)}"><b>{fdx.get_flag_name(f)} ({f})</b>:</span> {v:.3f}"""
+
+            disp_str = f"""{disp_str}
+    
+"""
+
+        self.load_preview(entry, details=disp_str)
+        adj = self.prev_box_scrbar.get_adjustment()
+        adj.set_value(99999999999999)
 
 
 
@@ -1074,8 +1146,8 @@ It will also take some time to perform""") ))
             self._show_upn_page(self.plugins_tab)
             return 0        
         # ... and learnde rules ...
-        if tp == FX_TAB_LEARNED and self.learned_rules_tab != -1:
-            self._show_upn_page(self.learned_rules_tab)
+        if tp == FX_TAB_LEARNED and self.learned_tab != -1:
+            self._show_upn_page(self.learned_tab)
             return 0
         # ... and learnde rules ...
         if tp == FX_TAB_CATALOG and self.catalog_tab != -1:
@@ -1103,7 +1175,7 @@ It will also take some time to perform""") ))
             self.plugins_tab = tab.uid
             do_search = True
         elif tp == FX_TAB_LEARNED:
-            self.learned_rules_tab = tab.uid
+            self.learned_tab = tab.uid
             do_search = True
         elif tp == FX_TAB_CATALOG:
             self.catalog_tab = tab.uid
@@ -1153,7 +1225,7 @@ It will also take some time to perform""") ))
         elif type == FX_TAB_RULES: self.rules_tab = -1
         elif type == FX_TAB_FLAGS: self.flags_tab = -1
         elif type == FX_TAB_PLUGINS: self.plugins_tab = -1
-        elif type == FX_TAB_LEARNED: self.learned_rules_tab = -1
+        elif type == FX_TAB_LEARNED: self.learned_tab = -1
         elif type == FX_TAB_CATALOG: self.catalog_tab = -1
 
         i = self._get_upn_page(uid)
@@ -1246,31 +1318,32 @@ It will also take some time to perform""") ))
                 text = text.replace(s, f'<span foreground="{col}">{s}</span>')
 
         
-        self.prev_links = ''
+        self.prev_entry_links = []
         link_list = []
         link_text = ''
-        for i,l in enumerate([scast(result.get('link'), str, '')] + \
+        links = [scast(result.get('link'), str, '')] + \
                             scast(result.get('links'), str, '').splitlines() + \
-                            scast(result.get('enclosures'), str, '').splitlines()):
-            if i != 0: self.prev_links = f'{self.prev_links}{l}\n'
-            if l in link_list: continue
-            link_list.append(l)
-            l_text = l.replace('<','').replace('>','')
-            if l_text.endswith('/'): l_label = slist(l_text.split('/'), -2, l_text)
-            else: l_label = slist(l_text.split('/'), -1, l_text)
-            l_label = ellipsize(    l_label, 75)
-            l_text = esc_mu(l_text)
-            l_label = esc_mu(l_label)
-            link_text = f"""{link_text}
+                            scast(result.get('enclosures'), str, '').splitlines()
+
+        if len(links) > 0 and links != ['']:
+            for i,l in enumerate(links):
+                if i != 0: self.prev_entry_links.append(l)
+                if l in link_list: continue
+                link_list.append(l)
+                l_text = l.replace('<','').replace('>','')
+                if l_text.endswith('/'): l_label = slist(l_text.split('/'), -2, l_text)
+                else: l_label = slist(l_text.split('/'), -1, l_text)
+                l_label = ellipsize(    l_label, 75)
+                l_text = esc_mu(l_text)
+                l_label = esc_mu(l_label)
+                link_text = f"""{link_text}
 <a href="{l_text}" title="{_('Click to open link')}: <b>{l_text}</b>">{l_label}</a>"""
         
-        if link_text != '': link_text = f"\n\n{_('Links:')}\n{link_text}"
+            link_text = f"\n\n{_('Links:')}\n{link_text}"
 
-        if result.get('prev_footer') is not None:
-            footer = f"""
-<small>-------------------------------------
-{result.get('prev_footer')}</small>
-"""
+        for il in scast(result.get('images'), str, '').splitlines(): self.prev_entry_links.append(il)
+
+        if kargs.get('details') is not None: footer = f"""{kargs.get('details')}"""
         else: footer = ''
 
         stat_str = f"""{snip_str}\n\n<small>-------------------------------------\n{_("Word count")}: <b>{result['word_count']}</b>
@@ -1280,9 +1353,9 @@ It will also take some time to perform""") ))
 {_("Common word count")}: <b>{result['com_word_count']}</b>
 {_("Polysyllable count")}: <b>{result['polysyl_count']}</b>
 {_("Numeral count")}: <b>{result['numerals_count']}</b>\n
-{_("Importance")}: <b>{round(result['importance'],3)}</b>
-{_("Weight")}: <b>{round(result['weight'],3)}</b>
-{_("Readability")}: <b>{round(result['readability'],3)}</b></small>\n"""
+{_("Importance")}: <b>{round(scast(result['importance'],float,0),3)}</b>
+{_("Weight")}: <b>{round(scast(result['weight'],float,0),3)}</b>
+{_("Readability")}: <b>{round(scast(result['readability'],float,0),3)}</b></small>\n"""
 
         if author != '' or publisher != '' or contributors != '': author_section = f"""
 
@@ -1308,7 +1381,7 @@ It will also take some time to perform""") ))
 {stat_str}
 """)
 
-        self.handle_images(result.get('id', None), f"""{result.get('images','')}\n{self.prev_links}""")
+        self.handle_images(result.get('id', None), self.prev_entry_links)
 
 
 
@@ -1341,9 +1414,6 @@ It will also take some time to perform""") ))
         if result['additive'] == 1: additive_str = _('This rule adds its weight to the rest of ranking')
         else: additive_str = _('This rule supercedes wieights of other ranking rules if matched')
 
-        if result['learned'] == 1: learned_str = _('This rule was learned by algorithm from openned or added item')
-        else: learned_str = _('This rule was manually added by user')
-
         if coalesce(result.get('flag'),0) > 0:
             color = fdx.get_flag_color(result.get('flag',0)) 
             flag_str = f"""<b><span foreground="{color}">{esc_mu(result["flag_name"])}</span></b>"""
@@ -1374,14 +1444,10 @@ It will also take some time to perform""") ))
 
 <i>{additive_str}</i>
 
-<i><b>{learned_str}</b></i>
 
 """
         self.preview_label.set_line_wrap(False)
         self.preview_label.set_markup(prev_text)
-
-
-
 
 
 
@@ -1474,7 +1540,7 @@ It will also take some time to perform""") ))
 
 
 
-    def handle_images(self, id:int, string:str, **kargs):
+    def handle_images(self, id:int, links, **kargs):
         """ Handle preview images: detect thumbnails and load them to preview boxes or send requests for downloads """
 
         if id != self.prev_entry.get('id', None): return 0
@@ -1499,7 +1565,10 @@ It will also take some time to perform""") ))
 
         urls = []
         download_q = []
-        for i in string.splitlines():
+        for i in links:
+
+            if i.startswith('<local>') and i.endswith('<\local>'): continue
+
             res = fdx.parse_res_link(i)
             if res is None: continue
             if res['url'] in urls: continue

@@ -11,8 +11,8 @@ from feedex_headers import *
 
 
 # Constants
-FEEDEX_VERSION = "1.0.0"
-FEEDEX_DB_VERSION_COMPAT = "1.0.0"
+FEEDEX_VERSION = "1.2.0"
+FEEDEX_DB_VERSION_COMPAT = "1.2.0"
 FEEDEX_RELEASE="2023"
 FEEDEX_AUTHOR ="""Karol Pałac"""
 FEEDEX_CONTACT="""palac.karol@gmail.com"""
@@ -123,69 +123,70 @@ join feeds f on f.id = e.feed_id and coalesce(f.deleted, 0) = 0
 where coalesce(e.deleted,0) = 0
 """
 
-
-
-GET_RULES_SQL="""
+LOAD_FEED_FREQ_SQL="""
 select
-null as n, r.name, r.type, r.feed_id, r.field_id, r.string, r.case_insensitive, r.lang,
-sum(r.weight * coalesce(e.read, 
-    case 
-        when r.learned = 1 then 0
-        else 1
-    end
-    ) * coalesce(e.weight,
-	case 
-		when r.learned = 1 then 0
-		else 1
-	end
-	) ) as main_weight,
-r.additive, r.learned, r.flag, coalesce(r.context_id, 0) as context_id
+f.id,
+sum(coalesce(e.read,0)) as freq
+from feeds f
+join entries e on e.feed_id = f.id and coalesce(e.read,0) > 0
+where f.is_category <> 1 and coalesce(f.deleted,0) = 0 and coalesce(e.deleted, 0) = 0
+group by f.id
+order by freq desc
+"""
 
-from rules r
-left join entries e on e.id = r.context_id
-left join feeds f on f.id = e.feed_id
-where coalesce(e.deleted,0) <> 1 and coalesce(f.deleted,0) <> 1
+LOAD_TERMS_ALGO_1_SQL="""
+select
+t.term,
+sum(t.weight * coalesce(e.read,0)) as weight, 
+t.model,
+t.form
+from terms t
+join entries e on e.id = t.context_id
+join feeds f on f.id = e.feed_id
+where coalesce(e.deleted,0) == 0 and coalesce(f.deleted,0) == 0
+group by t.term, t.model
+order by weight desc
+"""
 
-group by n, r.name, r.type, r.feed_id, r.field_id, r.case_insensitive, r.lang, r.additive, r.string, r.learned, r.flag, r.context_id
+LOAD_TERMS_ALGO_2_SQL="""
+select
+t.term,
+sum(t.weight * coalesce(e.read,0) * coalesce(e.weight)) as weight,
+t.model,
+t.form
+from terms t
+join entries e on e.id = t.context_id
+join feeds f on f.id = e.feed_id
+where coalesce(e.deleted,0) == 0 and coalesce(f.deleted,0) == 0
+group by t.term, t.model
+order by weight desc
+"""
 
-having sum(r.weight * coalesce(e.read, 
-    case 
-        when r.learned = 1 then 0
-        else 1
-    end
-    ) * coalesce(e.weight,
-	case 
-		when r.learned = 1 then 0
-		else 1
-	end
-	) ) <> 0
-order by r.type asc, abs(main_weight) desc
+LOAD_TERMS_ALGO_3_SQL="""
+select
+t.term,
+sum(t.weight * coalesce(e.read,0) * coalesce(e.readability,0)) as weight, 
+t.model,
+t.form
+from terms t
+join entries e on e.id = t.context_id
+join feeds f on f.id = e.feed_id
+where coalesce(e.deleted,0) == 0 and coalesce(f.deleted,0) == 0
+group by t.term, t.model
+order by weight desc
 """
 
 
-GET_RULES_NL_SQL="""
+LOAD_TERMS_LONG_SQL="""
 select
-null as n, r.name, r.type, r.feed_id, r.field_id, r.string, r.case_insensitive, r.lang, r.weight, r.additive, r.learned, r.flag, 0 as context_id
-from rules r
-where coalesce(r.learned,0) = 0 and r.context_id is NULL
-order by r.weight desc
+t.*
+from terms t
+join entries e on e.id = t.context_id
+join feeds f on f.id = e.feed_id
+where coalesce(e.deleted,0) = 0 and coalesce(f.deleted,0) = 0
+order by e.pubdate desc
 """
 
-SHOW_RULES_LEARNED_SQL="""
-select
-r.id, r.name, r.type, r.feed_id, r.field_id, r.string, r.case_insensitive, r.lang, 
-coalesce(r.weight,0) * coalesce(e.read,0) as weight,
-r.additive, r.learned, r.context_id, r.flag 
-from rules r
-left join entries e on e.id = r.context_id
-where r.learned = 1
-order by r.weight DESC
-"""
-
-
-
-
-GET_FEEDS_SQL="""select * from feeds order by display_order asc"""
 
 
 
@@ -200,9 +201,7 @@ left join feeds c on c.id = f.parent_id
 left join flags fl on fl.id = e.flag"""
 
 
-
-
-EMPTY_TRASH_RULES_SQL = """delete from rules where context_id in
+EMPTY_TRASH_TERMS_SQL = """delete from terms where context_id in
 ( select e.id from entries e where e.deleted = 1 or e.feed_id in 
 ( select f.id from feeds f where f.deleted = 1)  )"""
 
@@ -210,9 +209,6 @@ EMPTY_TRASH_ENTRIES_SQL = """delete from entries where deleted = 1 or feed_id in
 
 EMPTY_TRASH_FEEDS_SQL1 = """update feeds set parent_id = NULL where parent_id in ( select f1.id from feeds f1 where f1.deleted = 1)"""
 EMPTY_TRASH_FEEDS_SQL2 = """delete from feeds where deleted = 1"""
-
-
-
 
 SEARCH_HISTORY_SQL = """
 select string,
@@ -223,6 +219,8 @@ coalesce(string, '') <> ''
 group by string
 order by date
 """
+
+
 
 RECALC_MULTI_SQL = """select 
 e.* 
@@ -263,7 +261,7 @@ RESULTS_SQL_TABLE_PRINT          = ENTRIES_SQL_TABLE_PRINT + (n_("Is Deleted?"),
 
 LING_TEXT_LIST = ('title','desc','tags','category','text', 'author', 'publisher', 'contributors')
 REINDEX_LIST = LING_TEXT_LIST + ('adddate','pubdate','feed_id','flag','read','note','deleted','handler')
-ENTRIES_TECH_LIST = ('sent_count','word_count','char_count','polysyl_count','com_word_count','numerals_count','caps_count','readability','weight','importance','adddate','adddate_str','ix_id')
+ENTRIES_TECH_LIST = ('sent_count','word_count','char_count','polysyl_count','com_word_count','numerals_count','caps_count','readability','weight', 'adddate','adddate_str','ix_id')
 
 
 
@@ -317,22 +315,16 @@ CATEGORIES_PRINT       = ("id", "name", "subtitle","sdeleted", "children_no", "i
 
 
 
-RULES_SQL_TABLE =        ('id','name','type','feed_id','field_id','string','case_insensitive','lang','weight','additive','learned','context_id','flag')
-RULES_SQL_TYPES = (int, str, int, int, str,   str, int, str,    float,   int, int, int, int)
-RULES_SQL_TABLE_PRINT =  (n_('ID'), n_('Name'), n_('Type'),n_('Feed ID'), n_('Field ID'), n_('Search string'), n_('Case insensitive?'), n_('Language'), n_('Weight'), 
-                            n_('Additive?'), n_('Learned?'), n_('Context Entry ID'), n_('Flag') )
+RULES_SQL_TABLE =        ('id','name','type','feed_id','field_id','string','case_insensitive','lang','weight','additive','flag')
+RULES_SQL_TYPES = (int, str, int, int, str,   str, int, str,    float, int, int)
+RULES_SQL_TABLE_PRINT =  (n_('ID'), n_('Name'), n_('Type'),n_('Feed ID'), n_('Field ID'), n_('Search string'), n_('Case insensitive?'), n_('Language'), n_('Weight'), n_('Additive?'), n_('Flag') )
 
-RULES_SQL_TABLE_RES = RULES_SQL_TABLE + ('flag_name', 'feed_name', 'field_name', 'query_type', 'matched', 'scase_insensitive', 'sadditive', 'slearned')
-RULES_SQL_TYPES_RES = RULES_SQL_TYPES + (str, str, str, str, int,   str,str,str)
-RULES_SQL_TABLE_RES_PRINT = RULES_SQL_TABLE_PRINT + (n_('Flag name'), n_('Feed/Category name'), n_('Field name'), n_('Query Type'), n_('No. of matches'), n_('Case Insensitive?'), n_('Additive?'), n_('Learned?'))
+RULES_SQL_TABLE_RES = RULES_SQL_TABLE + ('flag_name', 'feed_name', 'field_name', 'query_type', 'matched', 'scase_insensitive', 'sadditive')
+RULES_SQL_TYPES_RES = RULES_SQL_TYPES + (str, str, str, str, int,   str,str)
+RULES_SQL_TABLE_RES_PRINT = RULES_SQL_TABLE_PRINT + (n_('Flag name'), n_('Feed/Category name'), n_('Field name'), n_('Query Type'), n_('No. of matches'), n_('Case Insensitive?'), n_('Additive?'),)
 
-PRINT_RULES_SHORT = ("id", "name", "string", "weight", "scase_insensitive", "query_type", "slearned", "flag_name", "flag", "field_name", "feed_name",)
-PRINT_RULES_FOR_ENTRY = ("name", "string", "matched", "weight", "scase_insensitive", "query_type", "slearned", "flag_name", "flag", "field_name", "feed_name", "context_id")
-PRINT_RULES_LEARNED = ("name", "string", "weight", "lang", "context_id")
-
-RULES_TECH_LIST = ('learned','context_id',)
-
-
+PRINT_RULES_SHORT = ("id", "name", "string", "weight", "scase_insensitive", "query_type", "flag_name", "flag", "field_name", "feed_name",)
+PRINT_RULES_FOR_ENTRY = ("name", "string", "matched", "weight", "scase_insensitive", "query_type", "flag_name", "flag", "field_name", "feed_name",)
 
 
 HISTORY_SQL_TABLE = ('id', 'string', 'feed_id', 'date')
@@ -342,6 +334,16 @@ HISTORY_SQL_TABLE_PRINT = (n_('ID'), n_("Query String"), n_("Feed/Category ID"),
 FLAGS_SQL_TABLE = ('id', 'name', 'desc', 'color', 'color_cli')
 FLAGS_SQL_TABLE_PRINT = (n_('ID'), n_('Name'), n_('Description'), n_('GUI display color'), n_('CLI display color'))
 FLAGS_SQL_TYPES = (int, str, str, str, str)
+
+KW_TERMS_TABLE = ('id', 'term', 'weight', 'model', 'form', 'context_id',)
+KW_TERMS_TYPES = (int, str, float, str, str, int,)
+KW_TERMS_TABLE_PRINT = (n_('ID'), n_('Term'), n_('Weight'), n_('Lang. model'), n_('Basic form'), n_('Context ID'),)
+
+KW_TERMS_SHORT = ('term', 'weight', 'model', 'form',)
+KW_TERMS_SHORT_PRINT = (n_('Terms'), n_('Weight'), _('Lang. model'), _('Basic form'))
+
+
+
 
 TERMS_TABLE = ('term', 'weight', 'search_form')
 TERMS_TYPES = (str, float, str)
@@ -354,6 +356,10 @@ TS_TYPES = (str, str, str, float)
 TS_TABLE_PRINT = (n_('Time'), n_('From'), n_('To'), n_('Frequecy'))
 TS_TABLE_SHORT = ('time', 'freq')
 
+FETCH_TABLE = ('ord', 'date', 'from', 'to',)
+FETCH_TABLE_PRINT = (n_('Ordinal'), n_('Fetched on'), n_('Date from'), n_('Date to'),)
+FETCH_TABLE_TYPES = (int, str, int, int,)
+FETCH_TABLE_SHORT = ('ord','date',)
 
 # Catalog consts
 FEEDEX_CATALOG_TABLE = ('id', 'name', 'desc', 'link_res', 'link_home', 'link_img', 'tags', 'location', 'handler', 
@@ -467,9 +473,9 @@ DEFAULT_CONFIG = {
             'default_interval': 45,
             'error_threshold': 5,
             'max_items_per_transaction': 300,
-            'rule_limit' : 50000,
             'use_keyword_learning' : True,
-            'ranking_scheme' : 'simple',
+            'recom_algo' : 1,
+            'recom_limit' : 200,
             'no_history': False,
             'default_entry_weight' : 2,
             'default_rule_weight' : 2,
@@ -527,9 +533,9 @@ CONFIG_NAMES = {
             'default_interval': _('Default Channel check interval'),
             'error_threshold': _('Channel error threshold'),
             'max_items_per_transaction': _('Max items for a single transaction'),
-            'rule_limit' : _('Limit for rules'),
+            'recom_limit' : _('Limit for recommendation queries'),
             'use_keyword_learning' : _('Use keyword learning'),
-            'ranking_scheme' : _('Ranking Scheme/Algo'),
+            'recom_algo' : _('Recommendation algorithm'),
             'no_history' : _('Do not save queries in History'),
             'default_entry_weight' : _('Default Entry weight'),
             'default_rule_weight' : _('Default Rule weight'),
@@ -575,12 +581,12 @@ CONFIG_NAMES = {
 }
 
 
-CONFIG_INTS_NZ=('timeout','notify_level','default_interval','error_threshold','max_items_per_transaction', 'default_similarity_limit')
-CONFIG_INTS_Z=('rule_limit','gui_clear_cache','default_depth','gui_layout','gui_orientation','gui_notify_depth','fetch_timeout')
+CONFIG_INTS_NZ=('timeout','notify_level','default_interval','error_threshold','max_items_per_transaction', 'default_similarity_limit','recom_limit',)
+CONFIG_INTS_Z=('gui_clear_cache','default_depth','gui_layout','gui_orientation','gui_notify_depth','fetch_timeout', 'recom_algo')
 
 CONFIG_FLOATS=('default_entry_weight', 'default_rule_weight', 'query_rule_weight' )
 
-CONFIG_STRINGS=('profile_name', 'log','db_path','browser','lang','user_agent', 'fallback_user_agent', 'gui_notify_group', 'window_name_exclude', 'ranking_scheme',\
+CONFIG_STRINGS=('profile_name', 'log','db_path','browser','lang','user_agent', 'fallback_user_agent', 'gui_notify_group', 'window_name_exclude',\
     'gui_new_color','gui_deleted_color', 'gui_hilight_color', 'gui_default_flag_color' ,'imave_viewer', 'search_engine','bold_markup_beg','bold_markup_end')
 CONFIG_KEYS=('gui_key_new_entry', 'gui_key_new_rule', 'gui_key_add', 'gui_key_edit', 'gui_key_search',)
 
@@ -601,6 +607,8 @@ FX_ERROR_VAL = -7
 FX_ERROR_NOT_FOUND = -8
 FX_ERROR_CL = -9
 FX_ERROR_LP = -10
+FX_ERROR_INDEX = -11
+FX_ERROR_CONFIG = -12
 
 
 

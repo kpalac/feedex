@@ -134,7 +134,7 @@ class ResultGUITree(ResultGUIEntry):
 
             self.gui_vals.clear()
             self.gui_vals['gui_ix'] = ix  
-            self.gui_vals['title'] = self.vals['title']
+            self.gui_vals['title'] = esc_mu(self.vals['title'])
             self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
             self.gui_vals['is_node'] = 1
 
@@ -143,7 +143,7 @@ class ResultGUITree(ResultGUIEntry):
             elif self.vals['pubdate_str'] is not None: self.gui_vals['gui_icon'] = self.MW.icons['calendar']
 
             self.gui_vals['gui_bold'] = 800
-            self.gui_vals['title'] = f"""<b><u>{esc_mu(self.gui_vals['title'])} ({esc_mu(self.vals['children_no'])})</u></b>"""
+            self.gui_vals['title'] = f"""<u>{self.gui_vals['title']} ({esc_mu(self.vals['children_no'])})</u>"""
 
         else:
             self.pre_prep_gui_vals(ix, **kargs)
@@ -153,7 +153,7 @@ class ResultGUITree(ResultGUIEntry):
 
             if self.vals['is_node'] == 1:
                 self.gui_vals['gui_bold'] = 800
-                self.gui_vals['title'] = f"""<b><u>{esc_mu(self.gui_vals['title'])} ({esc_mu(self.vals['children_no'])})</u></b>"""
+                self.gui_vals['title'] = f"""<u>{self.gui_vals['title']} ({esc_mu(self.vals['children_no'])})</u>"""
             else:
                 if coalesce(self.vals['read'],0) > 0: self.gui_vals['gui_bold'] = 700
                 else: self.gui_vals['gui_bold'] = 400
@@ -275,8 +275,8 @@ class ResultGUIRule(ResultGUI, ResultRule):
         ResultGUI.__init__(self, **kargs)
 
         self.gui_fields = ('gui_ix', 'id', 'name', 'string', 'weight', 'scase_insensitive', 'query_type', 'flag_name', 'field_name', 'feed_name', 
-                           'lang', 'matched', 'context_id', 'slearned', 'sadditive', 'flag', 'gui_color',)
-        self.gui_types = (int, int, str, str, float, str, str, str, str, str, str, int, int,   str, str, int, str,)
+                           'lang', 'matched', 'sadditive', 'flag', 'gui_color',)
+        self.gui_types = (int, int, str, str, float, str, str, str, str, str, str, int, str,  int, str,)
         self.search_col = self.gindex('string')
 
 
@@ -294,8 +294,6 @@ class ResultGUIRule(ResultGUI, ResultRule):
         self.gui_vals['feed_name'] = self.vals['feed_name']
         self.gui_vals['lang'] = self.vals['lang']
         self.gui_vals['matched'] = self.vals['matched']
-        self.gui_vals['context_id'] = self.vals['context_id']        
-        self.gui_vals['slearned'] = self.vals['slearned']        
         self.gui_vals['sadditive'] = self.vals['sadditive']        
         self.gui_vals['flag'] = self.vals['flag']        
         if coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
@@ -340,6 +338,26 @@ class ResultGUITerm(ResultGUI, ResultTerm):
         self.gui_vals['weight'] = self.vals['weight']
         self.gui_vals['search_form'] = self.vals['search_form']
 
+
+class ResultGUIKwTerm(ResultGUI, ResultKwTermShort):
+    """ GUI result for term list """
+    def __init__(self, **kargs):
+        ResultKwTermShort.__init__(self, replace_nones=True, **kargs)
+        ResultGUI.__init__(self, **kargs)
+        self.gui_fields = ('gui_ix', 'term', 'weight', 'model', 'form', 'gui_bold',)
+        self.gui_types = (int, str, float, str, str, int)
+        self.search_col = self.gindex('term')
+
+
+    def prep_gui_vals(self, ix, **kargs):
+        self.gui_vals.clear()
+        self.gui_vals['gui_ix'] = ix
+        self.gui_vals['term'] = self.vals['term']
+        self.gui_vals['weight'] = self.vals['weight']
+        self.gui_vals['model'] = self.vals['model']
+        self.gui_vals['form'] = self.vals['form']
+        if ix <= self.config.get('recom_limit',0): self.gui_vals['gui_bold'] = 700
+        else: self.gui_vals['gui_bold'] = 400
 
 
 

@@ -32,12 +32,12 @@ default_entry_weight = 2
 
 # Use feature learning at all>
 use_keyword_learning = True
+# Recommendation algorithm
+recom_algo = 1
+# Limit terms in recommendation queries
+recom_limit = 200
 
-# Limit learned rules used for ranking. Can boost performance and precision
-rule_limit = 50000
 
-# Use search history for ranking
-use_search_habits = True
 
 # Snippet length (to exclude long wildcard matches)
 max_context_length = 500

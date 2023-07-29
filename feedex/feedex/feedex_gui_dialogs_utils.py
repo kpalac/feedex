@@ -166,12 +166,6 @@ class PreferencesDialog(Gtk.Dialog):
         self.result = {}
         self.response = 0        
 
-        # Markers if reloads, restarts etc. are required
-        self.restart = False
-        self.reload = False
-        self.reload_lang = False
-        self.reload_decor = False
-
 
         self.desktop_notify_button = Gtk.CheckButton.new_with_label(_('Enable desktop notifications?') )
         self.desktop_notify_button.connect('clicked', self.on_changed)
@@ -183,22 +177,15 @@ class PreferencesDialog(Gtk.Dialog):
         self.default_interval_entry = Gtk.Entry()
         self.default_interval_entry.set_tooltip_markup(_('Default fetching interval for newly added feeds'))
         
-        rule_limit_label = f_label(_('Ranking rules limit:'))
-        self.rule_limit_entry = Gtk.Entry()
-        self.rule_limit_entry.set_tooltip_markup(_("""When ranking incomming news you can 
-limit the number of rules to match.
-Only those with N top weight will be checked.
-This can help avoid unimportant terms influencing ranking
-and prevent scaling problems for large datasets
-Enter <b>0</b> for <b>no rule limit</b> (every rule will be checked)"""))
+        recom_limit_label = f_label(_('Recommendation query limit:'))
+        self.recom_limit_entry = Gtk.Entry()
+        self.recom_limit_entry.set_tooltip_markup(_("""How many top learned keywords are to be used when recommending articles?
+<i>Going above 1500 may cause performance hit</i>"""))
 
         self.learn_button = Gtk.CheckButton.new_with_label(_('Enable Keyword learning?'))
         self.learn_button.set_tooltip_markup(_("""If enabled, keywords are extracted and learned 
-every time an article is read or marked as read.
-Incomming news are then ranked agains the rules from those extracted keywords.
-Feedex uses this ranking to get articles most likely interesting to you on top.
-If disabled, no learning will take place and ranking will be done only against rules
-that were manually added by user."""))
+every time an article is read or marked as read (or a marked Note added).
+Those keywords are then used for better recommendation along with user rules"""))
 
 
         self.notify_group_combo = f_group_combo(with_empty=True, with_number=True, connect=self.on_changed, tooltip=_("""Should incoming news be grouped? How?
@@ -220,9 +207,8 @@ If no grouping is selected, it will simply show top results"""))
         self.default_similar_weight_entry = Gtk.Entry()
         self.default_similar_weight_entry.set_tooltip_markup(_('How much weight for ranking should items for which similar ones are searched for be given. Zero to disable'))
         
-        ranking_scheme_label = f_label(_('Incomming articles ranking scheme:'))
-        self.ranking_scheme_combo = f_ranking_scheme_combo()
-
+        recom_algo_label = f_label(_('Recommendation algorithm:'))
+        self.recom_algo_combo = f_recom_algo_combo()
 
         new_color_label = f_label(_('Added entry color:'))
         new_color = Gdk.color_parse(self.config.get('gui_new_color','#0FDACA'))
@@ -417,8 +403,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
         learn_grid = create_grid()
         learn_grid.attach(self.learn_button, 1,1, 6,1)
-        learn_grid.attach(rule_limit_label, 1,2, 3,1)
-        learn_grid.attach(self.rule_limit_entry, 4,2, 3,1)
+        learn_grid.attach(recom_limit_label, 1,2, 3,1)
+        learn_grid.attach(self.recom_limit_entry, 4,2, 3,1)
         learn_grid.attach(similarity_limit_label, 1,5, 4,1)
         learn_grid.attach(self.similarity_limit_entry, 5,5, 3,1)
         learn_grid.attach(max_context_length_label, 1,6,4,1)
@@ -432,8 +418,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         learn_grid.attach(self.default_rule_weight_entry, 4, 9, 3,1)
         learn_grid.attach(default_similar_wieght_label, 1,10,4,1)
         learn_grid.attach(self.default_similar_weight_entry, 5, 10, 3,1)
-        learn_grid.attach(ranking_scheme_label, 1,11,4,1)
-        learn_grid.attach(self.ranking_scheme_combo, 5, 11, 3,1)
+        learn_grid.attach(recom_algo_label, 1,11,4,1)
+        learn_grid.attach(self.recom_algo_combo, 5, 11, 3,1)
 
 
         system_grid = create_grid()
@@ -553,7 +539,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         if self.config.get('use_keyword_learning', True): self.learn_button.set_active(True)
         else: self.learn_button.set_active(False)
 
-        self.rule_limit_entry.set_text(scast(self.config.get('rule_limit', 50000), str, _('<<ERROR>>')))
+        self.recom_limit_entry.set_text(scast(self.config.get('recom_limit', 250), str, _('<<ERROR>>')))
 
         if self.config.get('gui_desktop_notify',True): self.desktop_notify_button.set_active(True)
         else: self.desktop_notify_button.set_active(False)
@@ -582,7 +568,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
         self.default_similar_weight_entry.set_text(scast(self.config.get('default_similar_weight',2), str, _('<<ERROR>>')))
 
-        f_set_combo(self.ranking_scheme_combo, self.config.get('ranking_scheme','simple'))
+        f_set_combo(self.recom_algo_combo, self.config.get('recom_algo',1))
 
         self.max_context_length_entry.set_text(scast(self.config.get('max_context_length',500), str, _('<<ERROR>>')))
         self.default_depth_entry.set_text(scast(self.config.get('default_depth',5), str, _('<<ERROR>>')))
@@ -636,13 +622,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         self.on_changed()
 
 
-    def validate_entries(self, *args):
-        self.get_data()
-        err = fdx.validate_config(config=self.result, strict=True, load=False)
-        if err != 0:
-            self.err_label.set_markup(gui_msg(*err))
-            return False
-        else: return True
+
 
 
 
@@ -654,7 +634,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         if self.learn_button.get_active(): self.result['use_keyword_learning'] = True
         else: self.result['use_keyword_learning'] = False
 
-        self.result['rule_limit'] = nullif(self.rule_limit_entry.get_text(),'')
+        self.result['recom_limit'] = nullif(self.recom_limit_entry.get_text(),'')
 
         if self.desktop_notify_button.get_active(): self.result['gui_desktop_notify'] = True
         else: self.result['gui_desktop_notify'] = False
@@ -681,7 +661,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
         self.result['default_similar_weight'] = nullif(self.default_similar_weight_entry.get_text(),'')
 
-        self.result['ranking_scheme'] = f_get_combo(self.ranking_scheme_combo)
+        self.result['recom_algo'] = f_get_combo(self.recom_algo_combo)
 
         self.result['max_context_length'] = nullif(self.max_context_length_entry.get_text(),'')
         self.result['default_depth'] = nullif(self.default_depth_entry.get_text(),'')
@@ -728,23 +708,57 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
 
 
+    def validate_entries(self, *args):
+        self.get_data()
+        err = fdx.validate_config(config=self.result, strict=True, load=False)
+        if err != 0:
+            self.err_label.set_markup(gui_msg(*err))
+            return False            
+        return True
+
+
+
+
+
+
     def on_save(self, *args):
         if self.validate_entries():
-            if self.result.get('db_path') !=  self.config.get('db_path'): self.restart = True
-            if self.result.get('gui_layout') !=  self.config.get('gui_layout'): self.restart = True
-            if self.result.get('gui_orientation') !=  self.config.get('gui_orientation'): self.restart = True
+            old_config = self.config.copy()
+            fdx.config = self.result.copy()
+            self.parent.config = self.result.copy()
+            err = fdx.save_config()
+            if err == 0:
+                
+                self.response = 1
+                self.close()
 
-            if self.result.get('use_keyword_learning') !=  self.config.get('use_keyword_learning'): self.reload = True
-            if self.result.get('rule_limit') !=  self.config.get('rule_limit'): self.reload = True
+                if self.result.get('db_path') !=  self.config.get('db_path'): self.response = 2 
 
-            if self.result.get('profile_name') !=  self.config.get('profile_name'): self.reload_decor = True
+                elif  self.result.get('use_keyword_learning') !=  self.config.get('use_keyword_learning') or\
+                        self.result.get('recom_limit') !=  self.config.get('recom_limit') or\
+                        self.result.get('recom_algo') !=  self.config.get('recom_algo'):
+                    self.parent.DB.load_terms()
+                
+                
+                if  self.result.get('gui_layout') !=  self.config.get('gui_layout') or \
+                    self.result.get('gui_orientation') !=  self.config.get('gui_orientation'): 
+                    self.response = 2
 
-            if self.result.get('lang') !=  self.config.get('lang'): 
-                self.restart = True
-                self.reload_lang = True
+                if self.result.get('profile_name') !=  self.config.get('profile_name'): 
+                    self.parent.set_profile()
+                    self.parent.win_decor()
 
-            self.response = 1
-            self.close()
+                if self.result.get('lang') !=  self.config.get('lang'): 
+                    if self.config.get('lang') not in (None,'en'):
+                        lang = gettext.translation('feedex', languages=[self.config.get('lang')])
+                        lang.install(FEEDEX_LOCALE_PATH)
+                    self.response = 2
+                
+                
+
+            else: 
+                fdx.config = old_config.copy()
+                self.parent.config = old_config.copy()
 
     def on_cancel(self, *args):
         self.response = 0

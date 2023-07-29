@@ -369,9 +369,6 @@ class ResultRule(SQLContainer):
         elif qtype == 2: self.vals['query_type'] = _('REGEX')
         else: self.vals['query_type'] = '<N/A>'
 
-        if coalesce(self.vals['learned'],0) == 1: self.vals['slearned'] = _('Yes')
-        else: self.vals['slearned'] = _('No')
-
         flag = coalesce(self.vals['flag'],0) 
         if flag == 0: self.vals['flag_name'] = _('-- None --')
         else: self.vals['flag_name'] = fdx.get_flag_name(flag)
@@ -521,6 +518,7 @@ class FeedexFlag(SQLContainerEditable):
 
 
     def get_by_id(self, id:int):
+        id = scast(id, int, -1)
         content = self.DB.qr_sql("select * from flags where id = :id", {'id':id}, one=True )
         if content in (None, (None,), ()):
             self.exists = False
@@ -575,7 +573,7 @@ class FeedexFlag(SQLContainerEditable):
         if self.DB.rowcount > 0:
 
             if not fdx.single_run:
-                err = self.DB.load_flags()
+                err = self.DB.load_flags(ignore_lock=True)
                 if err != 0: return msg(FX_ERROR_DB, _('Error reloading flags after successfull update!'))
             
             for i,u in enumerate(self.to_update):
@@ -585,9 +583,9 @@ class FeedexFlag(SQLContainerEditable):
             else:
                 for f in self.to_update:
                     if f == 'id':
-                        return msg(f'{_("Flag %a: ID changed from")} {self.backup_vals.get("id",_("<???>"))} {_("to")} {self.vals.get("id",_("<???>"))}', self.name(), log=True)
+                        return msg(_('Flag %a: ID changed from %b to %c'), self.name(), self.backup_vals.get("id",_("<???>")), self.vals.get("id",_("<???>")), log=True)
                     else:
-                        return msg(f'{_("Flag %a updated")}:  {f} -> {self.vals.get(f,_("<NULL>"))}', self.name(), log=True)
+                        return msg(_('Flag %a updated: %b -> %c'), self.name(), f, self.vals.get(f,_("<NULL>")), log=True)
             
             return msg(_('Nothing done'))
 
@@ -596,8 +594,8 @@ class FeedexFlag(SQLContainerEditable):
 
 
 
-
-    def update(self, idict, **kargs):
+    def update(self, idict, **kargs): return self.DB.run_fetch_locked(self._update, idict, **kargs)
+    def _update(self, idict, **kargs):
         """ Quick update with a value dictionary"""
         if not self.exists: return FX_ERROR_NOT_FOUND
         err = self.add_to_update(idict, allow_id=True)
@@ -605,8 +603,8 @@ class FeedexFlag(SQLContainerEditable):
         return err
 
 
-
-    def delete(self, **kargs):
+    def delete(self, **kargs): return self.DB.run_fetch_locked(self._delete, **kargs)
+    def _delete(self, **kargs):
         """ Delete flag by ID """
         if not self.exists: return msg(FX_ERROR_NOT_FOUND, _('Flag %a not found!'), id)
 
@@ -615,7 +613,7 @@ class FeedexFlag(SQLContainerEditable):
         
         if self.DB.rowcount > 0: 
             if not fdx.single_run: 
-                err = self.DB.load_flags()
+                err = self.DB.load_flags(ignore_lock=True)
                 if err != 0: return msg(FX_ERROR_DB, _('Error reloading flags after successfull delete!'))
 
             return msg(_('Flag %a deleted'), self.vals['id'], log=True)
@@ -625,8 +623,8 @@ class FeedexFlag(SQLContainerEditable):
 
 
 
-
-    def add(self, **kargs):
+    def add(self, **kargs): return self.DB.run_fetch_locked(self._add, **kargs)
+    def _add(self, **kargs):
         """ Add flag to database """
         idict = kargs.get('new')
         if idict is not None:
@@ -647,7 +645,7 @@ class FeedexFlag(SQLContainerEditable):
         self.DB.last_rule_id = self.vals['id']
 
         if not fdx.single_run: 
-            err = self.DB.load_flags()
+            err = self.DB.load_flags(ignore_lock=True)
             if err != 0: return msg(FX_ERROR_DB, _('Error reloading flags after successfull add!'))
 
         return msg(_('Flag %a added successfully'), self.name(with_id=True), log=True)
@@ -657,13 +655,33 @@ class FeedexFlag(SQLContainerEditable):
 
 
 
+class ResultFetch(SQLContainer):
+    """ Container for Fetch register item """
+    def __init__(self, **kargs):
+        super().__init__('actions', FETCH_TABLE, col_names=FETCH_TABLE_PRINT, types=FETCH_TABLE_TYPES)
+    def humanize(self): pass
+    def fill(self): pass
 
 
 
 
+class FeedexKwTerm(SQLContainer):
+    """ Keyword term extracted from read/marked entries """
+    def __init__(self, **kargs):
+        super().__init__('terms', KW_TERMS_TABLE, col_names=KW_TERMS_TABLE_PRINT, types=KW_TERMS_TYPES)
 
 
 
 
+class ResultKwTerm(FeedexKwTerm):
+    def __init__(self, **kargs):
+        super().__init__(**kargs)
+    def humanize(self): pass
+    def fill(self): pass
 
+class ResultKwTermShort(SQLContainer):
+    def __init__(self, **kargs):
+        super().__init__('terms', KW_TERMS_SHORT, col_names=KW_TERMS_SHORT_PRINT, **kargs)
+    def humanize(self): pass
+    def fill(self): pass
     

@@ -28,15 +28,17 @@ Usage: <b>feedex [parameters|filters] [actions]</b>
         -c, --check [ID]                        Check for news (applying intervals and no force download with etag/modified). 
                                                 Limit by channel ID
 
-        -r, --read-entry [ID]                   Read entry/news article contents by ID
+        -r, --read-entry [ID]                   Read entry/news article contents by ID (--summarize=1..100 for text summary, --details for keywords and rules)
         -o, --open-in-browser [ID|URL]          Open link of an entry by ID or URL. Register openning and learn keywords/rules for later ranking
+
         -F, --read-feed [ID]                    Get all entries from a Channel specified by ID
         -C, --read-category [ID|NAME]           Get all entries for a specified Category
-        -q, --query [Phrase]                    Query entries with search phrase (see --help-query option for details)
 
-        -qc [PHRASE], --query-catalog [PHRASE]  Query Feed Catalog for Channels to import
+        -q, --query [Phrase]                    Query entries with search phrase (see --help-query option for details)
+        -R, -recommend                          Show recommended articles
+                    
+        -qc, --query-catalog [PHRASE]           Query Feed Catalog for Channels to import
         
-        --csv                                   Output in CSV format (no beautifiers)
         --long                                  Show long output for queries
         --headlines                             Output only date, title and channel
 
@@ -58,14 +60,21 @@ Usage: <b>feedex [parameters|filters] [actions]</b>
 
 
 
+FEEDEX_HELP_DESC=_("""
+                   
+""")
+
+
+
 FEEDEX_LONG_HELP=_("""
 Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
-    Feedex lets you organize your news and notes. It classifies incoming news according to your previous choices and manually created rules. 
-    But Feedex can also handle other types of data - you can save categorized notes and analyze them for interesting features
-    to apply to rank and highlight news, to help you get important information quickly and efficiently. 
-    It is meant to be used as a scheduled job (with desktop notifications) or hotkey script for quickly saving highlighted text or keyword,
-    adding a news channel with URL or simply as a tool to read, query and analyse news/notes.
+    Feedex lets you organize your news and notes. It features recommendations, trend analysis, context search, time series,
+    term relatedness, similarity search and more. It can parse RSS/Atom feeds, HTML pages as well as JSON input from custom scripts.
+    User can define rules for flagging incomming articles or simply boosting them to the top. 
+    Keywords learning from opened or marked entries is used for recommendation system. 
+    Feedex also supports text summarization, desktop notification and adding item from desktop's selected text buffer (e.g. from a hotkey)
+    for adding notes and hilights that can be used to learn topics interesting to user.
 
     Technical notes:
     Feedex uses <b>SQLite</b> database to store data and <b>Xapian</b> for indexing. Ranking, indexing, feature learning and text summary
@@ -99,8 +108,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --delimiter2=STR                        Change item separator inside field, e.g. for snippets and contexts (cli/csv), delault ;
         --escape=STR                            Escape sequence for delimiters (useful for CSV)
 
-        --note_marker=STR,
-        --read_marker=STR                       Strings to mark read items and notes in CLI output
+        --note_marker=STR, --read_marker=STR    Strings to mark read items and notes in CLI output
 
         --bold_beg=STR, --bold_end=STR          Strings to be inserted as bold markup beginning/end. Used for displaying snippets, to hilight
                                                 the search phrase. Defaults are <b>,</b>
@@ -110,7 +118,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
                                                 Useful for scheduled tasks and keyboard shortcuts (e.g. adding a hilighted note with --clipboard)
 
         --clipboard                             Enable destkop clipboard/selection support. Selection and window title can be used in arguments
-                                                for actions: add-entry, add-feed, add-keyword, add-regex, add-full-text, add-full-text-exact
+                                                for actions: add-entry, add-feed, add-rule, add-regex, add-full-text, add-full-text-exact
                                                 Substitutions:  
                                                     %%  -   % character
                                                     %s  -   current text selection
@@ -120,8 +128,11 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
     <b>Fetching:</b>
         -g, --get-news [ID]                     Get news without checking intervals, ETags or Modified tags (force download). Limit by feed ID
         -c, --check [ID]                        Check for news (applying intervals and no force download with etag/modified). Limit by feed ID
-        -o, --open-in-browser [ID|URL]          Open entry by ID or URL in browser. Register openning for later ranking and
-                                                learn rules.
+
+        -o, --open-in-browser [ID|URL]          Open entry by ID or URL in browser. Openned items are marked as important.
+                                                Features are extracted from it for future recommendations
+                   
+        --list-fetches                          Display fetching history. Ordinals can be used in query with last_n filter
 
     <b>Feeds:</b>
         Every news channel is saved as feed. Feeds can be downloaded, edited, deleted, added by providing URL etc. Downloaded news 
@@ -168,16 +179,17 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
         -r, --read-entry [ID]                   Read entry contents by ID (does not cause learning)
                                                 --summarize=INT    Give summarization level for this entry for display (1..100)
+                                                --details          Show keywords and rules matched for this entry
 
-        --mark [ID] [N]                         Mark entry as read N times (increases weight in later ranking) and learn features
+        --mark [ID] [N]                         Mark entry as read N times (important for future recommendation)
                                                 options:
                                                 --learn,--no-learn         Extract patterns from Entry?
-        --mark-unimportant [ID]                 Mark entry as unimportant and learn negative features
+        --mark-unimportant [ID]                 Mark entry as unimportant for future recommendations
                                                 options:
                                                 --learn,--no-learn         Extract patterns from Entry?
-        --flag [ID] [N]                         Flag entry to be highlighted in queries (0 - no flag)
-                                                Flags are also added if entry contains a keyword specified by --add-keyword
-                                                This helps to highlight items important to user
+
+        --flag [ID] [N]                         Set entry's flag
+
         -N, --add-entry [TITLE] [TEXT]          Add an entry providing title and text. Useful for saving highlights or notes.
                                                 NULL or NONE means NULL value
                                                 Parameters:
@@ -206,25 +218,25 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --list-history                          Show search history
         
         -q, --query [PHRASE]                    Query entries with a search phrase. See --help-query option for detailed manual
-                                                operators:
                                                 
+        -R, --recommend                         Show entries recommended for user (filters as for query)
+        --trending [PHRASE]                     Show trending entries for given filters (filters as for query)
                                                                 
         --context [PHRASE]                      Show contexts for given terms (parameters as in query, contexts taken from results)
 
         --trends [PHRASE]                       Show trends (frequent keywords) for filterred entries (filters as for query)
-        --trending [PHRASE]                     Show trending entries for given filters (filters as for query)
             
         --term-net [PHRASE]                     Show terms connected to a given term by context (parameters:lang)
-        --term-in-time [PHRASE]                 Show time distribution of a term (filters like in --query) 
+        --time-series [PHRASE]                  Show time distribution of a term (filters like in --query) 
                                                 parameters:
                                                 --lang=          language used for query
                                                 --group=         grouping (hourly, daily, monthly)
                                                 --plot           plot data points in CLI
                                                 --term-width=    width of terminal window (for aestetics)
 
-        -S, --find-similar [ID]                 Find similar entries to ID'd (filters like in --query)
+        -S, --similar [ID]                      Find similar entries to ID'd (filters like in --query)
                                                 --limit=INT        Limit results to INT-best (inproves performance)
-        --rel-in-time [ID]                      Entry's relevance as a time series - like --term-in -time for entry's keywords (filters like in --query)
+        --rel-in-time [ID]                      Entry's relevance as a time series - like --time-series for entry's keywords (filters like in --query)
                                                 --limit=INT        Limit results to INT-best (inproves performance)
 
         -qc [PHRASE], --query-catalog [PHRASE]  Query Feed Catalog for Channels to import 
@@ -242,20 +254,13 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         <b>script</b>   Run a script to fetch for this channel specified in <b>script_file</b> field
         <b>local</b>    No internet protocol. Feeds are not fetched from the Internet, but can be populated by scripts (see --add-entries-from-file/pipe)
 
-    <b>Rules (Keywords and Terms):</b>
-        Rules are learned when article is opened in browser (-o option) or added manually (--add-entry with --learn). 
-        They can also be added manually as keywords, phrases, REGEXes etc.
-        Learned rules are used to rank incoming news by importance (you can sort by importance in queries with --sort=importance)
-        and get most important news on top. 
-        Manual rules are used for flagging/highlighting articles so they are more visible. 
-        Feedex learns rules by extracting important phrases from opened entries using language models.
+    <b>Rules:</b>
+        User can define rules to flag or boost incomming articles/notes. Flags are defined by user.
         See <b>--help-rules</b> for more info
 
-        --list-rules                            Show all non-learned rules (Keywords, REGEX and strings)
-        --list-rules-learned                    Show all learned rules (might be very long)       
-        -K, --add-keyword [TEXT]                Add keyword(s) to rules applied on every news check (simple string matching)
-                                                If a keyword is matched in an incoming news or note, it will be highlighted
-                                                in notifications and queries (see --flag)
+        --list-rules                            Show all rules
+
+        -K, --add-rule [TEXT]                   Add simple string matching rule ($,^,*) wildcards are allowed
                                                 parameters:
                                                 --case_ins, --case_sens     for c. ins. matching
                                                 --feed=[ID]                 feed ID to be matched exclusively
@@ -267,19 +272,17 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
                                                 --lang                      language to be matched and used for stemming and tokenizing
                                                 --flag                      choose a flag to use if matched. Possible values: 1-5 or no
                                                 
-        --add-regex [TEXT]                      Add REGEX to rules applied on every news check
+        --add-regex [TEXT]                      Add REGEX rule
                                                 (parameters: as in previous option)
-        --add-full-text [TEXT]                  Add stemmed and tokenized query to rules applied on every news check.
-                                                Wildcards and logical operators are not supported
+        --add-full-text [TEXT]                  Add stemmed and tokenized query rule. Wildcards and logical operators are not supported
                                                 (parameters: as in previous option)
 
         --edit-rule [ID] [FIELD] [VALUE]        Edit ID'd Rule. Change [FIELD] to specified [VALUE]. 
                                                 \\NULL or \\NONE means NULL value
                                                 See --help-rules for field names
 
-        --delete-rule [ID]                      Delete rule by its ID (see: --show-rules)
+        --delete-rule [ID]                      Delete rule by its ID (see: --list-rules)
 
-        --entry-rank [ID]                       Show rules that matched and added to importance of ID'd entry
 
 
     <b>Flags:</b>
@@ -291,25 +294,24 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
     <b>Misc:</b>
         --clear-history                         Clear search history
-        --delete-query-rules                    Deletes all rules learned from query search phrases
-        --delete-learned-rules                  Deletes all learned keywords/rules (<i>use cautiously</i>)
+        --delete-learned-keywords               Deletes all learned keywords (<i>use cautiously</i>)
         --empty-trash                           Permanently removes all Entries, Feeds and Categories marked as deleted
 
 
     <b>Data and Dev:</b>
         
-        --export-rules [FILENAME]               Export added rules to json file
-        --import-rules [FILENAME]               Import added rules from json file to current DB
+        --export-rules [FILENAME]               Export added rules to JSON file
+        --import-rules [FILENAME]               Import added rules from JSON file to current DB
 
-        --export-feeds [FILENAME]               Export saved news channels to json file
-        --import-feeds [FILENAME]               Import saved news channels from json file to current DB
+        --export-feeds [FILENAME]               Export saved news channels to JSON file
+        --import-feeds [FILENAME]               Import saved news channels from JSON file to current DB
 
-        --export-flags [FILENAME]               Export saved flags to json file
-        --import-flags [FILENAME]               Import saved flags from json file to current DB
+        --export-flags [FILENAME]               Export saved flags to JSON file
+        --import-flags [FILENAME]               Import saved flags from JSON file to current DB
 
         --export, --export=FILE                 Export results as JSON string compatibile for later import (query results-entries, feeds, rules, flags)
 
-        Exports/imports can be used to move data between DBs. In addition you can export query results with --export-to-file option
+        Exports/imports can be used to move data between DBs. In addition you can export query results with --ofile option
         and then import it to new DB with --add-entries-from-file. This way you can archive or trim big databases.
 
 
@@ -331,9 +333,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
                                                     --default-feeds Import default Feeds 
         
         --lock-db, --unlock-db                  Force-lock/unlock database (use with caution)
-        --lock-fetching,
-        --unlock-fetching                       Force-lock/unlock database for fetching. Useful for scripts and error recovery
-        --ignore-lock                           Ignore DB locking mechanism
+
         --db-stats                              Database statistics
         --timeout=INT                           (param) Timeout to try connect on case database is locked
 
@@ -369,7 +369,8 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         8       Referenced data not found (e.g. entry with a given ID does not exists)
         9       Invalid command line arguments
         10      Language processing error
-        
+        11      Index error
+        12      Configuration error
 
     <b>Debug levels:</b>
         1       All
@@ -390,7 +391,7 @@ FEEDEX_HELP_EXAMPLES=_("""
 
 <b>Feedex: Command examples</b>
         
-        <b>feedex --rsort=adddate --category=Hilights -q</b>
+        <b>feedex --sort=adddate --rev --category=Hilights -q</b>
             Show all documents in "Hilights" category and reverse-sort them by date added
         
         <b>feedex --sort=pubdate -F=1 -q</b>
@@ -601,14 +602,15 @@ FEEDEX_HELP_FEEDS=_("""
 
 <b>Feedex: Feeds</b>
 
-Feeds (news Channels) are downloaded and parsed using handlers (rss, html) or populated by scripts (script, local - ignored during fetching).
+Feeds (news Channels) are downloaded and parsed using handlers (rss, html) or populated by scripts ('script' handler).
+Local handler marks feeds not updagted (storage only).
 Unless used with -g option, Feedex will respect etags and 'modified' tags if provided by publisher. 
 It will also check for news duplicates before saving. 
 HTTP return codes are analysed after download. If channel gave too many HTTP errors in consecutive tries, it will be
 ignored. To try again one needs to change error parameter using <b>--edit-feed [ID] error 0 </b>
 
-A feed/channel can be updated periodically (autoupdate field) to check for changes. If channel is moved permanently, 
-new URL will be checked and saved. If channel moved temporarily, it will download from new location but keep old URL
+A feed/channel's metadata can be updated periodically (autoupdate field) to check for changes. If channel is moved permanently, 
+new URL will be checked and saved. If channel moved temporarily, it will download from new location but keep old URL.
 
 If needed, authentication method ('auth' field) along with login ('login') and password ('password') can be specified
 and Feedex will try to use those to download a feed. IMPORTANT: passwords are stored in PLAINTEXT!
@@ -695,6 +697,8 @@ Below are field descriptions:
 
 Every field can be changed with --edit-feed [ID] [FIELD] [VALUE] command, where [FIELD] is a name from above
 
+                       
+<b>Categories</b> are used to group feeds or assign notes to. They are not fetched from, but are stored in the same table for convenience.
 
 """)
 
@@ -709,7 +713,7 @@ FEEDEX_HELP_ENTRIES=_("""
 
 Entries are downloaded news articles (see -c and -g options) and notes added by users (see --add-entry).
 Text fields are stripped of html using re. Images and links are extracted and saved.  
-Entries are stored in DB in 'entries' table. Below, are field descriptions:
+Entries are stored in DB in <b>entries</b> table. Below, are field descriptions:
 
     <b>id</b>           unique identifier (integer)
     <b>feed_id</b>      ID of Feed or Category this Entry belongs to (feed and category IDs do not overlap)
@@ -736,12 +740,12 @@ Entries are stored in DB in 'entries' table. Below, are field descriptions:
     <b>addate</b>              Epoch-encoded date when entry was added to DB/modified
     <b>addate_str</b>          Added date - human readable
 
-    <b>read</b>                 How many times was an entry opened (-o section) or marked. User-added, not downloaded entries
-                                are assigned status equal to default_entry_weight configuration parameter (2 if not given). 
-                                Feedex extract learning features from entries with read > 0 to use them for ranking of
-                                incoming news (see --mark option). Status also influences the weight of features learned
-                                from an entry.
-    <b>importance</b>          This is a rank assigned by matching learned rules. New entries are sorted by this field
+    <b>read</b>                How many times was an entry opened (-o section) or marked. User-added, not downloaded entries
+                               are assigned status equal to default_entry_weight configuration parameter (2 if not given). 
+                               Feedex extract learning features from entries with read > 0 to use them for ranking of
+                               incoming news (see --mark option). Status also influences the weight of features learned
+                               from an entry.
+    <b>importance</b>          This is a rank assigned by matching rules. 
         
     <b>sent_count</b>          Sentence count
     <b>word_count</b>          Word count (non-punctation tokens)
@@ -755,9 +759,8 @@ Entries are stored in DB in 'entries' table. Below, are field descriptions:
     <b>weight</b>              A number to compensate for document length and information content, so that very long articles are not 
                                ranked at the top by virtue of length alone. Calculations found in ling_processor module
 
-    <b>flag</b>                Increased whenever flagging rule is matched. It causes entry to be highlighted on output.
-                               Useful for catching important keywords or phrases regardless of learned ranking (see --flag option)
-
+    <b>flag</b>                User-defined flag assigned to entry by rules or manually
+                      
     <b>images</b>              Links to images extracted from HTML
     <b>enclosures</b>          Links to other data/media
 
@@ -792,8 +795,6 @@ Fields other than:
 
 ... will be overwritten or ommitted on processing linguistic data, text statistics and database compatibility
 
-
-
     
 """)
 
@@ -804,20 +805,8 @@ FEEDEX_HELP_RULES=_("""
 
 <b>Feedex: Rules</b>
 
-Each downloaded entry in checked against saved rules. For each entry importance is calculated and it is used to rank news against 
-your intersts and preferences. Rules can be learned or added manually. Both contribute to importance, but if manually added rule
-is matched an entry if flagged for highlighting at output (see --flag option) (this can be overriden by rule data). 
-Each rule is ascribed to its entry (context), and entry's read status or amount of times opened (see --mark option) multiplies importance 
-given from this particular rule. 
-Each entry has 'weight' field, that is also multiplied when matching to offset advantage given to long news articles.
-
-Each rule's weight is also multiplied by weight of a field it was extracted from, e.g. you will want title to bear more weight
-than text. Field weight is implemented during feature learning
-
-Learned rules are simply features extracted by NLProcessor according to tagging and rules whenever entry is opened in browser
-or marked. Example language models can be found in <b>tools</b> directory with comments explaining how they work.
-                    
-Rules are stored in DB in rules table. Below are field descriptions:
+Rules are used to boost and flag incomming news/notes.                    
+Rules are stored in DB in <b>rules</b> table. Below are field descriptions:
 
                     
     <b>id</b>                   unique identifier for a rule (integer)
@@ -835,30 +824,24 @@ Rules are stored in DB in rules table. Below are field descriptions:
 
     <b>string</b>               string to be matched according to rule type
     <b>case_insensitive</b>     is match case insensitive? 1 or 0
-    <b>lang</b>                 what language (of an entry) rule applies to
-    <b>weight</b>               increase in importance from this rule (later multiplied by context status and entry weight)
+    <b>lang</b>                 what language (of an entry) is used for stemming and tokenizing?
+    <b>weight</b>               importance boost from this rule
     <b>additive</b>             if rule importance additive or one-time
-    <b>learned</b>              is rule learned?
-                                values 1-learned, 0-manually added
-    <b>flag</b>                 Is rule flagging matched entry? Default is YES
-    <b>context_id</b>           ID of an entry that this rule comes from
+    <b>flag</b>                 Should rule flag matched entry? If multiple flags match, the most common is chosen
 
     
-Manual and search phrase rules can be deleted and edited by ID
+Rules can be deleted and edited by ID
 (see --list-rules)
-Fresh databases have no rules. As said before, they are learned by opening articles and adding notes.
-Rules can be relearned using --relearn option.
 
 
 
 
 <b>Feedex: Flags</b>
 
-Flags are manual markers for Entries that can be searched for. Entry can be flagged if matched by a Rule (id specified - see above).
-If more than one differently-flagged Rules are matched, frequency distribution is constructed with Rules' weights and maximum is selected.
-Flags were added to allow more detailed classification of Entries and News.
-They are stored in flags SQL table. Field description:
-
+Flags are user-defined entities with name, description and color. They can be assigned by rule or manually.
+They are stored in <b>flags</b> table. 
+Fields:
+                    
     <id>                        Unique identifier (integer)
     <name>                      Flag's name for display
     <desc>                      Flag's description

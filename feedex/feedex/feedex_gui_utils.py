@@ -92,24 +92,20 @@ FX_TAB_TERM_NET = 3
 FX_TAB_TIME_SERIES = 4
 FX_TAB_RULES = 5
 FX_TAB_SIMILAR = 6
-FX_TAB_RESULTS = 7
+FX_TAB_REL_TIME = 7
 FX_TAB_FEEDS = 8
-FX_TAB_REL_TIME = 9
-FX_TAB_PREVIEW = 10
-FX_TAB_FLAGS = 11
-FX_TAB_TREE = 12
-FX_TAB_NOTES = 13
-FX_TAB_MAP = 14
-FX_TAB_TRENDS = 15
-FX_TAB_TRENDING = 16
-FX_TAB_PLUGINS = 17
-FX_TAB_KEYWORDS = 18
-FX_TAB_RANK = 19
-FX_TAB_LEARNED = 20
-FX_TAB_CATALOG = 21
+FX_TAB_PREVIEW = 9
+FX_TAB_FLAGS = 10
+FX_TAB_TREE = 11
+FX_TAB_NOTES = 12
+FX_TAB_MAP = 13
+FX_TAB_TRENDS = 14
+FX_TAB_PLUGINS = 15
+FX_TAB_LEARNED = 16
+FX_TAB_CATALOG = 17
 
 # Tab type compatibility sets
-FX_TT_ENTRY = (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_NOTES, FX_TAB_RESULTS, FX_TAB_SIMILAR, FX_TAB_TREE,)
+FX_TT_ENTRY = (FX_TAB_PLACES, FX_TAB_SEARCH, FX_TAB_NOTES, FX_TAB_SIMILAR, FX_TAB_TREE,)
 
 
 # Places IDs
@@ -147,6 +143,7 @@ FX_PREV_RULE = 2
 FX_PREV_FLAG = 3
 FX_PREV_PLUGIN = 4
 FX_PREV_CATALOG = 5
+FX_PREV_FEED = 6
 
 # Default column layouts for tabs
 FX_DEF_LAYOUTS = {
@@ -174,12 +171,7 @@ FX_DEF_LAYOUTS = {
 
 'flags' : (('id',30), ('name',200), ('desc',700),),
 
-'rules_rank' : ( ('name',150), ('string',150), ('matched',30), ('slearned',20), ('scase_insensitive',20), ('query_type',100), ('field_name',100),
-                 ('feed_name',100), ('lang',50), ('weight',50), ('flag',20), ('flag_name',100), ('sadditive',30), ('context_id',50)  ),
-
-'rules_learned' : (('name',150), ('string',150), ('lang',50), ('weight',50), ('context_id',50)),
-
-'keywords' : (('term',200), ('weight',100), ('search_form',100)),
+'keywords_learned' : (('form',150), ('weight',150), ('term',150), ('model', 70),),
 
 'plugins' : (('id',30), ('name',200), ('type',150), ('command',450), ('desc',300)),
 
@@ -210,22 +202,18 @@ FX_TAB_PLACES : {},
 FX_TAB_RULES : {},
 FX_TAB_FLAGS : {},
 FX_TAB_PLUGINS : {},
-FX_TAB_RANK: {},
 FX_TAB_LEARNED: {},
 
-FX_TAB_SEARCH :         {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',) },
-FX_TAB_NOTES :          {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',) },
-FX_TAB_TREE :           {'search':'combo',  'filters': ('time', 'group', 'depth', 'sort', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
+FX_TAB_SEARCH :         {'search':'combo',  'filters': ('time', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',) },
+FX_TAB_NOTES :          {'search':'combo',  'filters': ('time', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',) },
+FX_TAB_TREE :           {'search':'combo',  'filters': ('time', 'group', 'depth', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
 FX_TAB_TIME_SERIES :    {'search':'combo',  'filters': ('time', 'time_series', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
 FX_TAB_TERM_NET :       {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
 FX_TAB_TRENDS :         {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
-FX_TAB_TRENDING :       {'search':'combo',  'filters': ('time', 'depth', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',)},
 FX_TAB_CONTEXTS :       {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',) },
 
 FX_TAB_SIMILAR :        {'search':'button', 'filters': ('time', 'depth', 'read', 'flag', 'notes', 'handler', 'cat',) },
 FX_TAB_REL_TIME :       {'search':'button', 'filters': ('time', 'group', 'read', 'flag', 'notes', 'handler', 'cat',) },
-
-FX_TAB_KEYWORDS :       {'search':'button', 'filters': ('depth',)},
 
 FX_TAB_CATALOG :        {'search':'catalog_combo',  'filters': ('catalog_field',) },
 
@@ -638,14 +626,24 @@ def f_depth_combo(**kargs):
     )
     return f_dual_combo(store, **kargs)
 
-def f_sort_combo(**kargs):
+FX_RANK_RECOM = 1
+FX_RANK_TREND = 2
+FX_RANK_LATEST = 3
+FX_RANK_DEBUBBLE = 4
+
+def f_rank_combo(**kargs):
     """ Sorting for tree grouping """
     store = (
-    ('+importance',_('Rank by Importance') ),
-    ('trends',_('Rank by Trends') ),
-    ('+pubdate',_('Sort by Date') ),
-    ('-importance',_('"Debubble"') ),
+    (FX_RANK_RECOM,_('Recommended') ),
+    (FX_RANK_TREND,_('Trending') ),
+    (FX_RANK_LATEST,_('Most Recent') ),
+    (FX_RANK_DEBUBBLE,_('"Debubble"') ),
     )
+    kargs['tooltip'] = _("""Default ranking/sorting
+Use <b>Recommended</b> to rank by most interesting entries for you based on previously read articles
+Use <b>Trending</b> to rank by most talked about subjects (<i>time consming for large time ranges</i>)
+Use <b>Most Recent</b> to simply sort by date
+Use <b>Debubble</b> to show news with the least importance for each grouping""")
     return f_dual_combo(store, **kargs)
 
 
@@ -890,16 +888,17 @@ def f_page_len_combo(**kargs):
     return f_dual_combo(store, **kargs)
 
 
-def f_ranking_scheme_combo(**kargs):
-    """ Construct combo for query page length """
+
+
+
+def f_recom_algo_combo(**kargs):
+    """ Construct combo for choosing recommendation algo """
     store = (
-    ('simple',_('Simple')), 
-    ('similarity',_('Similarity')) 
+    (1,_('Similarity')), 
+    (2,_('Simil. offset by doc, weight')),
+    (3,_('Simil. boosted by readability')),
     )
-    tooltip = """Which ranking algorithm should be used to rank incomming items?
-        <b>Simple:</b>  a basic summation on matched rules' weights (may overrank long articles)
-        <b>Similarity:</b>  importance by only top matched most similar important entries
-    """
+    tooltip = """Which algorithm should be used when recommending documents?"""
     kargs['tooltip'] = tooltip
     return f_dual_combo(store, **kargs)
 
@@ -1058,7 +1057,7 @@ def f_set_button_image(button, image_path:str, **kargs):
         image = Gtk.Image.new_from_icon_name('image-x-generic-symbolic', Gtk.IconSize.DIALOG)
     else:
         try: pb = GdkPixbuf.Pixbuf.new_from_file_at_size( image_path, 64, 64)
-        except Exception as e: return msg(FX_ERROR_IO, f"""{_('Error getting image from ')} {image_path}:""", e)
+        except Exception as e: return msg(FX_ERROR_IO, _('Error getting image from %a: %b'), image_path, e)
         image = Gtk.Image.new_from_pixbuf(pb)
     
     for c in button.get_children(): button.remove(c)
@@ -1236,42 +1235,58 @@ def f_chooser(parent, main_win, *args, **kargs):
     """ File chooser for porting """
     action = kargs.get('action', 'open_file')
     start_dir = kargs.get('start_dir')
-    mimes = kargs.get('mimes')
 
     if action == 'save':
         header = kargs.get('header',_('Save as...'))
         dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.SAVE)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+        dialog.set_do_overwrite_confirmation(True)
+
     elif action == 'open_file':
         header = kargs.get('header',_('Open File'))
         dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.OPEN)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+    
     elif action == 'open_dir':
         header = kargs.get('header',_('Open Folder'))
         dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.SELECT_FOLDER)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+    
+    elif action == 'choose_image':
+        header = kargs.get('header',_('Choose Image'))
+        filter = Gtk.FileFilter()
+        filter.set_name(_('Image files'))
+        for e in ('png','jpg','jpeg','bmp','jpe','ico','tif','tiff','icon','bitmap','pcx',):
+            filter.add_pattern(f'*.{e}')
+            filter.add_pattern(f'*.{e.upper()}')
+
+        all_filter = Gtk.FileFilter()
+        all_filter.set_name(_('All files'))
+        all_filter.add_pattern('*.*')
+
+        dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.OPEN)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, _('No Image'), Gtk.ResponseType.NO, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+        dialog.add_filter(filter)
+        dialog.add_filter(all_filter)
+
+
 
     if start_dir is not None: dialog.set_current_folder(start_dir)
     else: dialog.set_current_folder(main_win.gui_cache.get('last_dir', os.getcwd()))
     response = dialog.run()
     if response == Gtk.ResponseType.OK:
         filename = dialog.get_filename()
+    elif response == Gtk.ResponseType.NO: filename = -1
     else: filename = False
     dialog.destroy()
 
     if action == 'save':
-        if os.path.isfile(filename):
-            dialog = YesNoDialog(parent, f'{_("Overwrite?")}', f'{_("File ")}<b>{esc_mu(filename)}</b>{_(" already exists!   Do you want to overwrite it?")}')
-            dialog.run()
-            if dialog.response == 1: os.remove(filename)
-            else: filename = False
-            dialog.destroy()
-        elif os.path.isdir(filename):
+        if os.path.isdir(filename):
             msg(FX_ERROR_IO, _('Target %a is a directory!'), filename)
             filename = False
 
     if filename in ('',None,False,): filename = False
-    else: main_win.gui_cache['last_dir'] = os.path.dirname(filename)
+    elif filename != -1: main_win.gui_cache['last_dir'] = os.path.dirname(filename)
 
     return filename
 
@@ -1291,7 +1306,7 @@ def save_thumbnail(bin_data, ofile, **kargs):
         img.save(ofile, format="PNG")
         return 0
     except (OSError, UnidentifiedImageError, Image.DecompressionBombError, FileNotFoundError, AttributeError) as e:
-        return msg(FX_ERROR_HANDLER, f"""{_('Error saving thumbnail from ')}{url}: %a""", e)
+        return msg(FX_ERROR_HANDLER, _('Error saving thumbnail from %a: %b'), url, e)
 
 
 def download_thumbnail(url, ofile, **kargs):
@@ -1307,7 +1322,7 @@ def local_thumbnail(ifile, ofile, **kargs):
     bin_data = BytesIO()
     try:
         with open(ifile, 'rb') as f: bin_data.write(f.read())
-    except (OSError, IOError,) as e: return msg(FX_ERROR_HANDLER, f"""{_('Error creating thumbnail for')} {ifile}: %a""", e)
+    except (OSError, IOError,) as e: return msg(FX_ERROR_HANDLER, _('Error creating %a thumbnail for %b: %c'), ofile, ifile, e)
     return save_thumbnail(bin_data, ofile, **kargs)
     
 
@@ -1337,26 +1352,35 @@ def image2pixbuf(im):
 
 def gui_msg(*args, **kargs):
     """ Converts message tuple into a markup """
-    code = args[0]
-    text = args[1]
-    arg = slist(args, 2, '')
+    code = None
+    text = None
+    sargs = []
+    for a in args:
+        if code is None:
+            code = a
+            continue
+        if text is None:
+            text = a
+            text = text.strip()
+            text = esc_mu(text)
+            continue
+        
+        sargs.append(a)
+        
+        
+    for i,a in enumerate(sargs):
+        if i == 0: chks = '%a'
+        elif i == 1: chks = '%b'
+        elif i == 2: chks = '%c'
+        elif i == 3: chks = '%d'
+
+        if chks in text: text = text.replace(chks, f'<b>{esc_mu(a)}</b>')
+        else: text = f'{text} <b>{esc_mu(a)}</b>'
 
     text = text.replace('\n',' ')
     text = text.replace('\r',' ')
-    text = text.strip()
-    text = esc_mu(text)
-
-    if arg is not None:
-        arg = arg.replace('\n',' ')
-        arg = arg.replace('\r',' ')
-        arg =  esc_mu(arg)
-
+    
     if code < 0: text = f'<span foreground="red">{text}</span>'
-    if arg is not None:
-        arg = f'<b>{arg}</b>'
-        if '%a' in text: text = text.replace('%a',arg)
-        else: text = f'{text} <b>{arg}</b>'
-
     return text
 
 
@@ -1426,7 +1450,7 @@ def quick_find_case_ins_tree(self, model, column, key, rowiter, *args):
 
 
 from feedex_desktop_notifier import DesktopNotifier
-from feedex_gui_containers import ResultGUI, ResultGUIEntry, ResultGUINote, ResultGUITree, ResultGUIContext, ResultGUIRule, ResultGUIFlag, ResultGUITerm, ResultGUITimeSeries, FeedexPlugin, FeedexCatalogQuery, ResultGUIPlugin, ResultGUICatItem, ResultPlugin, ResultCatItem
+from feedex_gui_containers import ResultGUI, ResultGUIEntry, ResultGUINote, ResultGUITree, ResultGUIContext, ResultGUIRule, ResultGUIFlag, ResultGUITerm, ResultGUITimeSeries, FeedexPlugin, FeedexCatalogQuery, ResultGUIPlugin, ResultGUICatItem, ResultPlugin, ResultCatItem, ResultGUIKwTerm
 from feedex_gui_dialogs_utils import BasicDialog, YesNoDialog, PreferencesDialog, CalendarDialog
 from feedex_gui_tabs import FeedexTab, FeedexGUITable
 from feedex_gui_feeds import FeedexFeedTab

@@ -13,8 +13,8 @@ INSERT INTO "main"."flags" ("id", "name", "desc", "color", "color_cli") VALUES (
 INSERT INTO "main"."flags" ("id", "name", "desc", "color", "color_cli") VALUES ('11', 'Important!', 'Breaking and important news', '#efef29292929', 'LIGHT_RED_BOLD');
 INSERT INTO "main"."flags" ("id", "name", "desc", "color", "color_cli") VALUES ('12', 'Check later...', 'Something to check out later...', '#ededd4d40000', 'YELLOW');
 
-INSERT INTO "main"."rules" ("id", "name", "type", "feed_id", "field_id", "string", "case_insensitive", "lang", "weight", "additive", "learned", "context_id", "flag") VALUES ('1', 'BREAKING', '0', NULL, 'title', 'BREAKING', '1', NULL, '50', '1', '0', NULL, '11');
-INSERT INTO "main"."rules" ("id", "name", "type", "feed_id", "field_id", "string", "case_insensitive", "lang", "weight", "additive", "learned", "context_id", "flag") VALUES ('2', 'ALERT', '0', NULL, 'title', 'ALERT', '0', NULL, '50', '0', '0', NULL, '11');
+INSERT INTO "main"."rules" ("id", "name", "type", "feed_id", "field_id", "string", "case_insensitive", "lang", "weight", "additive", "flag") VALUES ('1', 'BREAKING', '0', NULL, 'title', 'BREAKING', '1', NULL, '50', '1', '11');
+INSERT INTO "main"."rules" ("id", "name", "type", "feed_id", "field_id", "string", "case_insensitive", "lang", "weight", "additive", "flag") VALUES ('2', 'ALERT', '0', NULL, 'title', 'ALERT', '0', NULL, '50', '0', '11');
 
 COMMIT;
 

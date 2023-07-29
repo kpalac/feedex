@@ -8,21 +8,31 @@ from feedex_headers import *
 
 class FeedexError(Exception):
     """ Generic Feedex exception"""
-    def __init__(self, *args):
-        self.code = abs(msg(*args, log=True))
+    def __init__(self, *args, **kargs):
+        self.code = kargs.get('code', FX_ERROR)
+        self.log = kargs.get('log', True)
+        self.bus_message = args
+        msg(self.code, *args)        
+
 
 
 class FeedexTypeError(FeedexError):
     """ Type given was different than expected """
-    def __init__(self, *args): super().__init__(*args)
+    def __init__(self, *args, **kargs): 
+        kargs['code'] = kargs.get('code', FX_ERROR_VAL)
+        super().__init__(*args, **kargs)
 
 class FeedexConfigError(FeedexError):
     """ Error with Fedex configuration """
-    def __init__(self, *args): super().__init__(*args)
+    def __init__(self, *args, **kargs): 
+        kargs['code'] = kargs.get('code', FX_ERROR_VAL)
+        super().__init__(*args, **kargs)
 
 class FeedexCommandLineError(FeedexError):
     """ Invalid command line arguments were given """
-    def __init__(self, *args): super().__init__(*args)
+    def __init__(self, *args, **kargs): 
+        kargs['code'] = kargs.get('code', FX_ERROR_CL)        
+        super().__init__(*args, **kargs)
 
 
 
@@ -48,8 +58,14 @@ class FeedexMainBus:
         # Cached DB data 
         self.__dict__['feeds_cache'] = None
         self.__dict__['rules_cache'] = None
+        self.__dict__['rules_val_cache'] = None
         self.__dict__['search_history_cache'] = None
         self.__dict__['flags_cache'] = None
+        self.__dict__['terms_cache'] = None
+        self.__dict__['feed_freq_cache'] = None
+
+        self.__dict__['recom_qr_str'] = None # Query string used for recommendations 
+
 
         self.__dict__['icons_cache'] = None
 
@@ -64,7 +80,6 @@ class FeedexMainBus:
         self.__dict__['ret_status'] = 0
 
         # One-time Flags
-        self.__dict__['rules_validated'] = False
         self.__dict__['cli'] = True
         self.__dict__['single_run'] = True
 
@@ -74,7 +89,10 @@ class FeedexMainBus:
 
         # Download errors ( not to retry failed downloads)
         self.__dict__['download_errors'] = []
-
+        # Invalid log
+        self.__dict__['log_err'] = False
+        # Invalid CLI parameters
+        self.__dict__['cli_param_error'] = False
 
         # Action flags to manage traffic
         self.__dict__['busy'] = False
@@ -118,6 +136,7 @@ class FeedexMainBus:
 
     def log(self, code:int, *args, **kargs):
         """Handle adding log entry (add timestamp and ERROR bit)"""
+        if self.log_err is True: return -1
         if code < 0: err = 'ERROR: '
         else: err=''
         log_str = ''
@@ -129,6 +148,7 @@ class FeedexMainBus:
         try:
             with open(self.config.get('log'),'a') as logf: logf.write(log_str)
         except (OSError, TypeError) as e: 
+            self.log_err = True
             self.msg( (FX_ERROR_IO,f"{_('Could not open log file')} {self.config.get('log','<UNKNOWN>')}: %a", f'{e}') ) 
 
 
@@ -136,63 +156,70 @@ class FeedexMainBus:
 
     def parse_msg_args(self, *args, **kargs):
         """ Parses argument tuble for msg """
-        args_len = len(args)
-        if args_len == 1:
-            code = 0
-            text = args[0]
-            arg = ''
-        elif args_len == 2:
-            if type(args[0]) in (int,):
-                code = args[0]
-                text = args[1]
-                arg = ''
-            else:
-                code = 0
-                text = args[0]
-                arg = str(args[1])
-        elif args_len > 2:
-            code = scast(args[0], int, 0)
-            text = args[1]
-            arg = str(args[2])
+        code = None
+        text = None
+        aargs = []
 
-        return code, text, arg
+        for a in args:
+            if type(a) is int and text is None and code is None: 
+                code = a
+                continue
+
+            if code is None: code = 0
+            if text is None: 
+                text = a
+                continue
+            else: aargs.append(a)
+
+        return code, text, aargs
+
+
 
 
 
     def msg(self, *args, **kargs):
         """ Print nice CLI message, log and enqueue to bus """
         log = kargs.get('log',False)
-        do_print = kargs.get('print',self.cli)
+        do_print = kargs.get('print', self.cli)
         
-        code, text, arg = self.parse_msg_args(*args, **kargs)
+        code, text, aargs = self.parse_msg_args(*args, **kargs)
+        if not self.single_run: self.bus_append((code, text, *aargs))
 
         if code < 0: self.ret_status = code
         else: self.ret_status = 0
+        
         if do_print or log:
-            if code < 0:
-                cli_text = f"""{TERM_ERR}{text}{TERM_NORMAL}"""
-                if arg != '': cli_arg = f"""{TERM_ERR_BOLD}{arg}{TERM_ERR}"""
-            else: 
-                cli_text = text
-                if arg != '': cli_arg = f"""{TERM_BOLD}{arg}{TERM_NORMAL}"""
             
-            if arg != '':
-                if '%a' in text: 
-                    log_text = text.replace('%a', arg)
-                    cli_text = cli_text.replace('%a', cli_arg)
+            cli_text = text
+            base_text = text
+            
+            for i,a in enumerate(aargs):
+                if i == 0: chks = '%a'
+                elif i == 1: chks = '%b'
+                elif i == 2: chks = '%c'
+                elif i == 3: chks = '%d'
+
+                if chks in base_text:
+                    if do_print:
+                        if code < 0: cli_text = cli_text.replace(chks, f'{TERM_ERR_BOLD}{a}{TERM_ERR}')
+                        else: cli_text = cli_text.replace(chks, f'{TERM_BOLD}{a}{TERM_NORMAL}')
+                    if log: base_text = base_text.replace(chks, str(a))
                 else:
-                    log_text = f"""{text} {arg}"""
-                    cli_text = f"""{cli_text} {arg}"""
-            else: log_text = text
+                    if do_print:
+                        if code < 0: cli_text = f'{cli_text} {TERM_ERR_BOLD}{a}{TERM_ERR}'
+                        else: cli_text = f'{cli_text} {TERM_BOLD}{a}{TERM_NORMAL}'
+                    if log: base_text = f'{base_text} {a}'
 
-        if not self.single_run: self.bus_append( (code, text, arg) )
+            if do_print:
+                if code < 0: cli_text = f'{TERM_ERR}{cli_text}{TERM_NORMAL}'
 
-        if log: self.log(code, log_text)
+
+        if log: self.log(code, base_text)
 
         if do_print:
             if code >= 0: print(cli_text)
             else: sys.stderr.write(cli_text + "\n")
-                            
+        
         return code
 
 
@@ -225,8 +252,7 @@ class FeedexMainBus:
         try: 
             with open(cfile, 'r') as f: lines = f.readlines()
         except OSError as e:
-            self.msg(FX_ERROR_IO, f'{_("Error reading config from %a:")} {e}', cfile)
-            raise FeedexConfigError
+            raise FeedexConfigError(_('Error reading config from %a: %b'), cfile, e)
 
 
         for l in lines:
@@ -367,7 +393,14 @@ class FeedexMainBus:
     
 
 
-    
+    def get_par(self, arg, **kargs):
+        """ Sanitizes 'x=y' parameter """
+        rarg = slist(scast(arg, str, '').split('='), 1, None)
+        if rarg is None: self.cli_param_error = True
+        return rarg
+
+        
+
 
     def sanitize_arg(self, arg, tp, default, **kargs):
         """ Sanitize and error check command line argument """
@@ -546,10 +579,9 @@ class FeedexMainBus:
     def find_feed(self, val:int, **kargs):
         """ check if feed with given ID is present """
         if val is None: return None
-        load = kargs.get('load', False)
-        val = scast(val, int, None)
-        if val is None: return -1
+        val = scast(val, int, -1)
         if val < 0: return -1
+        load = kargs.get('load', False)
         for f in self.feeds_cache:
             if val == f[FEEDS_SQL_TABLE.index('id')] and f[FEEDS_SQL_TABLE.index('is_category')] != 1: 
                 if load: return f
@@ -560,7 +592,7 @@ class FeedexMainBus:
     def find_f_o_c(self, val, **kargs):
         """ Resolve feed or category """
         if val is None: return None
-        if type(val) is not int: return -1
+        val = scast(val, int, -1)
         if val < 0: return -1
         load = kargs.get('load', False)
         for f in self.feeds_cache:
@@ -915,7 +947,7 @@ def convert_timestamp(datestring:str, **kargs):
     if isinstance(datestring, str):
         
         if datestring.isdigit():
-            if len(datestring) >= 10: 
+            if len(datestring) >= 10:
                 datestring = datestring[:10]
                 return int(datestring)
             else: 
@@ -1077,7 +1109,7 @@ def load_json(infile, default, **kargs):
         with open(infile, 'r') as f:
             out = json.load(f)
     except (OSError, json.JSONDecodeError) as e:
-        msg(FX_ERROR_IO, f'{_("Error reading from %a:")} {e}', infile )
+        msg(FX_ERROR_IO, _('Error reading from %a: %b'), infile, e )
         return default
     return out
 
@@ -1093,7 +1125,7 @@ def save_json(ofile:str, data, **kargs):
             json.dump(data, f)
         msg(_('Data saved to %a'), ofile)
     except (OSError, json.JSONDecodeError) as e:
-        msg(FX_ERROR_IO, f'{_("Error writing to %a:")} {e}', ofile)
+        msg(FX_ERROR_IO, _('Error writing to %a: %b'), ofile, e)
         return -1
     return 0
 
@@ -1104,7 +1136,7 @@ def print_json(data):
     try:
         json_string = json.dumps(data)
     except (OSError, json.JSONDecodeError, TypeError) as e:
-        msg(FX_ERROR_IO, f'{_("Error converting to JSON: %a")}', e)
+        msg(FX_ERROR_IO, _('Error converting to JSON: %a'), e)
         return -1
     print(json_string)
     return 0

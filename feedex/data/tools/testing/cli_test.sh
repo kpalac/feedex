@@ -62,10 +62,6 @@ if [[ "$1" == "db" || "$1" == "all" ]]; then
     
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
-    F_Exec /usr/bin/feedex --debug --lock-fetching
-    F_Exec /usr/bin/feedex --debug --db-stats
-    F_Exec /usr/bin/feedex --debug --unlock-fetching
-
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --lock-db
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --unlock-db
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --db-stats
@@ -74,7 +70,7 @@ if [[ "$1" == "db" || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --unlock-db
 
     export FEEDEX_DB_PATH="test2.DB"
-    [ -f "$FEEDEX_DB_PATH" ] && rm -r "$FEEDEX_DB_PATH"
+    [ -d "$FEEDEX_DB_PATH" ] && rm -r "$FEEDEX_DB_PATH"
     F_Exec /usr/bin/feedex --debug --defaults --default-feeds --create-db
 
     F_Exec /usr/bin/feedex --debug --lock-db
@@ -106,10 +102,13 @@ fi
 
 
 if [[ "$1" == "notify" || "$1" == "all" ]]; then
-
+#28
     export FEEDEX_DB_PATH="test_full.db"
  
-    F_Exec /usr/bin/feedex --last -q
+    F_Exec /usr/bin/feedex --debug --last -q
+    F_Exec /usr/bin/feedex --debug --last_week -R
+    F_Exec /usr/bin/feedex --debug --last_week --group=feed --depth=10 -R
+    F_Exec /usr/bin/feedex --last_week --trending
     F_Exec /usr/bin/feedex --last_n=2 --group=category -q
     F_Exec /usr/bin/feedex --last_n=2 --headlines --group=category -q
     F_Exec /usr/bin/feedex --last_n=2 --long --group=category -q
@@ -149,6 +148,7 @@ if [[ "$1" == "basic_queries" || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex -L
     F_Exec /usr/bin/feedex --list-categories
     F_Exec /usr/bin/feedex --list-feeds-cats
+    F_Exec /usr/bin/feedex --list-learned-terms
     F_Exec /usr/bin/feedex -F 8
     F_Exec /usr/bin/feedex -F 1111111
     F_Exec /usr/bin/feedex --examine-feed 8
@@ -166,6 +166,10 @@ if [[ "$1" == "basic_queries" || "$1" == "all" ]]; then
 
     F_Exec /usr/bin/feedex --last --trends
     F_Exec /usr/bin/feedex --last --trending
+
+    F_Exec /usr/bin/feedex --list-fetches
+    F_Exec /usr/bin/feedex --long --list-fetches
+
 
     unset FEEDEX_DB_PATH
     
@@ -205,8 +209,8 @@ if [[ "$1" == 'queries' || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex --debug --type=string --feed=8 --last_quarter --context "vaccine"
     F_Exec /usr/bin/feedex --debug --feed=8 --last_quarter --context "vaccine"
 
-    F_Exec /usr/bin/feedex --debug --type=full --feed=8 --last_month --group=daily --term-in-time "vaccine"
-    F_Exec /usr/bin/feedex --debug --type=full --feed=8 --last_month --group=daily --plot --term-in-time "Biden vaccine"
+    F_Exec /usr/bin/feedex --debug --type=full --feed=8 --last_month --group=daily --time-series "vaccine"
+    F_Exec /usr/bin/feedex --debug --type=full --feed=8 --last_month --group=daily --plot --time-series "Biden vaccine"
 
    unset FEEDEX_DB_PATH
 
@@ -230,8 +234,8 @@ if [[ "$1" == 'queries_wildcards' || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex --debug --type=string --feed=8 --last_quarter --context "'vaccine * expected'"
     F_Exec /usr/bin/feedex --debug --feed=8 --last_quarter --context "'vaccine Expected'"
 
-    F_Exec /usr/bin/feedex --debug --type=full --feed=8 --last_month --group=daily --plot --term-in-time "'Vaccine expected'"
-    F_Exec /usr/bin/feedex --debug --type=string --feed=8 --last_month --group=daily --plot --term-in-time "'vaccine * expected'"
+    F_Exec /usr/bin/feedex --debug --type=full --feed=8 --last_month --group=daily --plot --time-series "'Vaccine expected'"
+    F_Exec /usr/bin/feedex --debug --type=string --feed=8 --last_month --group=daily --plot --time-series "'vaccine * expected'"
 
    unset FEEDEX_DB_PATH
 
@@ -243,13 +247,13 @@ if [[ "$1" == 'queries_special' || "$1" == "all" ]]; then
     export FEEDEX_DB_PATH="test_full.db"
 
     F_Exec /usr/bin/feedex -r 88
-    F_Exec /usr/bin/feedex --entry-rank 88157777777777
-    F_Exec /usr/bin/feedex --entry-rank 1466
+    F_Exec /usr/bin/feedex --details -r 88157777777777
+    F_Exec /usr/bin/feedex --details -r 1466
     F_Exec /usr/bin/feedex --last_week -S 88157777777777
     F_Exec /usr/bin/feedex --debug --last_week -S 88157
     F_Exec /usr/bin/feedex -r 881
     F_Exec /usr/bin/feedex --debug -r 881
-
+#118
     unset FEEDEX_DB_PATH
 
 fi
@@ -295,7 +299,7 @@ if [[ "$1" == 'actions_feed' || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --debug --examine-feed 1
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --edit-feed 1 auth NONE
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --insert-feed-before 2 1
-
+#155
 
 fi
 
@@ -415,7 +419,7 @@ if [[ "$1" == 'actions_entry_add' || "$1" == "all" ]]; then
     IFILE2="test_ifile2.json"
     IFILE3="test_ifile_long3.json"
     [ -d "$TEST_DB" ] && rm -r "$TEST_DB"
-    F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
+    /usr/bin/feedex --debug --database="$TEST_DB" --defaults --default-feeds --create-db
 
 
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --add-entry "'Test'" "'DESC Test'"
@@ -447,7 +451,7 @@ if [[ "$1" == 'actions_entry_add' || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --import-entries-from-file "$IFILE"
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --import-entries-from-file "$IFILE2"
 
-    F_Exec /usr/bin/feedex --last_quarter --export --ofile="$IFILE3" --read -q
+    F_Exec /usr/bin/feedex --database="$TEST_DB" --last_quarter --export --ofile="$IFILE3" --read -q
     
     F_Exec /usr/bin/feedex --debug --database="$TEST_DB" --import-entries-from-file "$IFILE3"
 

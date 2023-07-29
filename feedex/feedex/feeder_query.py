@@ -48,7 +48,6 @@ class FeedexQuery(FeedexQueryInterface):
         self.DB.cache_flags()
         self.DB.cache_history()
         self.LP = self.DB.LP
-
         # Config
         self.config = kargs.get('config', self.DB.config)
 
@@ -95,11 +94,11 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def query(self, string:str, filters:dict, **kargs):
-        """ Main Query method
-            Queries database with search string. """
+    def query(self, qr:str, filters:dict, **kargs):
+        """ Main Query method """
+        qr = scast(qr, str, '')
 
-        ret = self._validate_filters(string, filters)
+        ret = self._validate_filters(qr, filters)
         if type(ret) is not tuple:
             self._empty(result=ResultEntry())
             return FX_ERROR_QUERY
@@ -110,13 +109,14 @@ class FeedexQuery(FeedexQueryInterface):
         rank =  kargs.get('rank',True)
         cnt = kargs.get('cnt',False)
         snippets = kargs.get('snippets',True)
+        recom = kargs.get('recom', False)
         
         max_context_length = self.config.get('max_context_length', 500)
 
         # Construct phrase if needed
         if kargs.get('phrase') is None:
-            if qtype == 0:      self.phrase = self.parse_query(string, case_ins=case_ins, field=filters.get('field'), sql=True, str_match=True)
-            elif qtype == 1:    self.phrase = self.parse_query(string, case_ins=case_ins, field=filters.get('field'), sql=False, fts=True)
+            if qtype == 0:      self.phrase = self.parse_query(qr, case_ins=case_ins, field=filters.get('field'), sql=True, str_match=True)
+            elif qtype == 1:    self.phrase = self.parse_query(qr, case_ins=case_ins, field=filters.get('field'), sql=False, fts=True)
         
         else: self.phrase = kargs.get('phrase',{})
 
@@ -133,10 +133,10 @@ class FeedexQuery(FeedexQueryInterface):
         # Query index if needed
         if qtype == 1 and not self.phrase['empty']:
             
-            ret = self._build_xapian_qr(self.phrase, filters)
+            ret = self._build_xapian_qr(self.phrase, filters, **kargs)
             if type(ret) is not tuple: 
                 self._empty(result=ResultEntry())
-                return -5
+                return FX_ERROR_QUERY
             else: ix_qr, enquire = ret
 
 
@@ -145,6 +145,8 @@ class FeedexQuery(FeedexQueryInterface):
             self.ix_results.clear()
             self.ix_results_ids.clear()
             
+            if recom: max_rank_recom = ix_matches.get_max_attained()/20
+
             for ixm in ix_matches:
                 self.ix_results_ids.append(ixm.docid)
                 
@@ -167,12 +169,12 @@ class FeedexQuery(FeedexQueryInterface):
                 self.ix_results[ixm.docid] = (ixm.weight, ixm.rank, count, snips)
 
 
+            if not recom:
+                if len(self.ix_results_ids) == 0:
+                    self._empty(result=ResultEntry())
+                    return 0
 
-            if len(self.ix_results_ids) == 0:
-                self._empty(result=ResultEntry())
-                return 0
-
-            filters['IX_ID_list'] = self.ix_results_ids.copy() # This list will be appended to SQL query to extract Xapian results
+                filters['IX_ID_list'] = self.ix_results_ids.copy() # This list will be appended to SQL query to extract Xapian results
 
 
 
@@ -180,9 +182,9 @@ class FeedexQuery(FeedexQueryInterface):
 
 
         # Query SQL database
-        (query, vals) = self._build_sql(self.phrase, filters)
+        (query, vals) = self._build_sql(self.phrase, filters, **kargs)
         results_tmp = self.DB.qr_sql(query, vals, all=True)
-        if self.DB.status != 0: 
+        if self.DB.status != 0:
             self._empty(result=ResultEntry())
             return FX_ERROR_QUERY
         
@@ -197,9 +199,16 @@ class FeedexQuery(FeedexQueryInterface):
             for r in results_tmp:
                 self.result.populate(r)
 
+                if rank or cnt or snippets: ix_result = self.ix_results.get(self.result['ix_id'], (0,0,0,[]))
+
                 # Append Xapian ranking to SQL results                
-                if rank: self.result['rank'] = self.ix_results[self.result['ix_id']][0]
-                if cnt: self.result['count'] = self.ix_results[self.result['ix_id']][0]
+                if rank: 
+                    if not recom: self.result['rank'] = self.ix_results[self.result['ix_id']][0]
+                    else: # Add feed frequencies to ranking in recommendations
+                        self.result['rank'] = ix_result[0] +\
+                              (max_rank_recom * fdx.feed_freq_cache.get(self.result['feed_id'], 0))
+                
+                if cnt: self.result['count'] = ix_result[0]
 
                 if snippets:  # ... and try to extract snippets 
                     
@@ -207,7 +216,7 @@ class FeedexQuery(FeedexQueryInterface):
                     else: field_lst = LING_TEXT_LIST
                         
                     snips = []
-                    vars = self.ix_results[self.result['ix_id']][3].copy()
+                    vars = ix_result[3].copy()
                         
                     for f in field_lst:
                         f = self.result[f]
@@ -285,9 +294,18 @@ class FeedexQuery(FeedexQueryInterface):
 
         else: self.results = results_tmp
 
+        # Sort by recom. ranking and importance, add fed freqs if needed
+        if recom:
+            if not ranked:
+                for i,r in enumerate(self.results):
+                    self.result.populate(r)
+                    self.result['rank'] = fdx.feed_freq_cache.get(self.result['feed_id'],0)
+                    self.results[i] = self.result.tuplify()
+
+            self.results.sort(key=lambda x: (x[self.result.get_index('importance')], x[self.result.get_index('rank')]), reverse=True)
 
         # Sort results by rank or count if no other sorting method was chosen
-        if (not sort) and ranked:
+        elif (not sort) and ranked:
             if cnt: self.results.sort(key=lambda x: x[self.result.get_index('count')], reverse=True)
             elif rank: self.results.sort(key=lambda x: x[self.result.get_index('rank')], reverse=True)
 
@@ -299,12 +317,14 @@ class FeedexQuery(FeedexQueryInterface):
         if not kargs.get('no_history',False):
             err = self.history_item.add(self.phrase, filters.get('feed'))
             if err != 0: msg(*err)
-        
+
+        if rev: self._rev()
+
         # Group results, if needed
         if kargs.get('allow_group',False):
             if filters.get('group') is not None:
                 self.result_no2 = self.result_no
-                self.group_results(**filters)
+                self.group(**filters)
                 self.result_no = len(self.results)
             elif filters.get('depth') is not None:
                 self.result_no2 = self.result_no
@@ -312,7 +332,6 @@ class FeedexQuery(FeedexQueryInterface):
                 self.result_no = len(self.results)
 
 
-        if rev: self.results.reverse()
         self.results = tuple(self.results)
 
         return 0
@@ -334,12 +353,25 @@ class FeedexQuery(FeedexQueryInterface):
 #       COMPOSITE QUERIES
 #
 
-    def get_trends(self, qr, filters, **kargs):
+
+    def recommend(self, filters, **kargs):
+        """ Rank by recommendation from filterred entries """
+        self.DB.cache_terms()
+        filters['qtype'] = 1
+        err = self.query(fdx.recom_qr_str, filters, w_scheme='tfidf', rank=True, recom=True, snippets=False, no_history=True, no_wildcards=True, allow_group=kargs.get('allow_group',True))        
+        return err
+
+
+
+
+
+    def trends(self, qr, filters, **kargs):
         """ Extract trends from group of entries (can get time consuming) """
+        qr = scast(qr, str, '')
+
         rev = kargs.get('rev', filters.get('rev',False))
         filters['rev'] = False
 
-        qr = scast(qr, str, '')
         flang = filters.get('lang')
 
         self.query(qr, filters, rank=False, cnt=False, snippets=False, no_history=True, allow_group=False)
@@ -370,7 +402,7 @@ class FeedexQuery(FeedexQueryInterface):
         
         self.results.sort(key=lambda x: x[1], reverse=True)
 
-        if rev: self.results.reverse()
+        if rev: self._rev()
         self.results = tuple(self.results)
 
         self.result_no = len(self.results)
@@ -381,14 +413,16 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def get_trending(self, qr, filters, **kargs):
+    def trending(self, qr, filters, **kargs):
         """ Get trending articles from given filters"""
+        qr = scast(qr, str, '')
+
         rev = kargs.get('rev', filters.get('rev',False))
         filters['rev'] = False
 
-        depth = filters.get('depth',100)
+        depth = filters.get('depth',250)
 
-        self.get_trends(qr, filters, no_history=True, allow_group=False)
+        self.trends(qr, filters, no_history=True, allow_group=False)
 
         qr_string = ''
         for i,r in enumerate(self.results):
@@ -407,37 +441,38 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def find_similar(self, id, **kargs):
+    def similar(self, id, filters, **kargs):
         """ Find entry similar to specified by ID based on extracted features """
         id = scast(id, int, 0)
+
         self.result = ResultEntry()
         entry = FeedexEntry(self.DB, id=id)
-        rule = SQLContainer('rules', RULES_SQL_TABLE)
+        term = SQLContainer('terms', KW_TERMS_TABLE)
         if not entry.exists:
             self._empty(result=ResultEntry())
-            return -7
+            return FX_ERROR_NOT_FOUND
 
-        depth = kargs.get('depth',self.config.get('default_similarity_limit',30)) # Limit results
+        depth = filters.get('depth',self.config.get('default_similarity_limit',30)) # Limit results
 
         # Get or generate rules
-        if self.config.get('use_keyword_learning', True): 
-            rules = self.DB.qr_sql("select * from rules where context_id=:id order by weight desc", {'id':id} , all=True)
+        if self.config.get('use_keyword_learning', True):
+            terms = self.DB.qr_sql("select * from terms where context_id=:id order by weight desc", {'id':id} , all=True)
             if self.DB.status != 0: 
                 self._empty(result=ResultEntry())
-                return -2
-        else: rules = None
+                return FX_ERROR_DB
+        else: terms = None
 
-        if rules in (None, [], [None], (), (None,)):
+        if terms in (None, [], [None], (), (None,)):
             if self.config.get('default_similar_weight', 2) > 0 and not kargs.get('no_weight',False):
-                err = entry.ling(index=False, rank=False, learn=True, save_rules=True)
+                err = entry.ling(index=False, rank=False, learn=True, save_terms=True)
             else:
-                err = entry.ling(index=False, rank=False, learn=True, save_rules=False)
+                err = entry.ling(index=False, rank=False, learn=True, save_terms=False)
             if err != 0: 
                 self._empty(result=ResultEntry())
                 return -2
-            rules = entry.rules.copy()
+            terms = entry.terms.copy()
 
-        if rules in (None, [], [None], ()):
+        if terms in (None, [], [None], ()):
             debug(5, "Nothing to find...")
             self._empty(result=ResultEntry())
             return 0
@@ -447,7 +482,6 @@ class FeedexQuery(FeedexQueryInterface):
             self.DB.run_sql_lock(f"update entries set read = coalesce(read,0) + {self.config.get('default_similar_weight', 2)}  where id = :id", {'id':id} )
 
         # Search for keywords in entries ...
-        filters = kargs.copy()
         filters['lang'] = entry.get('lang','heuristic')
         filters['case_ins'] = True
         filters['qtype'] = 1
@@ -458,16 +492,16 @@ class FeedexQuery(FeedexQueryInterface):
 
         # ... and to do this construct a single query string from rules
         qr_string = ''
-        for i,r in enumerate(rules):
+        for i,r in enumerate(terms):
             if i >= depth: break
             
-            if type(r) in (list, tuple): rule.populate(r)
+            if type(r) in (list, tuple): term.populate(r)
             elif type(r) is dict:
-                rule.clear()
-                rule.merge(r)
+                term.clear()
+                term.merge(r)
             else: continue
 
-            s = str(rule['string']).strip()
+            s = str(term['term'])
             if ' ' in s: s = f"""({s.replace(' ',' ~3 ')})"""
             qr_string =f"""{qr_string} OR {s}"""
         if qr_string.startswith(' OR '): qr_string = qr_string[4:]
@@ -507,12 +541,13 @@ class FeedexQuery(FeedexQueryInterface):
                 month = time.strftime('%Y-%m', time.localtime(dtetime)) + "-01 00:00:00"
                 freq_dict[month] = freq_dict.get(month,0) + rnk                    
 
-
+  
         # Construct time series from frequency dictionary
         data_points = []
         mx = 0
         for f in freq_dict.keys():
             freq = freq_dict.get(f,0)
+            if freq == 0: continue
             if freq > mx: mx = freq
             data_points.append([f, round(freq, 3)])
 
@@ -578,7 +613,7 @@ class FeedexQuery(FeedexQueryInterface):
 
         self.results = time_series.copy()
         
-        if rev: self.results.reverse()
+        if rev: self._rev()
         self.results = tuple(self.results)
 
         self.result = ResultTimeSeries()
@@ -591,24 +626,24 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def relevance_in_time(self, id, **kargs):
+    def relevance_in_time(self, id, filters, **kargs):
         """ Gets keywords from entry and produces time series for them """
         id = scast(id, int, 0)
 
         # Get similar items
-        filters = kargs.copy()
         filters['depth'] = 500
         filters['allow_group'] = False
-        
-        self.find_similar(id, **filters)
-        
+        rev = filters.get('rev',False)  # Reverse sort order
+        filters['rev'] = False
+
+        self.similar(id, filters)
+
         if len(self.results) == 0:
             self._empty(result=ResultTimeSeries())
             return 0
         else: self.result_no2 = len(self.results)
 
-        group = kargs.get('group','daily')
-        rev = kargs.get('rev',False)  # Reverse sort order
+        group = filters.get('group','daily')
 
         self._build_time_series(group, rev, True)
         return 0
@@ -622,16 +657,16 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def term_context(self, string:str, **kargs):
+    def context(self, qr, filters, **kargs):
         """ Get term's context (find entries and print immediate surroundings) """
-        string = scast(string, str, '')
-        if string == '': 
+        qr = scast(qr, str, '').strip()
+        if qr == '': 
             self._empty(result=ResultContext())
             return 0
         
-        rev = kargs.get('rev',False)
-        kargs['rev'] = False
-        self.query(string, kargs, count=False, rank=True, snippets=True, allow_group=False)
+        rev = filters.get('rev',False)
+        filters['rev'] = False
+        self.query(qr, filters, count=False, rank=True, snippets=True, allow_group=False)
 
         self.result_no2 = len(self.results)
 
@@ -650,7 +685,7 @@ class FeedexQuery(FeedexQueryInterface):
 
         self.results = results_tmp.copy()
         
-        if rev: self.results.reverse()
+        if rev: self._rev()
         self.results = tuple(self.results)
 
         self.result_no = len(self.results)
@@ -667,11 +702,11 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def term_net(self, term:str, **kargs):
+    def term_net(self, term, filters, **kargs):
         """ Show terms/features connected to a given term by analising contexts """
         # Check for empty term
-        result = ResultEntry()
         term = scast(term, str, '').strip()
+        result = ResultEntry()
         if term == '':
             self._empty(result=ResultTerm())
             return 0
@@ -679,9 +714,9 @@ class FeedexQuery(FeedexQueryInterface):
         doc_count = kargs.get('doc_count', self.DB.get_doc_count())
 
         # Query for containing docs
-        rev = kargs.get('rev',False)
-        kargs['rev'] = False
-        self.query(term, kargs, rank=True, cnt=True, doc_count=doc_count, snippets=False, no_history=True, no_wildcards=True, allow_group=False)
+        rev = filters.get('rev',False)
+        filters['rev'] = False
+        self.query(term, filters, rank=True, cnt=True, doc_count=doc_count, snippets=False, no_history=True, no_wildcards=True, allow_group=False)
         self.result_no2 = len(self.results)
 
         kwd_list = []
@@ -708,14 +743,14 @@ class FeedexQuery(FeedexQueryInterface):
 
         self.results.sort(key=lambda x: x[1], reverse=True)
 
-        if rev: self.results.reverse()
+        if rev: self._rev()
         self.results = tuple(self.results)
 
         self.result = ResultTerm()
         self.result_no = len(self.results)
 
         # Save term to history        
-        if not kargs.get('no_history',False):
+        if not kargs.get('no_history', False):
             err = self.history_item.add(self.phrase, None)
             if err != 0: msg(*err) 
         return 0       
@@ -726,17 +761,17 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def term_in_time(self, term:str, **kargs):
+    def time_series(self, term:str, filters, **kargs):
         """ Get term frequency in time and output as a table of data points or a plot in terminal """
-        term = scast(term, str, '')
+        term = scast(term, str, '').strip()
         if term == '':
             self._empty(result=ResultTimeSeries())
             return 0
 
-        group = kargs.get('group','daily')
-        rev = kargs.get('rev', False)
-        kargs['rev'] = False
-        self.query(term, kargs, rank=False, cnt=True, snippets=False, allow_group=False)
+        group = filters.get('group','daily')
+        rev = filters.get('rev', False)
+        filters['rev'] = False
+        self.query(term, filters, w_scheme='coord', rank=False, cnt=True, snippets=False, allow_group=False)
 
         if len(self.results) == 0:
             self._empty(result=ResultTimeSeries())
@@ -751,7 +786,7 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def group_results(self, **kargs):
+    def group(self, **kargs):
         """ Creates and prints a tree with results grouped by a column """
         group_by = kargs.get('group','category')
         depth = kargs.get('depth',self.config.get('default_depth',5))
@@ -857,7 +892,6 @@ class FeedexQuery(FeedexQueryInterface):
             filters['config'] = None
             filters['rev'] = False
             filters['sort'] = None
-            filters['fallback_sort'] = 'id'
             filters['depth'] = int(len(self.results) / depth)
 
             node_count = 0
@@ -871,7 +905,8 @@ class FeedexQuery(FeedexQueryInterface):
                     tmp_result.populate(r)
                     tmp_result['is_node'] = 1
                     node_count += 1
-                    self.find_similar(r[id_ix], **filters)
+                    filters['fallback_sort'] = 'id'
+                    self.similar(r[id_ix], filters)
                     for t in self.results:
                         if t[id_ix] not in matched_ids and r[id_ix] != t[id_ix]: 
                             count += 1
@@ -957,8 +992,7 @@ class FeedexQuery(FeedexQueryInterface):
                     results_tmp.append(self.result.listify())
                     results_tmp = results_tmp + node_tmp
 
-
-        self.results = tuple(results_tmp.copy())
+        self.results = results_tmp.copy()
 
 
 
@@ -972,6 +1006,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_feeds(self, **kargs):
         """ Lists feeds in DB """
+        self.DB.cache_feeds()
         cats_only = kargs.get('cats_only',False)
         feeds_only = kargs.get('feeds_only',False)
         all = kargs.get('all',True)
@@ -986,7 +1021,7 @@ class FeedexQuery(FeedexQueryInterface):
             elif cats_only and self.result['is_category'] == 1: self.results.append(f)
             elif all: self.results.append(f) 
         
-        if kargs.get('rev',False): self.results.reverse()
+        if kargs.get('rev',False): self._rev()
         self.results = tuple(self.results)
 
         self.result_no = len(self.results)
@@ -999,6 +1034,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def feed_tree(self, **kargs):
         """ Generate Feed/Category tree """
+        self.DB.cache_feeds()
         self.result = ResultFeed()
         result_tmp = ResultFeed()
         node_tmp = []
@@ -1031,7 +1067,7 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-        if kargs.get('rev',False): self.results.reverse()
+        if kargs.get('rev',False): self._rev()
         self.results = tuple(self.results)
 
         self.result_no = len(self.results)
@@ -1043,21 +1079,40 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_rules(self, **kargs):
         """ List user's rules in DB """
+        self.DB.cache_rules()
         self.result = ResultRule()
-        if kargs.get('learned',False): self.results = self.DB.qr_sql(SHOW_RULES_LEARNED_SQL, {}, all=True)
-        else: self.results = self.DB.qr_sql("select * from rules where learned <> 1 order by id desc", {}, all=True)
-        if kargs.get('rev',False): self.results.reverse()
+        self.results = fdx.rules_cache
+        if kargs.get('rev',False): self._rev()
         self.results = tuple(self.results)
         self.result_no = len(self.results)
         self.result_no2 = 0
         return 0
 
+
+    def list_learned_terms(self, **kargs):
+        """ List user's rules in DB """
+        if kargs.get('short', True):
+            self.DB.cache_terms()
+            self.result = ResultKwTermShort()
+            self.results = fdx.terms_cache
+        else:
+            self.result = ResultKwTerm()
+            self.results = self.DB.qr_sql(LOAD_TERMS_LONG_SQL, all=True)
+
+        if kargs.get('rev',False): self._rev()
+        self.results = tuple(self.results)
+        self.result_no = len(self.results)
+        self.result_no2 = 0
+        return 0
+
+
     def list_flags(self, **kargs):
         """ Lists flags in DB """
+        self.DB.cache_flags()
         self.result = ResultFlag()
         self.results = []
         for k,v in fdx.flags_cache.items(): self.results.append( (k,) + v )
-        if kargs.get('rev',False): self.results.reverse()
+        if kargs.get('rev',False): self._rev()
         self.results = tuple(self.results)
         self.result_no = len(self.results)
         self.result_no2 = 0
@@ -1065,14 +1120,25 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_history(self, **kargs):
         """ List saved history items """
+        self.DB.cache_history()
         self.result = ResultHistoryItem()
         self.results = fdx.search_history_cache.copy()
-        if kargs.get('rev',False): self.results.reverse()
+        if kargs.get('rev',False): self._rev()
         self.results = tuple(self.results)
         self.result_no = len(self.results)
         self.result_no2 = 0
         return 0
 
+    def list_fetches(self, **kargs):
+        """ Display fetch history """
+        self.DB.cache_fetches()
+        self.result = ResultFetch()
+        self.results = fdx.fetches_cache.copy()
+        if kargs.get('rev',False): self._rev()
+        self.results = tuple(self.results)
+        self.result_no = len(self.results)
+        self.result_no2 = 0
+        return 0
 
 
 
@@ -1139,6 +1205,20 @@ class FeedexQuery(FeedexQueryInterface):
         
         filters['flag'] = self._resolve_flag(filters.get('flag'))
 
+
+        # Resolve preset date filters
+        if filters.get('last',False): 
+            fetch = self.DB.get_last(0)
+            filters['raw_adddate_from'] = fetch.get('from',-1)
+            filters['raw_adddate_to'] = fetch.get('to',-1)
+
+
+        if filters.get('last_n') is not None:
+            fetch = self.DB.get_last(filters['last_n'])
+            filters['raw_adddate_from'] = fetch.get('from',-1)
+            filters['raw_adddate_to'] = fetch.get('to',-1)
+
+
         # Resolve date ranges
         if filters.get('date_from') is not None:
             date = convert_timestamp(filters['date_from'])
@@ -1160,16 +1240,6 @@ class FeedexQuery(FeedexQueryInterface):
             if date is None: return msg(FX_ERROR_QUERY, _('Could not parse date (date_add_to)!'))
             filters['raw_adddate_to'] = date
 
-
-
-
-        # Resolve preset date filters
-        if filters.get('last',False): filters['raw_adddate_from'] = self.DB.get_last()
-
-        if filters.get('last_n') is not None:
-            last_upd = self.DB.get_last(ord=filters['last_n'])
-            if last_upd < 0: return msg(FX_ERROR_QUERY, _('Invalid value for last Nth update!'))
-            else: filters['raw_adddate_from'] = last_upd
 
 
         if filters.get("today", False):
@@ -1423,7 +1493,7 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-    def _build_xapian_qr(self, phrase:dict, filters:dict, *kargs):
+    def _build_xapian_qr(self, phrase:dict, filters:dict, **kargs):
         """ Parse filters and query to buid a proper Xapian query string """
             
         filter_qr = '' # Part of query string that handles filters
@@ -1475,12 +1545,25 @@ class FeedexQuery(FeedexQueryInterface):
             elif logic == 'phrase': def_op = xapian.Query.OP_PHRASE
             else: return msg(FX_ERROR_QUERY, _('Invalid logical operation! Must be: any, all, near, or phrase'))
 
+        # Weighting scheme
+        w_scheme = kargs.get('w_scheme')
+        if w_scheme is not None:
+            if w_scheme == 'tfidf': w_scheme = xapian.TfIdfWeight()
+            elif w_scheme == 'coord': w_scheme = xapian.CoordWeight()
+            elif w_scheme == 'bool': w_scheme = xapian.BoolWeight()
+            elif w_scheme == 'dlh': w_scheme = xapian.DLHWeight()
+            elif w_scheme == 'dph': w_scheme = xapian.DPHWeight()
+            elif w_scheme == 'inl2': w_scheme = xapian.InL2Weight()
+            elif w_scheme == 'ifb2': w_scheme = xapian.IfB2Weight()
+            else: w_scheme = None
+
         # ... handle xapian stuff now ...
         self.ix_qp.set_default_op(def_op)
         try: ix_qr = self.ix_qp.parse_query(self.phrase['fts'])
         except (xapian.QueryParserError, xapian.LogicError, xapian.RangeError, xapian.WildcardError,) as e: 
             return msg(FX_ERROR_QUERY, _('Index error: %a'), e)
         enquire = xapian.Enquire(self.DB.ix)
+        if w_scheme is not None: enquire.set_weighting_scheme(w_scheme)
         enquire.set_query(ix_qr)
         
         debug(5, f"Xapian query: {self.phrase['fts']}\n{ix_qr}")
@@ -1629,7 +1712,9 @@ class FeedexQuery(FeedexQueryInterface):
         sql = sql.replace('_', '\_')
         return sql
  
-
+    def _rev(self, **kargs):
+        if type(self.results) is not list: self.results = list(self.results)
+        self.results.reverse()
 
 
     def parse_json_query(self, json_str:str, **kargs):

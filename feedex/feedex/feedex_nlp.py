@@ -301,46 +301,40 @@ class FeedexLP(SmallSem):
         self.DB.connect_QP()
         self.DB.cache_rules()
 
-        # Abort, if already validated ...
-        if fdx.rules_validated: return 0
-
         debug(10, 'Validating rules...')
         remember_lang = self.get_model()
 
+        val_rules = []
         if type(fdx.rules_cache) is not list: fdx.rules_cache = list(fdx.rules_cache)
 
-        for i,r in enumerate(fdx.rules_cache):
+        for r in fdx.rules_cache:
             # Stem and prefix all user's FTS rules
-            qtype = scast(r[2], int, 0)
-            learned = scast(r[10], int, 0) 
-            string = scast(r[5], str, '')
-            field = scast(r[4], str, None)
+            qtype = scast(r[RULES_SQL_TABLE.index('type')], int, 0)
+            string = scast(r[RULES_SQL_TABLE.index('string')], str, '')
+            field = scast(r[RULES_SQL_TABLE.index('field_id')], str, None)
 
-            if string == '': # Empty strings cause a mess later, so simply invalidate them 
-                learned = -1
-                qtype = -1
-            
-            elif learned != 1:
-                if qtype == 1:
-                    self.set_model(r[7])
-                    phrase = self.DB.Q.parse_query(string, str_match_stem=True, sql=False)
-                    string = phrase['fts']
+            # Empty strings cause a mess later, so simply invalidate them
+            if string == '': string = ''
+            elif qtype == 1:
+                self.set_model(r[RULES_SQL_TABLE.index('lang')])
+                phrase = self.DB.Q.parse_query(string, str_match_stem=True, sql=False)
+                string = phrase['fts']
 
-                elif qtype == 0:
-                    if r[6] == 1: case_ins = True
-                    else: case_ins = False
-                    phrase = self.DB.Q.parse_query(string, str_match=True, sql=False, case_ins=case_ins)
-                    string = phrase.copy()
+            elif qtype == 0:
+                if r[RULES_SQL_TABLE.index('case_insensitive')] == 1: case_ins = True
+                else: case_ins = False
+                phrase = self.DB.Q.parse_query(string, str_match=True, sql=False, case_ins=case_ins)
+                string = phrase.copy()
 
-                elif qtype == 2:
-                    if r[6] == 1: case_ins = True
-                    else: case_ins = False
-                    if case_ins: re.compile(string, re.IGNORECASE)
-                    else: re.compile(string)
+            elif qtype == 2:
+                if r[RULES_SQL_TABLE.index('case_insensitive')] == 1: case_ins = True
+                else: case_ins = False
+                if case_ins: re.compile(string, re.IGNORECASE)
+                else: re.compile(string)
             
 
             # Validate data types ...
-            fdx.rules_cache[i] = (
+            val_rules.append((
                 r[0], 
                 r[1],
                 qtype, 
@@ -351,14 +345,12 @@ class FeedexLP(SmallSem):
                 r[7],
                 scast(r[8], float, 0),
                 scast(r[9], int, 1),
-                learned,
-                scast(r[11], int, 0),
-                scast(r[12], int, 0),               
-            )
+                scast(r[10], int, 0),               
+            ))
 
         self.set_model(remember_lang)
         
-        fdx.rules_validated = True
+        fdx.rules_val_cache = val_rules
         debug(10, 'Rules validated...')
 
 
@@ -377,15 +369,12 @@ class FeedexLP(SmallSem):
             rule = SQLContainer('rules', RULES_SQL_TABLE_RES, replace_nones=True)   
 
         importance = 0
-        raw_importance = 0
         flag = 0
-
         flag_freq_dist = {}
-        context_freq_dist = {}
 
-        self.validate_rules()
+        if fdx.rules_val_cache is None: self.validate_rules()
 
-        for r in fdx.rules_cache:
+        for r in fdx.rules_val_cache:
             name    = r[1]
             qtype   = r[2]
             feed    = r[3]
@@ -393,22 +382,20 @@ class FeedexLP(SmallSem):
 
             field   = r[4]
             string  = r[5]
-            if type(string) is str and len(string) < 1: continue
 
             if r[6] == 1: case_ins = True
             else: case_ins = False
 
+            lang        = r[7]
+            if lang is not None and lang != self.get_model(): continue
+            
             rweight     = r[8]
             additive    = r[9]
-            learned     = r[10]
-            rflag       = r[11]
-            context_id  = r[12]
+            rflag       = r[10]
 
             matched = 0
 
-            if learned == 1:
-                matched = ranking_token_str.count(string)
-
+            if string == '' and feed is not None and feed != -1: matched = 1
             elif qtype == 1:
                 matched = ranking_token_str.count(string)
 
@@ -442,24 +429,18 @@ class FeedexLP(SmallSem):
 
             if matched > 0:
 
-                if additive == 1: 
-                    raw_importance += matched * rweight
-                    context_freq_dist[context_id] = context_freq_dist.get(context_id,0) + (matched * rweight)
-                else:
-                    raw_importance = matched * rweight
-                    context_freq_dist[context_id] = matched * rweight
+                if additive == 1: importance += matched * rweight
+                else: importance = matched * rweight
 
-                if learned != 1 and rflag > 0: flag_freq_dist[rflag] = flag_freq_dist.get(rflag,0) + (rweight * matched)
+                if rflag > 0: flag_freq_dist[rflag] = flag_freq_dist.get(rflag,0) + (dezeroe(rweight,1) * matched)
 
                 # Create list for display
-                if to_disp: 
+                if to_disp:
                     rule.clear()
-                    rule['learned'] = learned
                     rule['case_insensitive'] = case_ins
                     rule['additive'] = additive
                     
-                    if learned == 1: rule['string'] = str(string)
-                    elif qtype == 0: rule['string'] = string['raw']
+                    if qtype == 0: rule['string'] = string['raw']
                     elif qtype == 1: rule['string'] = string
                     elif qtype == 2: rule['string'] = str(string)
                     else: str(string)
@@ -470,38 +451,17 @@ class FeedexLP(SmallSem):
                     rule['field_id'] = field
                     rule['feed_id'] = feed
                     rule['flag'] = rflag
-                    rule['lang'] = r[7]
+                    rule['lang'] = lang
                     rule['weight'] = rweight
-                    rule['context_id'] = context_id
 
                     display_list.append( rule.tuplify() )
 
-        importance = context_freq_dist.get(0,0)
-
-        context_freq_dist[0] = 0
-        context_freq_dist[entry['id']] = 0
-
-        contexts_sorted = sorted(context_freq_dist.items(), key=lambda x:abs(x[1]), reverse=True)
-        
-        best_contexts = []
-        
-        for i,cx in enumerate(contexts_sorted):
-            if i > MAX_RANKING_DEPTH: break
-            importance = importance + cx[1]
-            best_contexts.append(cx[0])
-
         importance = importance * entry['weight']
-        raw_importance = raw_importance * entry['weight']
         
-        # Decide final importance with ranking algo parameter
-        if self.ranking_algo == 0: final_importance = raw_importance
-        elif self.ranking_algo == 1: final_importance = importance
-        else: final_importance = raw_importance
-
         if flag_freq_dist != {}: flag = max(flag_freq_dist, key=flag_freq_dist.get)
 
-        if to_disp: return final_importance, flag, best_contexts, flag_freq_dist, display_list
-        else: return final_importance, flag
+        if to_disp: return importance, flag, flag_freq_dist, display_list
+        else: return importance, flag
              
 
 

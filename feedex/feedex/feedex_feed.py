@@ -42,7 +42,7 @@ class FeedexFeed(SQLContainerEditable):
             self.populate(feed)
             return 0
 
-    def get_cat_by_id(self, id:int):     
+    def get_cat_by_id(self, id:int):
         feed = fdx.find_category(id, load=True)
         if feed == -1:
             self.exists = False
@@ -53,6 +53,7 @@ class FeedexFeed(SQLContainerEditable):
             return 0
     
     def get_by_id(self, id:int):
+        id = scast(id, int, -1)
         for f in fdx.feeds_cache:
             if f[self.get_index('id')] == id:
                 self.populate(f)
@@ -188,14 +189,14 @@ class FeedexFeed(SQLContainerEditable):
         if self.DB.rowcount > 0:
 
             if not fdx.single_run: 
-                err = self.DB.load_feeds()
+                err = self.DB.load_feeds(ignore_lock=True)
                 if err != 0: return msg(FX_ERROR_DB, _('Error reloading Feeds after successfull update!'))
 
             if restoring:
                 err = self.DB.update_stats()
                 if err != 0: return msg(FX_ERROR_DB, _('Error updating DB stats after successfull update!'))
-                err = self.DB.load_rules()
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading rules after successfull update!'))
+                err = self.DB.load_terms()
+                if err != 0: return msg(FX_ERROR_DB, _('Error reloading learned keywords after successfull update!'))
 
             if self.vals['is_category'] == 1: stype = _('Category')
             else: stype = _('Channel')
@@ -237,8 +238,8 @@ class FeedexFeed(SQLContainerEditable):
 
 
 
-
-    def update(self, idict, **kargs):
+    def update(self, idict, **kargs): return self.DB.run_fetch_locked(self._update, idict, **kargs)
+    def _update(self, idict, **kargs):
         """ Quick update with a value dictionary """
         if not self.exists: return -8
         err = self.add_to_update(idict)
@@ -246,33 +247,35 @@ class FeedexFeed(SQLContainerEditable):
         return err
 
 
-
-    def delete(self, **kargs):
-        """ Remove channel/cat with entries and rules if required """
+    def delete(self, **kargs): return self.DB.run_fetch_locked(self._delete, **kargs)
+    def _delete(self, **kargs):
+        """ Remove channel/cat with entries and keywords if required """
         if not self.exists: return FX_ERROR_NOT_FOUND
 
         deleted = self.vals['deleted']
 
         id = {'id': self.vals['id']}
         if deleted == 1:
-            # Remove from index ...
-            self.DB.connect_ixer()
-            try: self.DB.ixer_db.delete_document(f'FEED_ID {self.vals["id"]}')
-            except xapian.DatabaseError as e:
-                self.DB.close_ixer(rollback=True)
-                return msg(FX_ERROR_DB, _('Index error: %a'), e)
-            self.DB.close_ixer()
-
             # Delete irreversably with all data and icon
             err = self.DB.run_sql_multi_lock( \
-                (("delete from rules where learned = 1 and context_id in (select e.id from entries e where e.feed_id = :id)", id ),\
+                (("delete from terms where context_id in (select e.id from entries e where e.feed_id = :id)", id ),\
                 ("delete from entries where feed_id = :id", id),\
                 ("update feeds set parent_id = NULL where parent_id = :id", id),\
                 ("delete from feeds where id = :id", id)) )
+            
             if err == 0:
-                if fdx.icons_cache == {}: self.DB.load_icons()
+                if fdx.icons_cache == {}: self.DB.load_icons(ignore_lock=True)
                 icon = fdx.icons_cache.get(self.vals['id'])
                 if icon is not None and icon.startswith(os.path.join(self.DB.icon_path,'feed_')) and os.path.isfile(icon): os.remove(icon)
+            
+                # Remove from index ...
+                self.DB.connect_ixer()
+                try: self.DB.ixer_db.delete_document(f'FEED_ID {self.vals["id"]}')
+                except xapian.DatabaseError as e:
+                    self.DB.close_ixer(rollback=True)
+                    return msg(FX_ERROR_DB, _('Index error: %a'), e)
+                self.DB.close_ixer()
+
 
         else:
             # Simply mark as deleted
@@ -285,8 +288,8 @@ class FeedexFeed(SQLContainerEditable):
         if self.DB.rowcount > 0:
 
             if not fdx.single_run: 
-                err = self.DB.load_feeds()
-                if err == 0: err = self.DB.load_rules()
+                err = self.DB.load_feeds(ignore_lock=True)
+                if err == 0: err = self.DB.load_terms()
                 if err != 0: return msg(FX_ERROR_DB, _('Error reloading data after successfull delete!'))
             
             err = self.DB.update_stats()
@@ -299,7 +302,7 @@ class FeedexFeed(SQLContainerEditable):
             if deleted == 1:
                 self.vals['deleted'] == 2
                 self.exists = False
-                return msg(f'{stype} {_("%a deleted permanently (with entries and rules)")}', f'{self.name()} ({self.vals["id"]})', log=True)
+                return msg(f'{stype} {_("%a deleted permanently (with entries and learned keywords)")}', f'{self.name()} ({self.vals["id"]})', log=True)
             else:
                 self.vals['deleted'] = 1
                 return msg(f'{stype} {_("%a deleted")}', f'{self.name(with_id=False)} ({self.vals["id"]})', log=True)
@@ -310,8 +313,8 @@ class FeedexFeed(SQLContainerEditable):
 
 
 
-
-    def add(self, **kargs):
+    def add(self, **kargs): return self.DB.run_fetch_locked(self._add, **kargs)
+    def _add(self, **kargs):
         """ Add feed to database """
         if kargs.get('new') is not None: 
             self.clear()
@@ -337,7 +340,7 @@ class FeedexFeed(SQLContainerEditable):
         self.DB.last_feed_id = self.vals['id']
 
         if not fdx.single_run and not kargs.get('no_reload', False):
-            err = self.DB.load_feeds()
+            err = self.DB.load_feeds(ignore_lock=True)
             if err != 0: return msg(FX_ERROR_DB, _('Error reloading Feeds after successfull add!'))
 
         if self.vals['is_category'] == 1: stype = _('Category')
@@ -373,8 +376,8 @@ class FeedexFeed(SQLContainerEditable):
                 return msg(FX_ERROR_VAL, _('Channel with this URL already exists (%a)'), f'{f[self.get_index("name")]} ({f[self.get_index("id")]})')
 
         err = self.add(validate=False)
-        if err != 0: return -7
-
+        if err != 0: return err
+        print(self)
         if kargs.get('no_fetch',False): return 0 # Sometimes fetching must be ommitted to allow further editing (e.g. authentication)
         if self.vals['handler'] in ('local','html','script'): return 0 # ...also, don't fetch if channel is not RSS etc.
 
@@ -393,7 +396,10 @@ class FeedexFeed(SQLContainerEditable):
 
 
 
-    def update_feed_order(self, **kargs):
+
+
+    def update_feed_order(self, **kargs): return self.DB.run_fetch_locked(self.update_feed_order, **kargs)
+    def _update_feed_order(self, **kargs):
         """ Updates feed order to DB according to current loaded list """
         update_list = []
         for i,f in enumerate(fdx.feeds_cache):
@@ -403,12 +409,16 @@ class FeedexFeed(SQLContainerEditable):
         if err != 0: return msg(FX_ERROR_DB, _('DB error while updating feed list order!'))
         
         if not fdx.single_run:
-            err = self.DB.load_feeds()
+            err = self.DB.load_feeds(ignore_lock=True)
             if err != 0: return msg(FX_ERROR_DB, _('Error while reloading Feeds after successful reorder!'))
         return 0
 
 
-    def order_insert(self, target:int, **kargs):
+
+
+
+    def order_insert(self, target:int, **kargs): return self.DB.run_fetch_locked(self._order_insert, target, **kargs)
+    def _order_insert(self, target:int, **kargs):
         """ Insert (display order) before target, or assign to category """
         if not self.exists: return FX_ERROR_NOT_FOUND
 
@@ -431,10 +441,10 @@ class FeedexFeed(SQLContainerEditable):
             for i,f in enumerate(fdx.feeds_cache):
                 if f[self.get_index('id')] == self.vals['id'] and i != target_pos:
                     try: del fdx.feeds_cache[i]
-                    except (ValueError, IndexError) as e:return msg(FX_ERROR_VAL, _('Error insering Channel/Category: %a'), e)
+                    except (ValueError, IndexError) as e: return msg(FX_ERROR_VAL, _('Error insering Channel/Category: %a'), e)
                     break
 
-            err = self.update_feed_order()
+            err = self._update_feed_order()
             if err != 0: return err
 
             if with_cat:
@@ -450,7 +460,7 @@ class FeedexFeed(SQLContainerEditable):
             return msg(_('Nothing to do'))
 
         if not fdx.single_run:
-            err = self.DB.load_feeds()
+            err = self.DB.load_feeds(ignore_lock=True)
             if err != 0: return msg(FX_ERROR_DB, _('Error reloading Feeds after successfull operation!'))
 
         return msg(_('Display order changed successfully...'))

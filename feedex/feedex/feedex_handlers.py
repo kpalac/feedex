@@ -61,7 +61,7 @@ class FeedexRSSHandler:
             self.ifeed.populate(feed.tuplify())
         elif isinstance(feed, dict):
             self.ifeed = feed.copy()
-        else: raise FeedexTypeError(FX_ERROR, _('Invalid type of input feed! Should be a SQLContainer or dict!'))
+        else: raise FeedexTypeError(_('Invalid type of input feed! Should be a SQLContainer or dict!'))
 
         # Set up http headers from saved feed data
         headers = {}

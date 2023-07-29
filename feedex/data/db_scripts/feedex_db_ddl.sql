@@ -32,8 +32,6 @@ CREATE TABLE IF NOT EXISTS "rules" (
 	"lang"	TEXT,
 	"weight"	NUMERIC,
 	"additive"	INTEGER,
-	"learned"	INTEGER,
-	"context_id"	INTEGER,
 	"flag"	INTEGER,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
@@ -153,6 +151,17 @@ CREATE TABLE IF NOT EXISTS "flags" (
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 
+CREATE TABLE IF NOT EXISTS "terms" (
+	"id"	INTEGER NOT NULL,
+	"term"	TEXT,
+	"weight"	NUMERIC,
+	"model"	TEXT,
+	"form"	TEXT,
+	"context_id" INTEGER, 
+	PRIMARY KEY("id" AUTOINCREMENT)
+);
+
+
 
 
 CREATE INDEX IF NOT EXISTS "idx_rules_id" ON "rules" ( "id"	ASC );
@@ -209,10 +218,12 @@ CREATE INDEX IF NOT EXISTS "idx_actions_time_desc" ON "actions" ( "time"	DESC );
 CREATE INDEX IF NOT EXISTS "idx_flags_id" ON "flags" ( "id"	ASC );
 CREATE INDEX IF NOT EXISTS "idx_flags_name" ON "flags" ( "name" );
 
+CREATE INDEX IF NOT EXISTS "idx_terms_id" ON "terms" ( "id"	ASC );
+CREATE INDEX IF NOT EXISTS "idx_terms_term" ON "terms" ( "term" ASC);
+CREATE INDEX IF NOT EXISTS "idx_terms_term_desc" ON "terms" ( "term" DESC);
+CREATE INDEX IF NOT EXISTS "idx_terms_context_id" ON "terms" ( "context_id"	ASC );
+CREATE INDEX IF NOT EXISTS "idx_terms_context_id_desc" ON "terms" ( "context_id"	DESC );
 
-
-
-INSERT INTO "main"."params" ("name", "val") VALUES ('version', '1.0.0');
 
 
 COMMIT;

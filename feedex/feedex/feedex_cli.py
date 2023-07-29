@@ -27,23 +27,23 @@ class FeedexCLI:
         # Output flags
         self.output = kargs.get('output','cli')
         if self.output not in ('long','headlines','notes','csv','json','json_dict','cli',): self.output = 'cli'
-        self.plot = kargs.get('plot',False)
+        self.plot = kargs.get('plot', False)
 
         # CLI display options
-        self.delim = kargs.get('delimiter','|')
-        self.delim2 = kargs.get('delimiter2',';')
-        self.delim_escape = kargs.get('delim_escape','')
+        self.delim          = scast(kargs.get('delimiter'), str, '|')
+        self.delim2         = scast(kargs.get('delimiter2'), str,';')
+        self.delim_escape   = scast(kargs.get('delim_escape'), str,'')
         bsl = '\\'
         if self.delim_escape != '': self.delim_escape = f"""{self.delim_escape}{bsl}"""
-        self.trunc = kargs.get('trunc',200)
-        self.term_width = kargs.get('term_width',150)
+        self.trunc          = scast(kargs.get('trunc'), int ,200)
+        self.term_width     = scast(kargs.get('term_width'), int ,150)
 
-        self.read_marker = kargs.get('read_marker','=>  ')
-        self.note_marker = kargs.get('note_marker','(*)  ')
+        self.read_marker = scast(kargs.get('read_marker'), str, '=>  ')
+        self.note_marker = scast(kargs.get('note_marker'), str, '(*)  ')
 
 
-        self.snip_beg = kargs.get('bold_beg', self.config.get('BOLD_MARKUP_BEG', BOLD_MARKUP_BEG) )
-        self.snip_end = kargs.get('bold_end', self.config.get('BOLD_MARKUP_END', BOLD_MARKUP_END) )
+        self.snip_beg = scast(kargs.get('bold_beg'), str, self.config.get('BOLD_MARKUP_BEG', BOLD_MARKUP_BEG) )
+        self.snip_end = scast(kargs.get('bold_end'), str, self.config.get('BOLD_MARKUP_END', BOLD_MARKUP_END) )
 
         # Terminal colors
         self.STERM_NORMAL = self.config.get('TERM_NORMAL', TERM_NORMAL)
@@ -62,11 +62,11 @@ class FeedexCLI:
         self.yesterday = self.yesterday.strftime("%Y.%m.%d")
 
         # General file output
-        self.ofile = kargs.get('ofile')
+        self.ofile = scast(kargs.get('ofile'), str, None)
 
     
         # Curtom mask
-        self.display_cols = kargs.get('display_cols')
+        self.display_cols = scast(kargs.get('display_cols'), str, None)
 
         # Desktop notifier
         self.DN = None
@@ -86,7 +86,11 @@ class FeedexCLI:
         tmp_cols = []
         for c in cols.split(','):
             c = c.lower()
-            if c not in container.fields: return msg(FX_ERROR_VAL, _('Invalid display column name: %a'), c)
+            if c not in container.fields: 
+                fld_list = ''
+                for f in container.fields: fld_list = f'{fld_list}{f};'
+                return msg(FX_ERROR_VAL, _("""Invalid display column name: %a
+Available column names for this query: %b"""), c, fld_list)
             tmp_cols.append(c)
 
         self.display_cols = tmp_cols.copy()
@@ -259,7 +263,6 @@ class FeedexCLI:
                     if err != 0: return err
                     mask = self.display_cols
                 elif self.output in ('long','csv'): mask = RULES_SQL_TABLE_RES
-                elif self.output == 'headlines': mask = PRINT_RULES_LEARNED
                 else: mask = PRINT_RULES_SHORT
 
             elif isinstance(table, ResultTerm):
@@ -285,6 +288,17 @@ class FeedexCLI:
 
             elif isinstance(table, ResultHistoryItem):
                 footer = f"""{result_no} {_('history items')}"""
+
+            elif isinstance(table, ResultKwTerm):
+                footer = f"""{result_no} {_('learned keywords')}"""
+
+            elif isinstance(table, ResultKwTermShort):
+                footer = f"""{result_no} {_('recommendation keywords')}"""
+
+            elif isinstance(table, ResultFetch):
+                footer = f"""{result_no} {_('recent fetches')}"""
+                if self.output in ('long', 'csv'): mask = FETCH_TABLE
+                else: mask = FETCH_TABLE_SHORT
 
             elif isinstance(table, ResultCatItem):
                 footer = f"""{result_no} {_('catalog items found')}"""
@@ -353,7 +367,7 @@ class FeedexCLI:
                 try:        
                     with open(self.ofile, 'w') as f: f.write(csv_str)
                     msg(_('Data saved to %a as CSV'), self.ofile)
-                except OSError as e: return msg(FX_ERROR_IO, f'{_("Error saving CSV data to %a:")} {e}', self.ofile)
+                except OSError as e: return msg(FX_ERROR_IO, _("Error saving CSV data to %a file: %b"), self.ofile, e)
             else:
                 print(header)
                 for r in results: print(self._line(table, r))
@@ -374,7 +388,7 @@ class FeedexCLI:
                 try:        
                     with open(self.ofile, 'w') as f:
                         f.write(out_str)
-                except OSError as e: return msg(FX_ERROR_IO, f'{_("Error saving data to %a:")} {e}', self.ofile)
+                except OSError as e: return msg(FX_ERROR_IO, _('Error saving data to %a file: %b'), self.ofile, e)
 
             else:
                 print(cli_mu(header))
@@ -463,58 +477,56 @@ class FeedexCLI:
 {_('Flagged')} (flag):        <b>{entry.vals['flag']}</b>
 {_('Deleted?')} (deleted):     <b>{entry.vals['deleted']}</b>
 -----------------------------------------------------------------------------------------------------------
-{_('Weight')}:         <b>{entry.vals['weight']}</b>       {_('Importance')}:     <b>{entry.vals['importance']}</b>
+{_('Weight')}:         <b>{entry.vals['weight']:.4f}</b>       {_('Importance')}:     <b>{entry.vals['importance']:.4f}</b>
 """
-        entry.ling(index=False, rank=False, learn=True, save_rules=False)
-        kwd_str = ''
-        for k in entry.rules: kwd_str = f"""{kwd_str}{k['name']} ({round(k['weight'],3)}); """
+        if kargs.get('details',False):
 
-        if kwd_str != '': disp_str = f"""{disp_str}
+            entry.ling(index=False, rank=False, learn=True, save_terms=False)
+            kwd_str = ''
+            for k in entry.terms: kwd_str = f"""{kwd_str}{k['form']} ({round(k['weight'],3)}); """
+
+            if kwd_str != '': disp_str = f"""{disp_str}
 ------------------------------------------------------------------------------------------------------------
 {_('Keywords')}: <b>{kwd_str}</b>
 """
+        
+            importance, flag, flag_dist, results = entry.ling(index=False, rank=True, to_disp=True)
+            if len(results) > 0:        
+                rule = ResultRule()
+
+                if do_print: col_e = '</b>'
+                else: col_e = ''
+
+                rule_str = ''
+                for r in results:
+                    rule.populate(r)
+                    if do_print: col = TCOLS.get(fdx.get_flag_color_cli(rule.get('flag',-1)),'')
+                    else: col = ''    
+                    rule_str = f"""{rule_str}
+{col}{rule.name()}{col_e} ({_('Weight:')} {rule['weight']:.4f}, {_('Flag:')} {fdx.get_flag_name(rule['flag'])})    
+"""
+                disp_str = f"""{disp_str}
+------------------------------------------------------------------------------------------------------------
+{_('Matched rules')}:
+{rule_str}
+
+
+{_('Calculated Importance:')} <b>{importance:.3f}</b>, {_('Calculated Flag:')} <b>{flag:.0f}</b>
+{_('Boost from matched rules:')} <b>{entry.vals['weight']:.3f}</b>
+--------------------------------------------------------------------------------------------------------
+{_('Flag distriution:')}<b>"""
+
+                for f,v in flag_dist.items(): disp_str = f"""{disp_str} {fdx.get_flag_name(f)} ({f}): {v:.3f}"""
+
+                disp_str = f"""{disp_str}</b>
+    """
+
         if do_print: print(cli_mu(disp_str))
         return clr_mu(disp_str)
 
 
 
 
-
-
-
-
-    def out_entry_ranking(self, entry, **kargs):
-        """ Output keywords for a given entry """
-        if not entry.exists: return ''
-        
-        importance, flag, best_entries, flag_dist, results = entry.ling(index=False, rank=True, to_disp=True)
-
-        qr = FeedexQueryInterface()
-        qr.result = ResultRule()
-        qr.results = results
-        qr.result_no = len(results)
-        qr.result_no2 = 0
-
-        header = f"""{_('Rules matched for entry')} <b>{entry.vals['id']} ({entry.name()})</b>:"""
-        footer = f"""
-{_('Calculated Importance:')} <b>{importance:.3f}</b>, {_('Calculated Flag:')} <b>{flag:.0f}</b>
-{_('Saved Importance:')} <b>{entry.vals['importance']:.3f}</b>, {_('Saved Flag:')} <b>{entry.vals['flag']:.0f}</b>
-{_('Weight:')} <b>{entry.vals['weight']:.3f}</b>
---------------------------------------------------------------------------------------------------------
-{_('Flag distriution:')}<b>"""
-
-        for f,v in flag_dist.items(): footer = f"""{footer} {fdx.get_flag_name(f)} ({f}): {v:.3f}"""
-
-        footer = f"""{footer}</b>
---------------------------------------------------------------------------------------------------------
-{_('Most similar read Entries:')}<b>"""
-
-        for e in best_entries: footer = f"""{footer} {e}; """
-
-        footer = f"""{footer}</b>
-"""
-        self.display_cols = ','.join(PRINT_RULES_FOR_ENTRY)
-        self.out_table(qr, header=header, footer=footer)
 
 
 
@@ -619,8 +631,8 @@ class FeedexCLI:
 {_('Entry count')}:             <b>{stats['doc_count']}</b>
 {_('Last entry ID')}:           <b>{stats['last_doc_id']}</b>
 
-{_('Learned rule count')}:      <b>{stats['rule_count']}</b>
-{_('Manual rule count')}:       <b>{stats['user_rule_count']}</b>
+{_('Rule count')}:              <b>{stats['rule_count']}</b>
+{_('Learned terms count')}:     <b>{stats['learned_kw_count']}</b>
 
 {_('Feed count')}:              <b>{stats['feed_count']}</b>
 {_('Category count')}:          <b>{stats['cat_count']}</b>
@@ -629,12 +641,7 @@ class FeedexCLI:
 {_('First news update')}:       <b>{stats['first_update']}</b>
 
 """
-        if stats['lock']: 
-            stat_str = f"""{stat_str}
-{_('DATABASE LOCKED')}
 
-
-"""
         if stats['fetch_lock']: 
             stat_str = f"""{stat_str}
 {_('DATABASE LOCKED FOR FETCHING')}

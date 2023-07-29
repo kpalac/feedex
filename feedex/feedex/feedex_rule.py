@@ -26,12 +26,11 @@ class FeedexRule(SQLContainerEditable):
 
         if kargs.get('id') is not None: self.get_by_id(kargs.get('id'))
 
-        self.immutable = RULES_TECH_LIST
-
 
     
     def get_by_id(self, id:int):
-        content = self.DB.qr_sql("select * from rules r where r.id = :id and coalesce(r.learned, 0) <> 1", {'id':id}, one=True )
+        id = scast(id, int, -1)
+        content = self.DB.qr_sql("select * from rules r where r.id = :id", {'id':id}, one=True )
         if content in (None, (None,), ()):
             self.exists = False
             return msg(FX_ERROR_NOT_FOUND, _('Rule %a not found!'), id)
@@ -200,7 +199,7 @@ class FeedexRule(SQLContainerEditable):
         if self.DB.rowcount > 0:
 
             if not fdx.single_run: 
-                err = self.DB.load_rules()
+                err = self.DB.load_rules(ignore_lock=True)
                 if err != 0: return msg(FX_ERROR_DB, _('Error reloading rules after successfull update!'))
             
             for i,u in enumerate(self.to_update):
@@ -220,8 +219,8 @@ class FeedexRule(SQLContainerEditable):
 
 
 
-
-    def update(self, idict, **kargs):
+    def update(self, idict, **kargs): return self.DB.run_fetch_locked(self._update, idict, **kargs)
+    def _update(self, idict, **kargs):
         """ Quick update with a value dictionary"""
         if not self.exists: return FX_ERROR_NOT_FOUND
         err = self.add_to_update(idict)
@@ -230,17 +229,17 @@ class FeedexRule(SQLContainerEditable):
       
 
 
-
-    def delete(self, **kargs):
+    def delete(self, **kargs): return self.DB.run_fetch_locked(self._delete, **kargs)
+    def _delete(self, **kargs):
         """ Delete rule by ID """
         if not self.exists: return FX_ERROR_NOT_FOUND
 
-        err = self.DB.run_sql_lock("delete from rules where id = :id and learned <> 1", {'id':self.vals['id']} )
+        err = self.DB.run_sql_lock("delete from rules where id = :id", {'id':self.vals['id']} )
         if err != 0: return err
         
         if self.DB.rowcount > 0: 
             if not fdx.single_run: 
-                err = self.DB.load_rules()
+                err = self.DB.load_rules(ignore_lock=True)
                 if err != 0: return msg(FX_ERROR_DB, _('Error reloading rules after successfull delete: %a'))
 
             return msg(_('Rule %a deleted'), self.vals['id'], log=True)
@@ -250,8 +249,8 @@ class FeedexRule(SQLContainerEditable):
 
 
 
-
-    def add(self, **kargs):
+    def add(self, **kargs): return self.DB.run_fetch_locked(self._add, **kargs)
+    def _add(self, **kargs):
         """ Add feed to database """
         idict = kargs.get('new')
         if idict is not None:
@@ -259,10 +258,6 @@ class FeedexRule(SQLContainerEditable):
             self.merge(idict)
 
         self.vals['id'] = None
-        self.vals['learned'] = 0
-        self.vals['archive'] = None
-        self.vals['path'] = None
-        self.vals['context_id'] = None
         
         if kargs.get('validate',True):
             err = self.validate()
@@ -276,7 +271,7 @@ class FeedexRule(SQLContainerEditable):
         self.DB.last_rule_id = self.vals['id']
 
         if not fdx.single_run: 
-            err = self.DB.load_rules()
+            err = self.DB.load_rules(ignore_lock=True)
             if err != 0: return msg(FX_ERROR_DB, _('Error reloading rules after successfull add!'))
 
         return msg(_('Rule %a added successfully'), self.name(id=True), log=True)

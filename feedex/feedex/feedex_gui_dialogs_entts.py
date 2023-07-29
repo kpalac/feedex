@@ -202,9 +202,12 @@ class EditEntry(Gtk.Dialog):
         self.set_position(Gtk.WindowPosition.CENTER)
 
         self.result = {}
+        self.curr_image = None
         self.new_image = None
         self.response = 0
         
+        self._extract_image()
+
         self.cat_combo = f_feed_combo(self.parent, with_feeds=True, no_empty=True, ellipsize=True, tooltip=_("""Choose <b>Category</b> or <b>Channel</b> to assign this Entry to.
 It is a good idea to have categories exclusively for manually added entries for quick access to notes, hilights etc.
 <i>Every Entry needs to be assigned to a Category or a Channel</i>"""))
@@ -244,7 +247,7 @@ It is a good idea to have categories exclusively for manually added entries for 
         link_label = f_label(f'<b>{_("Link")}:</b>', wrap=False, markup=True, xalign=1)
         self.link_entry = Gtk.Entry()
 
-        image_label = f_label(f'<b>{_("Image")}:</b>', wrap=False, markup=True, xalign=1)
+        image_label = f_label(f'<b>{_("Image(s)")}:</b>', wrap=False, markup=True, xalign=1)
         self.image_entry = Gtk.Entry()
 
 
@@ -374,12 +377,24 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
 
     def on_change_image(self, *args, **kargs):
         """ Image change dialog """
-        filename = f_chooser(self, self.parent, action='open_file', header=_('Import image...') )
+        if self.new_image not in (-1, None): start_dir = os.path.dirname(self.new_image)
+        elif self.curr_image is not None: start_dir = os.path.dirname(self.curr_image)
+        else: start_dir = None
+
+        filename = f_chooser(self, self.parent, action='choose_image', header=_('Import image...'), start_dir=start_dir )
         if filename is False: return 0
-        
-        err = f_set_button_image(self.image_button, filename)
-        if err == 0: self.new_image = filename
-        else: self.new_image = None
+        elif filename == -1:
+            self.new_image = -1
+            self._remove_image(
+            f_set_button_image(self.image_button, '')
+            )
+        else:
+            err = f_set_button_image(self.image_button, filename)
+            if err == 0:
+                if filename != self.curr_image: self.new_image = filename
+                self._remove_image()
+                self._add_image()
+            else: self.new_image = None
 
         
 
@@ -437,6 +452,10 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         else:
             self.read_entry.set_text(scast(self.entry.backup_vals.get('read'), str, '0'))
 
+        if self.new_image is not None:
+            self.new_image = None
+            if self.curr_image is not None: f_set_button_image(self.image_button, self.curr_image)
+
 
     def validate(self):
         err = self.entry.validate()
@@ -458,7 +477,28 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         self.get_data()
         self.close()
 
+    def _extract_image(self, *args, **kargs):
+        self.curr_image = None
+        for l in scast(self.entry['images'], str, '').splitlines():
+            if l.startswith('<local>') and l.endswith('</local>'):
+                im = l.split('<local>')[1]
+                im = im.split('</local>')[0]
+                self.curr_image = im
 
+
+    def _remove_image(self, *args, **kargs):
+        new_imgs = ''
+        for l in scast(self.entry['images'], str, '').splitlines():
+            if l.startswith('<local>') and l.endswith('</local>'): continue
+            new_imgs = f"""{new_imgs}
+{l}"""
+        self.entry['images'] = nullif(new_imgs,'')
+
+
+    def _add_image(self, *args, **kargs):
+        im_str = scast(self.entry['images'], str, '')
+        self.entry['images'] = f"""{im_str}
+{self.new_image}"""
 
 
 

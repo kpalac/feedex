@@ -36,20 +36,12 @@ class FeedexGUIActions:
 
     def _fetch_lock(self, *args):
         """ Handle fetching lock gracefully """
-        if self.DB.locked_fetching(just_check=True):
-            dialog = YesNoDialog(self.MW, _("Database is Locked for Fetching"), f"<b>{_('Database is Locked for Fetching! Proceed and unlock?')}</b>", 
-                                subtitle=_("Another instance may be fetching news right now. If not, proceed with operation. Proceed?"), emblem='system-lock-screen-symbolic')
+        if self.DB.locked_fetching():
+            dialog = BasicDialog(self.MW, _("Database is Locked for Fetching"), f"<b>{_('Metadata edits are not allowed')}</b>", 
+                                subtitle=_("<i>If this message is due to some unforseen error, you can manually unlock database in Preferences->Database->Unlock</i>"), emblem='system-lock-screen-symbolic')
             dialog.run()
-            if dialog.response == 1:
-                dialog.destroy()
-                err = self.DB.unlock_fetching()
-                if err == 0:
-                    msg(_('Database manually unlocked for fetching...') )
-                    return True
-                else: return False
-            else:
-                dialog.destroy()
-                return False
+            dialog.destroy()
+            return False
         else: return True
 
 
@@ -88,10 +80,11 @@ class FeedexGUIActions:
         if DB.new_items > 0:
 
             self.MW.new_items = scast(self.MW.new_items, int, 0) + DB.new_items
-            self.MW.new_n = scast(self.MW.new_n, int, 1) + 1
+            self.MW.new_n = scast(self.MW.new_n, int, 0) + 1
             self.MW.feed_tab.redecorate_new()
 
             if self.config.get('gui_desktop_notify', True):
+                DB.connect_QP()
                 fx_notifier = DesktopNotifier(parent=self, icons=fdx.icons_cache)
 
                 if self.config.get('gui_notify_group','feed') == 'number':
@@ -249,9 +242,12 @@ class FeedexGUIActions:
         if err == 0:
             if new_image is not None:
                 im_file = os.path.join(self.MW.DB.img_path, f"""{item['id']}.img""")
+                tn_file = os.path.join(self.MW.DB.cache_path, f"""{item['id']}.img""")
                 try:
-                    if os.path.isfile(im_file): os.remove(im_file)
-                    copyfile(new_image, im_file)
+                    if os.path.isfile(im_file): 
+                        os.remove(im_file)
+                        os.remove(tn_file)
+                    if new_image != -1: copyfile(new_image, im_file)
                 except (OSError, IOError,) as e: msg(FX_ERROR_IO, f"""{_('Error importing %a file: ')}{e}""", new_image)
 
         DB.close()
@@ -518,6 +514,7 @@ class FeedexGUIActions:
 
     def on_del_rule(self, *args):
         """ Deletes rule - wrapper """
+        if not self._fetch_lock(): return 0
         item = args[-1]
 
         dialog = YesNoDialog(self.MW, _('Delete Rule'), f'{_("Are you sure you want to permanently delete ")}<b><i>{esc_mu(item.name())}</i></b>{_(" Rule?")}')           
@@ -534,6 +531,7 @@ class FeedexGUIActions:
 
     def on_edit_rule(self, *args):
         """ Edit / Add Rule with dialog """
+        if not self._fetch_lock(): return 0
         item = args[-1]
 
         if item is None:
@@ -566,6 +564,7 @@ class FeedexGUIActions:
 
     def on_del_flag(self, *args):
         """ Deletes flag - wrapper """
+        if not self._fetch_lock(): return 0
         item = args[-1]
 
         dialog = YesNoDialog(self.MW, _('Delete Flag'), f'{_("Are you sure you want to permanently delete ")}<b><i>{esc_mu(item.name())}</i></b>{_(" Flag?")}')           
@@ -582,6 +581,7 @@ class FeedexGUIActions:
 
     def on_edit_flag(self, *args):
         """ Edit / Add Flag with dialog """
+        if not self._fetch_lock(): return 0
         item = args[-1]
 
         if item is None:
@@ -689,27 +689,11 @@ class FeedexGUIActions:
         restart = False
         dialog = PreferencesDialog(self.MW)
         dialog.run()
-        if dialog.response == 1:
-            fdx.config = dialog.result.copy()
-            err = fdx.save_config()
-            if err == 0:
-                if dialog.reload_lang:
-                    if self.config.get('lang') not in (None,'en'):
-                        lang = gettext.translation('feedex', languages=[self.config.get('lang')])
-                        lang.install(FEEDEX_LOCALE_PATH)
-
-                if dialog.reload: self.DB.load_all()
-
-                if dialog.reload_decor:
-                    self.MW.set_profile()
-                    self.MW.win_decor()
-
-                if dialog.restart:
-                    dialog2 = BasicDialog(self.MW, _('Restart Required'), _('Restart is required for all changes to be applied.'), button_text=_('OK'), emblem='dialog-warning-symbolic' )
-                    dialog2.run()
-                    dialog2.destroy()
-
         dialog.destroy()
+        if dialog.response == 2:
+            dialog2 = BasicDialog(self.MW, _('Restart Required'), _('Restart is required for all changes to be applied.'), button_text=_('OK'), emblem='dialog-warning-symbolic' )
+            dialog2.run()
+            dialog2.destroy()
 
 
 
@@ -769,8 +753,8 @@ class FeedexGUIActions:
 {_('Entry count')}:             <b>{stats['doc_count']}</b>
 {_('Last entry ID')}:           <b>{stats['last_doc_id']}</b>
 
-{_('Learned rule count')}:      <b>{stats['rule_count']}</b>
-{_('Manual rule count')}:       <b>{stats['user_rule_count']}</b>
+{_('Rule count')}:              <b>{stats['rule_count']}</b>
+{_('Learned Keyword count')}:   <b>{stats['learned_kw_count']}</b>
 
 {_('Feed count')}:              <b>{stats['feed_count']}</b>
 {_('Category count')}:          <b>{stats['cat_count']}</b>
@@ -779,9 +763,7 @@ class FeedexGUIActions:
 {_('First news update')}:       <b>{stats['first_update']}</b>
 
 """
-        if stats['lock']: 
-            stat_str = f"""{stat_str}
-{_('DATABASE LOCKED')}"""
+
         if stats['fetch_lock']: 
             stat_str = f"""{stat_str}
 {_('DATABASE LOCKED FOR FETCHING')}"""
@@ -855,17 +837,17 @@ class FeedexGUIActions:
 
     def on_maintenance(self, *args, **kargs):
         """ BD Maintenance """
-        if fdx.busy: return -1
         if not self._fetch_lock(): return 0
+        if fdx.busy: return -1
         
         dialog = YesNoDialog(self.MW, _('DB Maintenance'), _('Are you sure you want to DB maintenance? This may take a long time...'), emblem='system-run-symbolic' )  
         dialog.run()
+        dialog.destroy()
         if dialog.response == 1:
             fdx.bus_append(FX_ACTION_BLOCK_DB)
             fdx.busy = True
             t = threading.Thread(target=self.on_maintenance_thr)
             t.start()
-        dialog.destroy()
 
 
 
@@ -883,61 +865,68 @@ class FeedexGUIActions:
         dialog = YesNoDialog(self.MW, _('Clear Cache'), _('Do you want to delete all downloaded and cached images/thumbnails?'),  emblem='edit-clear-all-symbolic')
         dialog.run()
         if dialog.response == 1:
+            dialog.destroy()
             fdx.bus_append(FX_ACTION_BLOCK_DB)
             fdx.busy = True
             t = threading.Thread(target=self.on_clear_cache_thr)
             t.start()
-        dialog.destroy()
 
     
-    def del_learned_rules(self, *args):
-        """ Wrapper for deleting learned rules from DB """
+    def del_learned_keywords(self, *args):
+        """ Wrapper for deleting learned keywords from DB """
         if fdx.busy: return -1
         if not self._fetch_lock(): return 0
-        dialog = YesNoDialog(self.MW, _('Delete Learned Rules?'), _('Do you want delete all learned rules used for ranking?'), 
-                             subtitle=_('<i>This action is permanent. Relearning rules can be time consuming</i>'),  emblem='dialog-warning-symbolic')
+        dialog = YesNoDialog(self.MW, _('Delete Learned Keywords?'), _('Do you want delete all learned Keywords used for recommendations?'), 
+                             subtitle=_('<i>This action is permanent. Relearning can be time consuming</i>'),  emblem='dialog-warning-symbolic')
         dialog.run()
+        dialog.destroy()
         if dialog.response == 1:
-            dialog.destroy()
-            dialog2 = YesNoDialog(self.MW, _('Delete Learned Rules?'), _('Are you sure?'), emblem='dialog-warning-symbolic')
+            dialog2 = YesNoDialog(self.MW, _('Delete Learned Keywords?'), _('Are you sure?'), emblem='dialog-warning-symbolic')
             dialog2.run()
-            if dialog2.response == 1:
-                err = self.DB.delete_learned_rules()
-                if err == 0: 
-                    if self.MW.learned_rules_tab != -1: self.MW._get_upn_page_obj(self.MW.learned_rules_tab).query(None)
             dialog2.destroy()
-        else: dialog.destroy()
+            if dialog2.response == 1:
+                err = self.DB.delete_learned_terms()
+                if err == 0: 
+                    if self.MW.learned_tab != -1: self.MW._get_upn_page_obj(self.MW.learned_tab).query(None, None)
         
 
 
 
-    def relearn_rules_thr(self, *args):
+    def relearn_keywords_thr(self, *args):
         DB = FeedexDatabase(connect=True)
         DB.recalculate(learn=True, rank=False, index=False)
+        DB.load_terms()
         DB.close()
-        if self.MW.learned_rules_tab != -1: self.MW._get_upn_page_obj(self.MW.learned_rules_tab).query(None)
+        if self.MW.learned_tab != -1: self.MW._get_upn_page_obj(self.MW.learned_tab).query(None, None)
         fdx.busy = False
         fdx.bus_append(FX_ACTION_UNBLOCK_DB)
 
 
-    def relearn_rules(self, *args):
-        """ Wrapper for relearning rules """
+    def relearn_keywords(self, *args):
+        """ Wrapper for relearning keywords """
         if fdx.busy: return -1
         if not self._fetch_lock(): return 0
-        dialog = YesNoDialog(self.MW, _('Relearn Ranking Rules?'), _('Do you want to relearn rules for Ranking from read/marked entries?'), 
+        dialog = YesNoDialog(self.MW, _('Relearn Keywords?'), _('Do you want to relearn Keywords for recommendations?'), 
                              subtitle=_('<i>This may take a long time</i>'),  emblem='applications-engineering-symbolic')
         dialog.run()
+        dialog.destroy()
         if dialog.response == 1:
             fdx.bus_append(FX_ACTION_BLOCK_DB)
             fdx.busy = True
-            t = threading.Thread(target=self.relearn_rules_thr)
+            t = threading.Thread(target=self.relearn_keywords_thr)
             t.start()
+
+
+    def on_unlock_fetching(self, *args):
+        """ Wrapper for manually lifting fetch lock """
+        dialog = YesNoDialog(self.MW, _('Lift Fetching Lock?'), _('Are you sure? If Feedex is currently fetchin/importing it may cause data inconsistency'),  emblem='dialog-warning-symbolic')
+        dialog.run()
         dialog.destroy()
-
-
-
-
-
+        if dialog.response == 1:
+            err = self.DB.unlock_fetching()
+            if err == 0: return msg(_('Database unlocked for fetching'))
+            else: return err
+        return 0
 
 
 
@@ -1117,6 +1106,7 @@ class FeedexGUIActions:
 
     def import_catalog(self, *args, **kargs):
         """ Import feeds from Catalog """
+        if not self._fetch_lock(): return 0
         ids = args[-1]
         item = FeedexCatalog(db=self.DB)
         item.prep_import(ids)

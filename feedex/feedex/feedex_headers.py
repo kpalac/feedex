@@ -42,7 +42,7 @@ import gettext
 # Our modules
 from feedex_data import *
 from feedex_utils import *
-from feedex_containers import SQLContainer, SQLContainerEditable, ResultEntry, ResultContext, ResultFeed, ResultRule, ResultFlag, ResultTerm, ResultTimeSeries, ResultHistoryItem, FeedexHistoryItem, FeedexFlag
+from feedex_containers import SQLContainer, SQLContainerEditable, ResultEntry, ResultContext, ResultFeed, ResultRule, ResultFlag, ResultTerm, ResultTimeSeries, ResultHistoryItem, FeedexHistoryItem, FeedexFlag, FeedexKwTerm, ResultKwTerm, ResultKwTermShort, ResultFetch
 
 from smallsem import SmallSem
 from feedex_nlp import FeedexLP
@@ -55,7 +55,7 @@ from feedex_handlers import FeedexRSSHandler, FeedexHTMLHandler, FeedexScriptHan
 
 
 from feeder_query import FeedexQuery, FeedexQueryInterface, FeedexCatalogQuery
-from feeder import FeedexDatabase, FeedexDatabaseError, FeedexDataError
+from feeder import FeedexDatabase, FeedexDatabaseError, FeedexDataError, FeedexDatabaseLockedError, FeedexDatabaseNotFoundError
 
 from feedex_cli import FeedexCLI
 

@@ -56,7 +56,6 @@ class FeedexTab(Gtk.VBox):
         
         self.header = f_label('', markup=True, wrap=False)        
         
-        self.prev_footer = '' # Preview footer
         self.top_entry_prev = False # Is top entry in preview window?
 
         self.save_to_cache = True # Should this tab type be savet to cache?
@@ -69,7 +68,7 @@ class FeedexTab(Gtk.VBox):
         if self.type == FX_TAB_SEARCH:
             self.header_icon_name = 'edit-find-symbolic'
             self.table = FeedexGUITable(self, ResultGUIEntry(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""Double-click to open in browser. 
+            self.table.view.set_tooltip_markup(_("""Double-click to open in browser or edit. 
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search by Title
 Hit <b>F2</b> for Menu
@@ -81,7 +80,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         elif self.type == FX_TAB_PLACES:
             self.header_icon_name = 'folder-open-symbolic'
             self.table = FeedexGUITable(self, ResultGUIEntry(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""Double-click to open in browser. 
+            self.table.view.set_tooltip_markup(_("""Double-click to open in browser or edit. 
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search by Title
 Hit <b>F2</b> for Menu
@@ -107,7 +106,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         elif self.type == FX_TAB_SIMILAR:
             self.header_icon_name = 'emblem-shared-symbolic'
             self.table = FeedexGUITable(self, ResultGUIEntry(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""Search items similar to Entry.
+            self.table.view.set_tooltip_markup(_("""Items similar to given entry.
 Double-click to open the entry.
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search by Title
@@ -122,7 +121,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         elif self.type == FX_TAB_TERM_NET:
             self.header_icon_name = 'emblem-shared-symbolic'
             self.table = FeedexGUITable(self, ResultGUITerm(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""These are terms related to the one queried for. 
+            self.table.view.set_tooltip_markup(_("""Terms related to the one queried for. 
 Right-click for more options            
 Hit <b>Ctrl-F</b> for interactive search
 Hit <b>F2</b> for Menu
@@ -148,10 +147,11 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
             self.header_icon_name = 'view-list-compact-symbolic'
             self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True)
             self.table.view.set_tooltip_markup(_("""These are manually added rules used for ranking and flagging.
-Each time articles are fetched or notes added, they are ranked according to these rules and flagged accordingly.
-Additionally, if learning is enabled, new items are also checked against learned rules and ranked accordingly.
-Both those types of rules contribute to Item's importance and flag.                                                  
-Double-click to edit. 
+Each time articles are fetched or notes added, they are matched against these rules.
+Rule's weight contributes to <b>importance</b> and <b>flag</b> accordingly.
+When recommending, items are sorted first by user's rules' importance, then by ranking from learned features if enabled.                                                 
+
+Double-click to edit.
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search
 Hit <b>F2</b> for Menu
@@ -165,6 +165,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.table = FeedexGUITable(self, ResultGUIFlag(main_win=self.MW), grid=True)
             self.table.view.set_tooltip_markup(_("""Flags used in rules and for manual marking of Entries.
 Their names, descriptions and colors are completely arbitrary and up to user.
+
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search by Name
 Hit <b>F2</b> for Menu
@@ -177,6 +178,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header_icon_name = 'extension-symbolic'
             self.table = FeedexGUITable(self, ResultGUIPlugin(main_win=self.MW), grid=True)
             self.table.view.set_tooltip_markup(_("""Plugins available in context menus allowing user to run custom shell commands and scripts on items
+
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search
 Hit <b>F2</b> for Menu
@@ -189,7 +191,8 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header_icon_name = 'histogram-symbolic'
             self.table = FeedexGUITable(self, ResultGUITimeSeries(main_win=self.MW))
             self.table.view.set_tooltip_markup(_("""Time distribution for similar documents.
-It shows how subjects prominent in a Document were relevant in a time period. 
+It shows how subjects prominent in a Document were relevant in a time range. 
+
 Right-click for more options            
 Hit <b>Ctrl-F</b> for interactive search
 Hit <b>F2</b> for Menu
@@ -204,7 +207,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
         elif self.type == FX_TAB_TREE:
             self.header_icon_name = 'view-filter-symbolic'
             self.table = FeedexGUITable(self, ResultGUITree(main_win=self.MW), tree=True)
-            self.table.view.set_tooltip_markup(_("""Double-click to open in browser. 
+            self.table.view.set_tooltip_markup(_("""Double-click to open in browser or edit. 
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search by Title
 Hit <b>F2</b> for Menu
@@ -216,7 +219,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         elif self.type == FX_TAB_NOTES:
             self.header_icon_name = 'format-unordered-list-symbolic'
             self.table = FeedexGUITable(self, ResultGUINote(main_win=self.MW), notes=True)
-            self.table.view.set_tooltip_markup(_("""Double-click to edit. 
+            self.table.view.set_tooltip_markup(_("""Double-click to edit or open in browser. 
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search by Title
 Hit <b>F2</b> for Menu
@@ -237,24 +240,13 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.mutable = False
 
 
-        elif self.type == FX_TAB_TRENDING:
-            self.header_icon_name = 'globe-symbolic'
-            self.table = FeedexGUITable(self, ResultGUIEntry(main_win=self.MW))
-            self.table.view.set_tooltip_markup(_("""These are the 'most talked about' terms in filtered documents
-Double-click to open in browser. 
-Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search by Title
-Hit <b>F2</b> for Menu
-Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
-            self.header.set_markup(_('Trending'))
-
-
         elif self.type == FX_TAB_CATALOG:
             self.header_icon_name = 'rss-symbolic'
             self.table = FeedexGUITable(self, ResultGUICatItem(main_win=self.MW), tree=True)
             self.table.view.set_tooltip_markup(_("""Mark Channels/Categories to Import.
 If Channel's parent category is selected, it will be imported as well (if a category of the same name does not exist)
 <i> Sorry about this catalog being in English only :( </i> 
+
 Hit <b>F2</b> for Menu
 Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.header.set_markup(_('Find Feeds...'))
@@ -263,46 +255,13 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.mutable = False
 
 
-        elif self.type == FX_TAB_KEYWORDS:
-            self.header_icon_name = 'system-run-symbolic'
-            self.table = FeedexGUITable(self, ResultGUITerm(main_win=self.MW), table='keywords')
-            self.table.view.set_tooltip_markup(_("""Keywords for a Document.
-Those are extracted using heuristic learning algo and used to create rules for ranking incomming items.
-Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search
-Hit <b>F2</b> for Menu
-Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
-            self.header.set_markup(_('Keywords for...'))
-            self.save_to_cache = False
-            self.prependable = False
-            self.mutable = False
-            self.top_entry_prev = True
-
-
-        elif self.type == FX_TAB_RANK:
-            self.header_icon_name = 'applications-engineering-symbolic'
-            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True, table='rules_rank')
-            self.table.view.set_tooltip_markup(_("""Ranking for a Document using Rules learned after <b>adding Entries</b> and <b>reading Articles</b>
-<i>Ranking summary can be found at Document's footer in preview window</i>
-Right-click for more options
-Hit <b>Ctrl-F</b> for interactive search
-Hit <b>F2</b> for Menu
-Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
-            self.header.set_markup(_('Ranking for...'))
-            self.save_to_cache = False
-            self.prependable = False
-            self.mutable = False
-            self.top_entry_prev = True
-
 
         elif self.type == FX_TAB_LEARNED:
             self.header_icon_name = 'applications-engineering-symbolic'
-            self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True, table='rules_learned')
-            self.table.view.set_tooltip_markup(_("""List of Rules learned after <b>adding Entries</b> and <b>reading Articles</b>
-<b>Name</b> - Displayed name, <i>not matched</i>, purely informational
-<b>Match string</b> - String matched against tokenized Entry with prefixes
-<b>Weight</b> - Weight added to Entry when the rule is matched (rule weights are offset by Entry weight to avoid overvaluing very long articles
-<b>Context ID</b> - ID of the Entry the rule was extracted from
+            self.table = FeedexGUITable(self, ResultGUIKwTerm(main_win=self.MW), grid=True, table='keywords_learned')
+            self.table.view.set_tooltip_markup(_("""List of Keywords learned after <b>adding Entries</b> and <b>reading Articles</b>
+They are used for recommending articles based on your previous choices.
+
 Right-click for more options
 Hit <b>Ctrl-F</b> for interactive search
 Hit <b>F2</b> for Menu
@@ -361,6 +320,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 (self.query_combo, self.query_entry) = f_combo_entry(self.history, connect=self.on_query, connect_button=self._clear_query_entry, tooltip_button=_('Clear search phrase'))
                 self.query_entry.connect("populate-popup", self._on_query_entry_menu)
                 self.query_combo.connect('button-press-event', self._on_button_press_header)
+                self.query_entry.connect('changed', self._on_entry_changed)
 
                 self.search_button      = f_button(None,'edit-find-symbolic', connect=self.on_query)
                 self.search_button.connect('button-press-event', self._on_button_press_header)
@@ -391,8 +351,8 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                         curr_widget = self.group_combo = f_group_combo(ellipsize=False, with_times=True, tooltip=_('Select grouping field\n<b>Grouping by Similarity will collapse similar entries into most important node</b>\n<i>Note that grouping by similarity will be very time consuming for large date ranges</i>') )
                     elif f == 'depth':
                         curr_widget = self.depth_combo = f_depth_combo(ellipsize=False, tooltip=_('Select how many top results to show for each grouping') )
-                    elif f == 'sort':
-                        curr_widget = self.sort_combo = f_sort_combo(ellipsize=False, tooltip=_('Default ranking/sorting\nUse <b>Importance</b> to rank by most interesting entries for you based on previously read articles\nUse <b>Trending</b> to rank by most talked about subjects (<i>time consming for large time ranges</i>)\nUse <b>Debubble</b> to show news with the least importance for each grouping') )
+                    elif f == 'rank':
+                        curr_widget = self.rank_combo = f_rank_combo(ellipsize=False)
                     elif f == 'time':
                         curr_widget = self.qtime_combo = f_time_combo(connect=self.on_date_changed, ellipsize=False, tooltip=f"""{_('Filter by date')}\n<i>{_('Searching whole database can be time consuming for large datasets')}</i>""")
                     elif f == 'cat':
@@ -559,7 +519,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         """ Selection change handler"""
         if isinstance(self.table.result, (ResultEntry, ResultContext,)): 
             sel = self.table.get_selection()
-            if sel is not None: self.MW.load_preview(sel)
+            if isinstance(sel, (ResultEntry, ResultContext,)): self.MW.load_preview(sel)
             else: self.MW.startup_decor()
 
         elif isinstance(self.table.result, ResultRule) and self.type in (FX_TAB_RULES, FX_TAB_LEARNED,): 
@@ -583,8 +543,8 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         result = self.table.get_selection()
         if isinstance(result, (ResultEntry, ResultContext,)):
             if scast(result['link'],str,'').strip() != '': self.MW.act.on_open_entry(result) 
-            else: self.MW.on_edit_entry(False, result)
-        elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.act.on_edit_rule(result)
+            else: self.MW.act.on_edit_entry(False, result)
+        elif isinstance(result, ResultRule): self.MW.act.on_edit_rule(result)
         elif isinstance(result, ResultFlag): self.MW.act.on_edit_flag(result)
         elif isinstance(result, ResultPlugin): self.MW.act.on_edit_plugin(result)
 
@@ -599,10 +559,15 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         menu.append( f_menu_item(1, _('Clear Search History'), self.MW.act.on_clear_history, icon='edit-clear-all-symbolic'))
         menu.show_all()
 
+    def _on_entry_changed(self, entry, *args):
+        """ Deactivate ranking combo if query phrase is not empty """
+        if hasattr(self, 'rank_combo'):
+            if entry.get_text().strip() == '': self.rank_combo.set_sensitive(True)
+            else: self.rank_combo.set_sensitive(False)
 
     def save_filters(self, *args, **kargs):
         """ Save current search filters as default for the future """
-        if self.type in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_TIME_SERIES, FX_TAB_REL_TIME, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDING, FX_TAB_TRENDS):
+        if self.type in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_TIME_SERIES, FX_TAB_REL_TIME, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDS):
             self.get_search_filters()
             self.MW.default_search_filters = self.search_filters.copy()
             self.MW.gui_cache['default_search_filters'] = self.search_filters.copy()
@@ -727,7 +692,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         if hasattr(self, 'time_series_combo'): self.search_filters['group'] = f_get_combo(self.time_series_combo)
         if hasattr(self, 'group_combo'): self.search_filters['group'] = f_get_combo(self.group_combo)
         if hasattr(self, 'depth_combo'): self.search_filters['depth'] = f_get_combo(self.depth_combo)            
-        if hasattr(self, 'sort_combo'): self.search_filters['fallback_sort'] = f_get_combo(self.sort_combo)
+        if hasattr(self, 'rank_combo'): self.search_filters['rank'] = f_get_combo(self.rank_combo)
 
         if hasattr(self, 'page_len_combo'): 
             self.search_filters['page_len'] = f_get_combo(self.page_len_combo)
@@ -773,7 +738,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         if hasattr(self, 'time_series_combo'): f_set_combo(self.time_series_combo, search_filters.get('group'))
         if hasattr(self, 'group_combo'): f_set_combo(self.group_combo, search_filters.get('group'))
         if hasattr(self, 'depth_combo'): f_set_combo(self.depth_combo, search_filters.get('depth'))
-        if hasattr(self, 'sort_combo'): f_set_combo(self.sort_combo, search_filters.get('fallback_sort'))
+        if hasattr(self, 'rank_combo'): f_set_combo(self.rank_combo, search_filters.get('rank'))
         if hasattr(self, 'page_len_combo'): f_set_combo(self.page_len_combo, search_filters.get('page_len'))
 
         self._on_filters_changed()
@@ -826,9 +791,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         self.table.commit_populate()
 
         if self.top_entry is not None and isinstance(self.top_entry, (ResultEntry, FeedexEntry,)):
-            if self.top_entry_prev:
-                if self.prev_footer not in ('', None): self.top_entry.vals['prev_footer'] = self.prev_footer
-                self.MW.load_preview(self.top_entry)
+            if self.top_entry_prev and self.MW.curr_upper.uid == self.uid: self.MW.load_preview(self.top_entry)
             if isinstance(self.table.result, (ResultEntry,)): self.table.append(self.top_entry)
 
 
@@ -852,7 +815,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         
         if self.type == FX_TAB_PLACES and self.MW.curr_place in (FX_PLACE_LAST, FX_PLACE_PREV_LAST,): 
             self.MW.new_items = 0
-            self.MW.new_n = 1
+            self.MW.new_n = 0
             self.MW.feed_tab.redecorate_new()
 
 
@@ -881,6 +844,12 @@ Escape: \ (only if before wildcards and field markers)""") )
             DB.connect_QP()
             QP = DB.Q
 
+        if filters is not None: rank_scheme = filters.get('rank')
+
+
+        if scast(qr, str, '').replace(' ','') == '': empty = True
+        else: empty = False
+
         err = 0
 
         # Do query ...
@@ -888,8 +857,16 @@ Escape: \ (only if before wildcards and field markers)""") )
 
             feed_name = f_get_combo(self.cat_combo, name=True)
 
-            filters['rev'] = False
-            err = QP.query(qr, filters)
+            if not empty: err = QP.query(qr, filters)
+            elif rank_scheme == FX_RANK_RECOM: err = QP.recommend(filters, no_history=True)
+            elif rank_scheme == FX_RANK_TREND: err = QP.trending('', filters, no_history=True)
+            elif rank_scheme == FX_RANK_DEBUBBLE:
+                filters['rev'] = True
+                err = QP.recommend(filters, no_history=True)
+            else:
+                filters['sort'] = 'pubdate'
+                err = QP.query('', filters, no_history=True)
+
 
             if QP.phrase.get('empty',False):
                 if feed_name is None: self.final_status = _('Results')
@@ -909,13 +886,13 @@ Escape: \ (only if before wildcards and field markers)""") )
                 self.final_status = _('Trash bin')
 
             else:
-                filters = {'sort':'importance'}
+
                 if qr == FX_PLACE_LAST:
                     if self.MW.new_n <= 1: filters['last'] = True
                     else: filters['last_n'] = self.MW.new_n
                     self.final_status = _('News')
-                elif qr == FX_PLACE_PREV_LAST:
-                    filters['last_n'] = self.MW.new_n + 1
+                elif qr == FX_PLACE_PREV_LAST or qr == 0:
+                    filters['last'] = True
                     self.final_status = _('News')
                 elif qr == FX_PLACE_LAST_HOUR: 
                     filters['last_hour'] = True
@@ -938,131 +915,69 @@ Escape: \ (only if before wildcards and field markers)""") )
                 elif qr == FX_PLACE_LAST_YEAR: 
                     filters['last_year'] = True
                     self.final_status = _('Year')
+                elif qr < 0:
+                    filters['last_n'] = -qr
+                    self.final_status = _('Prev. Updates')
 
-                err = QP.query('', filters, no_history=True)
+                err = QP.recommend(filters, no_history=True)
 
 
         elif self.type == FX_TAB_SIMILAR and self.top_entry is not None:
-
             self.final_status = _('Similar to ...')            
-            filters['rev'] = False
-            err = QP.find_similar(self.top_entry['id'], **filters)
-
-
-        elif self.type == FX_TAB_KEYWORDS and self.top_entry is not None:
-            self.final_status = _('Keywords for...')            
-            filters['rev'] = False
-            if not isinstance(self.top_entry, FeedexEntry): self.top_entry = self.top_entry.convert(FeedexEntry, DB, id=self.top_entry.get('id'))
-            err = self.top_entry.ling(index=False, rank=False, learn=True, save_rules=False, learning_depth=filters.get('depth', MAX_FEATURES_PER_ENTRY))
-            if err == 0:
-                QP.results = []
-                for r in self.top_entry.rules: QP.results.append( (r['name'], r['weight'], r['string']) )
-                QP.result_no = len(QP.results)
-
-
-        elif self.type == FX_TAB_RANK and self.top_entry is not None:
-            self.final_status = _('Ranking for...')            
-            filters['rev'] = False
-            if not isinstance(self.top_entry, FeedexEntry): self.top_entry = self.top_entry.convert(FeedexEntry, DB, id=self.top_entry.get('id'))
-            importance, flag, best_entries, flag_dist, rules = self.top_entry.ling(rank=True, index=False, learn=False, to_disp=True)
-            footer = f"""{_('Rules matched')}: <b>{len(rules)}</b>
-{_('Saved Importance')}: <b>{self.top_entry['importance']:.3f}</b>
-{_('Saved Flag')}: <b>{self.top_entry['flag']:.0f}</b>
-
-{_('Calculated Importance')}: <b>{importance:.3f}</b>
-{_('Caculated Flag')}: <b>{flag:.0f}</b>
-
-"""
-            flag_dist_str = ''
-            for f,v in flag_dist.items(): flag_dist_str =  f"{flag_dist_str}\n{fdx.get_flag_name(f)} ({f}): <b>{v:.3f}</b>"
-
-            if flag_dist_str != '': footer = f"""{footer}
-{_('Flag distribution')}: 
-{flag_dist_str}
-"""
-
-
-
-            footer = f"""{footer}
-
-
-{_('Most similar read Entries')}: <b>"""
-            for e in best_entries: 
-                if e not in (0, self.top_entry.get('id')): footer = f"""{footer}{e}, """
-            footer = f"""{footer}</b>"""
-            self.prev_footer = footer
-
-            QP.results = rules
-            QP.result_no = len(rules)
-            err = 0
-
+            err = QP.similar(self.top_entry['id'], filters)
 
         elif self.type == FX_TAB_REL_TIME and self.top_entry is not None:
-            filters['rev'] = False
             self.final_status = _('Relevance in Time ...')            
-            err = QP.relevance_in_time(self.top_entry['id'], **filters)
+            err = QP.relevance_in_time(self.top_entry['id'], filters)
 
         elif self.type == FX_TAB_CONTEXTS:
-            filters['rev'] = False
             self.final_status = f'{_("Contexts for ")}<b>{esc_mu(qr, ell=50)}</b>'
-            err = QP.term_context(qr, **filters)
+            err = QP.context(qr, filters)
 
         elif self.type == FX_TAB_TERM_NET:
-            filters['rev'] = False
             self.final_status = f'{_("Terms related to ")}<b>{esc_mu(qr, ell=50)}</b>'
-            err = QP.term_net(qr, print=False, lang=filters.get('lang'))
+            err = QP.term_net(qr, filters)
 
         elif self.type == FX_TAB_TRENDS:
-            filters['rev'] = False
             self.final_status = f'{_("Trends ")}<b>{esc_mu(qr, ell=50)}</b>'
-            err = QP.get_trends(qr, filters)
+            err = QP.trends(qr, filters)
         
-        elif self.type == FX_TAB_TRENDING:
-            filters['rev'] = False
-            self.final_status = f'{_("Trending ")}<b>{esc_mu(qr, ell=50)}</b>'
-            err = QP.get_trending(qr, filters)
-
-
         elif self.type == FX_TAB_TIME_SERIES:
-            filters['rev'] = False
             self.final_status = f'{_("Time Series for ")}<b>{esc_mu(qr, ell=50)}</b>'
-            err = QP.term_in_time(qr, **filters)
+            err = QP.time_series(qr, filters)
 
 
         elif self.type == FX_TAB_TREE:
 
             group = filters.get('group','category')
 
-            if filters.get('fallback_sort') == 'trends': 
-                filters['fallback_sort'] = None
-                trends = True
-            else: trends = False
+            if not empty: head_beg = f'<b>{esc_mu(qr, ell=50)}</b>'
+            elif rank_scheme == FX_RANK_RECOM: head_beg = _('Recomm.')
+            elif rank_scheme == FX_RANK_TREND: head_beg = _('Trending')
+            elif rank_scheme == FX_RANK_DEBUBBLE: head_beg = _('Debubble')
+            else: head_beg = _('Latest')
 
-            if group == 'category': 
-                if not trends: self.final_status = f'{_("Summary by Category")} <b>{esc_mu(qr, ell=50)}</b>'
-                else: self.final_status = f'{_("Trending Summary by Category")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'feed': 
-                if not trends: self.final_status = f'{_("Summary by Channel")} <b>{esc_mu(qr, ell=50)}</b>'
-                else: self.final_status = f'{_("Trending Summary by Channel")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'flag': 
-                if not trends: self.final_status = f'{_("Summary by Flag")} <b>{esc_mu(qr, ell=50)}</b>'
-                else: self.final_status = f'{_("Trending Summary by Flag")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'similar': 
-                if not trends: self.final_status = f'{_("Summary by Sim.")} <b>{esc_mu(qr, ell=50)}</b>'
-                else: self.final_status = f'{_("Trending Summary by Sim.")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'monthly': 
-                if not trends: self.final_status = f'{_("Summary by Month")} <b>{esc_mu(qr, ell=50)}</b>'
-                else: self.final_status = f'{_("Trending Summary by Month")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'daily': 
-                if not trends: self.final_status = f'{_("Summary by Day")} <b>{esc_mu(qr, ell=50)}</b>'
-                else: self.final_status = f'{_("Trending Summary by Day")} <b>{esc_mu(qr, ell=50)}</b>'
-            elif group == 'hourly': 
-                if not trends: self.final_status = f'{_("Summary by Hour")} <b>{esc_mu(qr, ell=50)}</b>'
-                else: self.final_status = f'{_("Trending Summary by Hour")} <b>{esc_mu(qr, ell=50)}</b>'
+            if group == 'category': head_end = _('by Category')
+            elif group == 'feed': head_end = _('by Channel')
+            elif group == 'flag': head_end = _('by Flag')
+            elif group == 'similar': head_end = _('by Simil.')
+            elif group == 'monthly': head_end = _('by Month')
+            elif group == 'daily': head_end = _('by Day')
+            elif group == 'hourly': head_end = _('by Hour')
 
-            filters['rev'] = False
-            if not trends: err = QP.query(qr, filters, allow_group=True)
-            else: err = QP.get_trending(qr, filters,  allow_group=True)
+            self.final_status = f'{head_beg} {head_end}'
+
+            if not empty:
+                err = QP.query(qr, filters, allow_group=True)
+            elif rank_scheme == FX_RANK_RECOM: err = QP.recommend(filters, allow_group=True)
+            elif rank_scheme == FX_RANK_TREND: err = QP.trending('', filters, allow_group=True)
+            elif rank_scheme == FX_RANK_DEBUBBLE:
+                filters['rev'] = True
+                err = QP.recommend(filters, allow_group=True)
+            else:
+                filters['sort'] = 'pubdate'
+                err = QP.query('', filters, allow_group=True)
+
 
 
         elif self.type == FX_TAB_RULES:
@@ -1070,8 +985,8 @@ Escape: \ (only if before wildcards and field markers)""") )
             err = QP.list_rules()
 
         elif self.type == FX_TAB_LEARNED:
-            self.final_status = _('Learned Rules')
-            err = QP.list_rules(learned=True)
+            self.final_status = _('Learned Keywords')
+            err = QP.list_learned_terms()
 
 
         elif self.type == FX_TAB_FLAGS:
@@ -1092,7 +1007,8 @@ Escape: \ (only if before wildcards and field markers)""") )
 
 
         if err == 0: self.table.populate(QP)
-        
+        else: self.final_status = f"""<span foreground="red">{self.final_status}</span>"""
+
         if DB is not None: DB.close()
         fdx.bus_append((FX_ACTION_FINISHED_SEARCH, self.uid,))
 
@@ -1107,7 +1023,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         self.busy = True
         
         if self.type in (FX_TAB_TREE, FX_TAB_TRENDS): self.block_search(_("Generating summary...") )
-        elif self.type in (FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS, FX_TAB_LEARNED, FX_TAB_KEYWORDS, FX_TAB_RANK,): self.block_search(_("Getting data...") )
+        elif self.type in (FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS, FX_TAB_LEARNED,): self.block_search(_("Getting data...") )
         elif self.type == FX_TAB_CATALOG: self.block_search(_('Querying Feed Catalog...'))
         else: self.block_search(_("Searching...") )
 
