@@ -517,6 +517,8 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
     def _on_changed_selection(self, *args, **kargs):
         """ Selection change handler"""
+        if self.uid != self.MW.curr_upper.uid: return 0
+        
         if isinstance(self.table.result, (ResultEntry, ResultContext,)): 
             sel = self.table.get_selection()
             if isinstance(sel, (ResultEntry, ResultContext,)): self.MW.load_preview(sel)

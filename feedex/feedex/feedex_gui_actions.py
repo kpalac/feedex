@@ -456,7 +456,7 @@ class FeedexGUIActions:
         dialog.run()
         if dialog.response == 1:
             err = self.DB.clear_history()
-            if err == 0: self.MW.reload_history_all()
+            if err == 0: self.reload_history_all()
         dialog.destroy()
 
 
