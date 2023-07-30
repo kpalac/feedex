@@ -327,6 +327,7 @@ class ResultEntry(SQLContainer):
         self.vals['feed_name_id'] = f"""{self.vals['feed_name']} ({feed['id']})"""
         self.vals['pubdate_r'] = datetime.fromtimestamp(self.vals.get('pubdate',0))
         self.vals['pubdate_short'] = datetime.strftime(self.vals['pubdate_r'], '%Y.%m.%d')
+        self.vals['pubdate_r'] = self.vals['pubdate_r'].strftime('%Y-%m-%d %H:%M:%S')
         if coalesce(self.vals['flag'],0) > 0: self.vals['flag_name'] = fdx.get_flag_name(coalesce(self.vals['flag'],0))
         self.vals['user_agent'] = feed['user_agent']
         self.vals['parent_id'] = feed['parent_id']

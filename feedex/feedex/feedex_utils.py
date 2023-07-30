@@ -1108,7 +1108,7 @@ def load_json(infile, default, **kargs):
     try:
         with open(infile, 'r') as f:
             out = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
+    except (OSError, TypeError, json.JSONDecodeError) as e:
         msg(FX_ERROR_IO, _('Error reading from %a: %b'), infile, e )
         return default
     return out
@@ -1124,7 +1124,7 @@ def save_json(ofile:str, data, **kargs):
         with open(ofile, 'w') as f:
             json.dump(data, f)
         msg(_('Data saved to %a'), ofile)
-    except (OSError, json.JSONDecodeError) as e:
+    except (OSError, TypeError, json.JSONDecodeError) as e:
         msg(FX_ERROR_IO, _('Error writing to %a: %b'), ofile, e)
         return -1
     return 0

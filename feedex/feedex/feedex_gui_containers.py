@@ -539,13 +539,6 @@ class FeedexPlugin(ResultPlugin):
         if isinstance(item, SQLContainer):
 
             is_cont = True
-            tmp_file_in = os.path.join(self.MW.DB.cache_path, f"""{random_str(length=30)}.tmp""")
-            while os.path.isfile(tmp_file_in): tmp_file_in = os.path.join(self.MW.DB.cache_path, f"""{random_str(length=30)}.tmp""")    
-
-            if self.vals['type'] == FX_PLUGIN_RESULTS: save_json(tmp_file_in, self.MW.curr_upper.table.results)
-            else: save_json(tmp_file_in, item)
-
-            run_env['FEEDEX_TMP_FILE'] = tmp_file_in
             run_env['FEEDEX_TABLE'] = item.table
             run_env['FEEDEX_FIELDS'] = ';'.join(item.fields)
 
@@ -565,27 +558,46 @@ class FeedexPlugin(ResultPlugin):
             if '%choose_file_save%' in arg:
                 filename = f_chooser(self.MW, self.MW, action='save', header=_('Save to...'))
                 if filename is not False: arg = arg.replace('%choose_file_save%', filename)
+                else: return msg(_('No file chosen'))
             if '%choose_file_open%' in arg:
                 filename = f_chooser(self.MW, self.MW, action='open_file', header=_('Choose File...'))
                 if filename is not False: arg = arg.replace('%choose_file_open%', filename)
+                else: return msg(_('No file chosen'))
             if '%choose_dir_open%' in arg:
                 filename = f_chooser(self.MW, self.MW, action='open_dir', header=_('Choose Directory...'))
                 if filename is not False: arg = arg.replace('%choose_dir_open%', filename)
+                else: return msg(_('No directory chosen'))
 
             # Substitute fields
-            if is_cont:
-                arg = arg.replace('%T', tmp_file_in)
-                arg = arg.replace('%t', item.table)
-            elif '%S' in arg and type(item) is str:
+            if '%S' in arg and type(item) is str:
                 arg = arg.replace('%S', item)
 
             # Restore escaped percent sign
-            arg = arg.replace(rstr, '%')
+            if not is_cont: arg = arg.replace(rstr, '%')
 
         command[i] = arg
 
         debug(3, f'Running: {" ".join(command)}')
         
+        if is_cont:
+            tmp_file_in = os.path.join(self.MW.DB.cache_path, f"""{random_str(length=30)}.tmp""")
+            while os.path.isfile(tmp_file_in): tmp_file_in = os.path.join(self.MW.DB.cache_path, f"""{random_str(length=30)}.tmp""")    
+            if self.vals['type'] == FX_PLUGIN_RESULTS: err = save_json(tmp_file_in, self.MW.curr_upper.table.results)
+            else: err = save_json(tmp_file_in, item)
+            if err != 0: return err
+            run_env['FEEDEX_TMP_FILE'] = tmp_file_in
+ 
+            # substitute tmp file string
+            for i, arg in enumerate(command):
+            
+                # Handle container-specific arguments
+                arg = arg.replace('%T', tmp_file_in)
+                arg = arg.replace('%t', item.table)
+                arg = arg.replace(rstr, '%')
+
+                command[i] = arg   
+
+
         err = 0
         # Run command
         try:
@@ -595,8 +607,9 @@ class FeedexPlugin(ResultPlugin):
         except Exception as e:
             err = msg(FX_ERROR_HANDLER, _("Error executing script: %a"), e)
         finally:
-            try: os.remove(tmp_file_in)
-            except (OSError, IOError,) as e: err = msg(FX_ERROR_IO, f"""{_('Error removing %a temp file!')} {e}""", tmp_file_in)
+            if is_cont:
+                try: os.remove(tmp_file_in)
+                except (OSError, IOError,) as e: err = msg(FX_ERROR_IO, f"""{_('Error removing %a temp file!')} {e}""", tmp_file_in)
 
         return err
 

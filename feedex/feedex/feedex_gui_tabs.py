@@ -1387,6 +1387,7 @@ class FeedexGUITable:
             self.result.humanize()
             self.result.fill()
             self.result.prep_gui_vals(ix)
+            
             if type(self.results) is tuple: self.results = list(self.results)
             self.results[ix] = self.result.listify()
 
