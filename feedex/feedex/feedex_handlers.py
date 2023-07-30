@@ -12,24 +12,24 @@ from feedex_headers import *
 
 
 class FeedexRSSHandler:  
-    """ RSS handler for Feedex and a handler base class """
+    """RSS handler for Feedex"""
 
     compare_links = True
     no_updates = False
     all_is_html = False
     prepend_homepage = False # if link starts with / this flag will prepend homepage to it 
 
-    def __init__(self, db, **kargs):
+    def __init__(self, FX, **kargs):
     
-        # Init db connection
-        self.DB = db
-        self.config = self.DB.config
+        self.FX = FX
+        self.config = self.FX.config
+
+        self.debug = kargs.get('debug', self.FX.config.get('debug'))
         
         # Containers for entry and field processing
-        self.entry  = FeedexEntry(self.DB)
-        self.feed   = SQLContainerEditable('feeds', FEEDS_SQL_TABLE, types=FEEDS_SQL_TYPES)
-        self.ifeed  = SQLContainer('feeds', FEEDS_SQL_TABLE)
-
+        self.entry = EntryContainer(self.FX) 
+        self.feed = FeedContainerBasic()
+        self.ifeed = FeedContainerBasic()
         self.entries = []
 
         self.http_headers = {}
@@ -37,7 +37,7 @@ class FeedexRSSHandler:
         self.feed_raw = {}
 
         self.error = False
-
+        self.error_str = ''
         self.changed = True
         self.redirected = False
 
@@ -45,7 +45,6 @@ class FeedexRSSHandler:
         self.modified = None
         self.etag = None
         self.agent = self.config.get('user_agent', FEEDEX_USER_AGENT)
-        self.fallback_agent = self.config.get('fallback_user_agent')
 
         self.images = []
 
@@ -57,13 +56,12 @@ class FeedexRSSHandler:
 
     def set_feed(self, feed):
         """ Setup feed and headers """
-        if isinstance(feed, SQLContainer):
+        if isinstance(feed,FeedContainerBasic):
             self.ifeed.populate(feed.tuplify())
         elif isinstance(feed, dict):
             self.ifeed = feed.copy()
-        else: raise FeedexTypeError(_('Invalid type of input feed! Should be a SQLContainer or dict!'))
+        else: raise FeedexTypeError(_('Invalid type of input feed! Should be a FeedContainer or dict!'))
 
-        # Set up http headers from saved feed data
         headers = {}
         headers['etag'] = self.ifeed.get('etag')
         headers['modified'] = self.ifeed.get('modified')
@@ -74,7 +72,7 @@ class FeedexRSSHandler:
 
         # Set up authentication handler
         if self.ifeed.get('auth') is not None and self.ifeed.get('login') is not None and self.ifeed.get('password') is not None:
-            debug(3, 'Setting up authentication...')
+            if self.debug in (1,3): print('Setting up authentication...')
             auth = urllib.request.HTTPDigestAuthHandler()
             if self.ifeed.get('auth') in ('digest', 'detect'):
                 auth.add_password('DigestTest', self.ifeed.get('domain'), self.ifeed.get('login'), self.ifeed.get('password'))
@@ -82,10 +80,10 @@ class FeedexRSSHandler:
                 auth.add_password('BasicTest', self.ifeed.get('domain'), self.ifeed.get('login'), self.ifeed.get('password'))
             else:
                 self.error = True
-                return msg(FX_ERROR_HANDLER,_('Unrecognized authentication handler (%a). Must be "digest" or "basic"'), self.ifeed.get('auth'))
+                return _('Unrecognized authentication handler (%a). Must be "digest" or "basic"'), self.ifeed.get('auth')
             headers['handlers'] = [auth]
 
-        # Consolidate headers' dict
+        # Consolifate headers' dict
         self.http_headers = {}
         for k, v in headers.items():
             if v not in (None, [], '',[None]): self.http_headers[k] = v
@@ -98,22 +96,11 @@ class FeedexRSSHandler:
     def _do_download(self, url:str, **kargs):
         """ Method for downloading specifically - to be overwritten for child classes/ different HTTP-based protocols"""
         try:
-            timeout = scast(self.config.get('fetch_timeout'), int, 0)
-            if timeout != 0:
-                old_timeout = socket.getdefaulttimeout()
-                socket.setdefaulttimeout(timeout)
-            
-            raw = feedparser.parse(url, **self.http_headers)
-            if timeout != 0: socket.setdefaulttimeout(old_timeout)
-            
-            return raw
-        
+            return feedparser.parse(url, **self.http_headers)
         except Exception as e:
             self.error = True
-            msg(FX_ERROR_HANDLER, _('Download error: %a'), e)
+            self.error_str = f'{e}'
             return {}
-
-
 
 
 
@@ -133,46 +120,52 @@ class FeedexRSSHandler:
             if 'modified' in self.http_headers.keys(): del self.http_headers['modified']
 
         # Download and parse...
-        feed_raw = self._do_download(url)
-        if self.error: return -3
+        try:
+            feed_raw = self._do_download(url)
+        except Exception as e:
+            self.error_str = f'{e}'
+            self.error = True
+            return f'{e}'
+
+        if self.error: return self.error_str
 
         # HTTP Status handling...       
         self.status = feed_raw.get('status')
         self.changed = True
 
-        if self.status is None: return msg(FX_ERROR_HANDLER,_('Could not read HTTP status'))
+        if self.status is None: return _('Could not read HTTP status')
         if self.status == 304:
             self.changed = False
             return 0
 
         elif self.status in (301, 302) and not self.redirected:
-            if not do_redirects: return msg(FX_ERROR_HANDLER, _("Feed %a moved to new location!"), url)
+            if not do_redirects: return f'{_("Feed")} {url} {_("moved to new location!")}'
             else:
                 new_url = feed_raw.get('href',None)
                 if new_url not in (None,''):
                     # Watch out for endless redirect loops!!!
                     self.redirected = True
-                    ret = self.download(url=url, do_redirects=False, force=force, redirected=True)
-                    return ret
+                    msg = self.download(url=url, do_redirects=False, force=force, redirected=True)
+                    return msg
                 else:
-                    return msg(FX_ERROR_HANDLER, _('URL to resource empty!'))
+                    return _('URL to resource empty!')
 
         elif self.status == 410:
-            debug(3, f"""410 {scast(feed_raw.get('debug_message'), str, _(' Permanently deleted'))}""")
+            if self.debug in (1,3): print(f"""410 {scast(feed_raw.get('debug_message'), str, _(' Permanently deleted'))}""")
             self.error = True
-            return msg(FX_ERROR_HANDLER, _("Feed %a removed permanently (410)!"), url)
+            return f'{_("Feed")} {url} {_("removed permanently!")}'
 
 
         elif (self.status not in (200, 201, 202, 203, 204, 205, 206)) and not (self.status in (301,302) and self.redirected):
-            debug(3, f"""{scast(self.status, str, '')} {scast(feed_raw.get('debug_message'), str, _(' Feed error'))}""")
+            if self.debug in (1,3): print(f"""{scast(self.status, str, '')} {scast(feed_raw.get('debug_message'), str, _(' Feed error'))}""")
             self.error = True
-            return msg(FX_ERROR_HANDLER, _("Invalid HTTP return code for %a"), f'{url} ({self.status})')
+            return f'{_("Invalid HTTP return code for")} {url} ({self.status})'
                 
         #Everything may go seemingly well, but the feed will be empty and then there is no point in processing it
         if feed_raw.get('feed',{}).get('title') is None:
-            debug(3, feed_raw)
+            if self.debug in (1,3): print(feed_raw)
             self.error = True
-            return msg(FX_ERROR_HANDLER, _("Feed %a unreadable!"), url)
+            return f'{_("Feed")} {url} {_("unreadable!")}'
 
         self.feed_raw = feed_raw
         self.etag = feed_raw.get('etag',None)
@@ -198,14 +191,21 @@ class FeedexRSSHandler:
 
         self.entries = []
         
-        err = self.download(force=force)
-        if err != 0 or self.error or self.feed_raw == {}: return err
-        if not self.changed: return msg(_('Feed unchanged (304)'))
+        msg = self.download(force=force)
+        if msg != 0: yield -3, msg
+
+        if self.error: return -1
+        if self.feed_raw == {}: return -1
+        if not self.changed:
+            yield 0, _('Feed unchanged (304)')
+            return 0
 
         pub_date_raw = self.feed_raw['feed'].get('updated')
         pub_date = scast(convert_timestamp(pub_date_raw), int, 0)
 
-        if pub_date <= last_read and pub_date_raw not in (None,''): return msg(_('Feed unchanged (Published Date)'))
+        if pub_date <= last_read and pub_date_raw not in (None,''):
+            yield 0, _('Feed unchanged (Published Date)')
+            return 0
 
         if nullif(feed['rx_images'],'') is not None and feed['handler'] != 'html': rx_images = re.compile(scast(feed['rx_images'], str,''), re.DOTALL)
         else: rx_images = None
@@ -223,7 +223,7 @@ class FeedexRSSHandler:
                 pub_date_entry_str = now
                 pub_date_entry = now_raw
             else:
-                pub_date_entry = scast(convert_timestamp(pub_date_entry_str), int, 0)
+                pub_date_entry = convert_timestamp(pub_date_entry_str)
 
             # Go on if nothing change
             if pub_date_entry <= last_read: continue
@@ -235,14 +235,14 @@ class FeedexRSSHandler:
 
             # Assign fields one by one (I find it more convenient...)
             self.entry['feed_id']                 = feed['id']
-            self.entry['title']                   = slist(fdx.strip_markup(entry.get('title'), html=True), 0, None)
+            self.entry['title']                   = slist(strip_markup(entry.get('title'), html=True), 0, None)
             
             authors = entry.get('author','')
             if authors == '' and type(entry.get('authors',())) in (list, tuple):
                 for a in entry.get('authors',()): 
                    if a.get('name','') != '': authors = f"""{authors}{a.get('name','')}; """
 
-            self.entry['author']                  = nullif(slist(fdx.strip_markup(authors), 0, ''),'')
+            self.entry['author']                  = nullif(authors,'')
             self.entry['author_contact']          = nullif( f"""{entry.get('author_detail',{}).get('email','')}; {entry.get('author_detail',{}).get('href','')}""", '; ')
             
             contribs = ''
@@ -277,7 +277,7 @@ class FeedexRSSHandler:
             #Description
             images = ''
             links = ''
-            txt, im, ls = fdx.strip_markup(entry.get('description'), html=self.all_is_html, rx_images=rx_images, rx_links=rx_links)
+            txt, im, ls = strip_markup(entry.get('description'), html=self.all_is_html, rx_images=rx_images, rx_links=rx_links)
             self.entry['desc'] = txt
             for i in im:
                 if i is not None and i != '': images = f"""{images}{i}\n"""
@@ -290,7 +290,7 @@ class FeedexRSSHandler:
             content = entry.get('content')
             if content is not None:
                 for c in content:
-                    txt, im, ls = fdx.strip_markup(c.get('value'), html=True, rx_images=rx_images, rx_links=rx_links)
+                    txt, im, ls = strip_markup(c.get('value'), html=True, rx_images=rx_images, rx_links=rx_links)
                     if txt not in (None, ''):
                         text = f"""\n\n{txt.replace(self.entry['desc'],'')}"""
                         for i in im:
@@ -325,30 +325,46 @@ class FeedexRSSHandler:
 
 
 
-
-
     def _get_images(self):
         """Download feed images/icons/logos to icon folder to use in notifications"""
         for i in self.images:
             href = scast( slist(i, 2, None), str, '')
             feed_id = scast( slist(i, 0, 0), str, '0')
-            icon = os.path.join(self.DB.icon_path, f'feed_{feed_id}.ico' )
-            if href not in (None, 0):
-                debug(3, f'Downloading image for feed {feed_id} from {href}...')                
-                fdx.download_res(href, ofile=icon, user_agent=self.agent)
-            
-            # Fallback to catalog icons
-            if not os.path.isfile(icon):
-                feed_url = ''
-                for f in fdx.feeds_cache:
-                    if f[self.feed.get_index('id')] == feed_id: 
-                        feed_url = f[self.feed.get_index('url')]
-                        break
-                if feed_url != '':
-                    thumbnail = os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'thumbnails', f"""{fdx.hash_url(feed_url)}.img""")
-                    if os.path.isfile(thumbnail):
-                        try: copyfile(thumbnail, icon)
-                        except (IOError, OSError,) as e: msg(FX_ERROR_IO, f"""{_('Error copying thumbnail for feed')} {feed_id}: %a""", e)
+
+            if href not in ('',None) and feed_id != 0:
+                if self.debug in (1,3): print(f'Downloading image for feed {feed_id} from {href}...')
+                imfile = f'{FEEDEX_ICON_PATH}{DIR_SEP}feed_{feed_id}_{self.FX.db_hash}.ico'
+                try:
+                    req = urllib.request.Request(href, None, self.http_headers)
+                    response = urllib.request.urlopen(req)
+                    if response.status in (200, 201, 202, 203, 204, 205, 206):
+                        
+                        if response.info().get('Content-Type') not in FEEDEX_IMAGE_MIMES: return f"""{_('Not a valid image type')} ({response.info().get('Content-Type')})"""
+                        content_size = scast(response.info().get('Content-Length'), int, None)
+                        if content_size is not None and content_size > MAX_DOWNLOAD_SIZE: return f"""{_('Resource size too big')} ({content_size}). {_('Should be')} {MAX_DOWNLOAD_SIZE} {_('max')}"""
+                        with open(imfile, 'wb') as f:
+                            i = 0
+                            while True:
+                                i += 1
+                                chunk = response.read(FEEDEX_MB)
+                                if not chunk: break
+                                if i >= MAX_DOWNLOAD_SIZE:
+                                    f.close()
+                                    return f'{_("Image resource too large! Should be")} {MAX_DOWNLOAD_SIZE} {_("max")}' 
+                                f.write(chunk)
+                    else: 
+                        self.images = []
+                        return f'{_("URLLib could not save image from")} {href}! {_("HTTP return status")}: {response.status}'    
+
+                except (urllib.error.URLError, ValueError, TypeError, OSError) as e:
+                    self.images = []
+                    return f'{_("Could not save image from")} {href}! {_("Error")}: {e}'
+            else:
+                continue
+
+        self.images = []
+        return 0
+
 
 
 
@@ -360,25 +376,22 @@ class FeedexRSSHandler:
         if kargs.get('feed_raw') is not None:
             self.feed_raw = kargs.get('feed_raw')
 
-        if self.feed_raw.get('feed',None) is None: 
-            self.error = True
-            return msg(f'{_("Downloaded feed empty")} ({feed.name()})!')
+        if self.feed_raw.get('feed',None) is None: return f'{_("Downloaded feed empty")} ({feed.name()})!'
 
         self.feed.clear()
         # Get image urls for later download
-        self.images = []
-
-        icon = self.feed_raw['feed'].get('icon',None)
-        if icon is not None:
-            self.images.append([feed['id'], None, icon, None])
-        else:
-            logo = self.feed_raw['feed'].get('logo',None)
-            if logo is not None:
-                self.images.append([feed['id'], None, logo, None])
+        if not kargs.get('ignore_images', False):
+            icon = self.feed_raw['feed'].get('icon',None)
+            if icon is not None:
+                self.images.append([feed['id'], None, icon, None])
             else:
-                image = self.feed_raw['feed'].get('image',None)
-                if image is not None:
-                    self.images.append([feed['id'], None, image.get('href',None), image.get('title',None)])
+                logo = self.feed_raw['feed'].get('logo',None)
+                if logo is not None:
+                    self.images.append([feed['id'], None, logo, None])
+                else:
+                    image = self.feed_raw['feed'].get('image',None)
+                    if image is not None:
+                        self.images.append([feed['id'], None, image.get('href',None), image.get('title',None)])
 
         # Overwrite Nones in current data and populate feed
         self.feed['id']                       = feed['id']
@@ -414,9 +427,9 @@ class FeedexRSSHandler:
         self.feed['name']                     = coalesce(feed['name'], self.feed_raw['feed'].get('title', None))
         self.feed['version']                  = self.feed_raw.get('version',None)
 
-
-        err = self._get_images()
-        if err != 0: return err
+        if not kargs.get('ignore_images', False):
+            msg = self._get_images()
+            if msg != 0: return msg
         return 0
 
 
@@ -432,9 +445,6 @@ class FeedexRSSHandler:
 
 
 
- 
-
-
 
 
 
@@ -448,23 +458,23 @@ class FeedexHTMLHandler(FeedexRSSHandler):
     all_is_html = True
     prepend_homepage = True
 
-    def __init__(self, db, **kargs):
-        FeedexRSSHandler.__init__(self, db, **kargs)
+    def __init__(self, FX, **kargs):
+        FeedexRSSHandler.__init__(self, FX, **kargs)
 
 
     def _parse_html(self, html, **kargs):
         """ Parse html string with REGEXes """
         ifeed = kargs.get('ifeed',self.ifeed)
         regexes = {}
-        for r in FEEDS_REGEX_HTML_PARSERS:
+        for r in FEEDS_REGEX_HTML_PARSERS: 
             restr = scast(ifeed.get(r), str, '')
             if restr == '': regexes[r] = ''
             else: 
                 try: regexes[r] = re.compile( scast(ifeed.get(r), str, ''), re.DOTALL)
                 except re.error as e: 
                     self.error = True
-                    msg(FX_ERROR_HANDLER, f'{r} {_("REGEX error:")} {e}', e)
-                    return FX_ERROR_HANDLER, '<???>', '<???>', '<???>', '<???>', '<???>', ()
+                    self.error_str = f'{r} {_("REGEX")} {e}'
+                    return f'{self.error_str}', _('<ERROR>'), _('<ERROR>'), _('<ERROR>'), _('<ERROR>'), _('<ERROR>'), ()
 
         feed_title = re.findall(regexes['rx_title_feed'], html)
         feed_title = slist(feed_title, 0, None)
@@ -518,8 +528,49 @@ class FeedexHTMLHandler(FeedexRSSHandler):
 
     def _do_download(self, url: str, **kargs):
         """ Download HTML resource """
-        response, html = fdx.download_res(url, output_pipe='', user_agent=self.agent, mimetypes=FEEDEX_TEXT_MIMES)
-        if type(response) is int or type(html) is not str: return {}
+        self.http_headers['User-Agent'] = self.agent
+        del self.http_headers['agent']
+        try:
+            req = urllib.request.Request(url, None, self.http_headers)
+            response = urllib.request.urlopen(req)
+        except Exception as e:
+            self.error = True
+            self.error_str = f'URLLib: {e}'
+            return {}
+
+        content_type = slist(scast(response.info().get('Content-Type'), str, '').split(';'), 0, '')
+        if content_type not in FEEDEX_TEXT_MIMES:
+            self.error = True
+            self.error_str = f"""{_('Invalind content type')} ({response.info().get('Content-Type')})  ({_('Should be text/plain or text/html')})"""
+            return {}
+        content_size = scast(response.info().get('Content-Length'), int, None)
+        if content_size is not None and content_size > MAX_DOWNLOAD_SIZE: 
+            self.error = True
+            self.error_str = f"""{_('Resource too big')} ({content_size})  ({_('Should be')} {MAX_DOWNLOAD_SIZE} {_('max')})"""
+            return {}
+        
+        html = ''
+        i = 0
+        try:
+            while True:
+                chunk = response.read(FEEDEX_MB)
+                i += 1
+                if not chunk: break
+                if i >= MAX_DOWNLOAD_SIZE: 
+                    self.error = True
+                    self.error_str = _("""Resource too big!""")
+                    return {}
+                html = f'{html}{chunk.decode("utf-8")}'
+        except Exception as e:
+            self.error = True
+            self.error_str = f'{_("URLLib")}: {e}'
+            return {}
+        
+        html = scast(html, str, None)
+        if html is None:
+            self.error = True
+            self.error_str = _("""Downloaded resource could not be converted to text""")
+            return {}
 
         feed_raw = {}
         feed_raw['status'] = response.status
@@ -546,13 +597,14 @@ class FeedexHTMLHandler(FeedexRSSHandler):
     def test_download(self, **kargs):
         """ Test download and parse into displayable string """
         self.error = False
+        self.error_str = ''
 
         if self.feed_raw.get('raw_html') is None:
-            debug(3, f"""Downloading {self.ifeed.get('url')} ...""")
+            if self.debug in (1,3): print(f"""Downloading {self.ifeed.get('url')} ...""")
             self.feed_raw = self._do_download(self.ifeed.get('url'), download_only=True)
 
-        if not self.error and type(self.feed_raw.get('raw_html')) is str: return self._parse_html(self.feed_raw.get('raw_html'))
-        else: return FX_ERROR_HANDLER, '<???>', '<???>', '<???>', '<???>', '<???>', () 
+        if not self.error: return self._parse_html(self.feed_raw.get('raw_html'))
+        else: return f'{self.error_str}', _('<ERROR>'), _('<ERROR>'), _('<ERROR>'), _('<ERROR>'), _('<ERROR>'), () 
 
 
 
@@ -568,8 +620,8 @@ class FeedexScriptHandler:
     compare_links = True
     no_updates = True
 
-    def __init__(self, db, **kargs):
-        FeedexRSSHandler.__init__(self, db, **kargs)
+    def __init__(self, FX, **kargs):
+        FeedexRSSHandler.__init__(self, FX, **kargs)
 
 
     def _do_download(self, dummy, **kargs):
@@ -577,24 +629,8 @@ class FeedexScriptHandler:
         command = self.ifeed.get('script_file')
         if command is None: 
             self.error = True
-            msg(FX_ERROR_HANDLER, _('No script file or command provided!'))
+            self.error_str = _('No script file provided!')
             return {}
-
-
-        # Setup transfer files' names
-        tmp_file = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")
-        while os.path.isfile(tmp_file): tmp_file = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")       
-
-        tmp_file_in = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")
-        while os.path.isfile(tmp_file_in): tmp_file_in = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")       
-
-        # Send feed data to infile
-        save_json(tmp_file_in, self.ifeed.vals())
-
-        # Setup running environ
-        run_env = os.environ.copy()
-        run_env['FEEDEX_TMP_FILE'] = tmp_file
-        run_env['FEEDEX_TMP_FILE_FEED'] = tmp_file_in
 
         # Substitute command line params ...
         rstr = random_str(string=command)
@@ -602,46 +638,32 @@ class FeedexScriptHandler:
         
         for i, arg, in enumerate(command):
             arg = arg.replace('%%',rstr)
-            arg = arg.replace('%T', tmp_file)
-            arg = arg.replace('%I', tmp_file_in)
             arg = arg.replace('%A', self.http_headers.get('agent'))
             arg = arg.replace('%E', self.http_headers.get('etag'))
             arg = arg.replace('%M', self.http_headers.get('modified'))
+            arg = arg.replace('%L', self.http_headers.get('login'))
+            arg = arg.replace('%P', self.http_headers.get('password'))
+            arg = arg.replace('%D', self.http_headers.get('domain'))
             arg = arg.replace('%U', self.ifeed.get('url'))
             arg = arg.replace('%F', self.ifeed.get('id'))
             arg = arg.replace(rstr, '%')
             command[i] = arg
 
-        json_str = None
+        if self.debug in (1,3): print(f"""Runing script: {' '.join(command)}""")
 
-        debug(3, f"""Runing script: {' '.join(command)}""")
         try:
-            pr = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=run_env)
-            pr.wait()
-            json_str = load_json(tmp_file, None)
-        except Exception as e:
+            comm_pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            json_str = comm_pipe.stdout.read()
+        except OSError as e:
             self.error = True
-            msg(FX_ERROR_HANDLER, _("Error executing script: %a"), e)
-        finally:
-            try: 
-                os.remove(tmp_file)
-                os.remove(tmp_file_in)
-            except (OSError, IOError,) as e: 
-                msg(FX_ERROR_IO, _('Error removing temp files!'), e)
-
-        
-        debug(3, f'Output: {json_str}')
-
-        if json_str is None:
-            self.error = True
+            self.error_str = f'{_("Error executing script")}: {e}'
             return {}
-        else: return json_str
 
+        if self.debug in (1,3): print(f'Output: {json_str}')
 
-        
-
-
-
-
-
-
+        try:
+            return json.loads(json_str)
+        except (OSError, JSONDecodeError) as e:
+            self.error = True
+            self.error_str = f'{_("Error decoding JSON")}: {e}'
+            return {}

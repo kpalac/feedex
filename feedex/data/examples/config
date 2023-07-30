@@ -1,43 +1,35 @@
 # Example configuration for Feedex News Reader
 
 
-# Profile name connected with this configuration
-# If specified, GUI session will be treated as separate from default
-#profile_name = Feedex
-
-
 # Display language
 lang = 
 
 
 # Path to log file
-log = ~/.local/share/feedex/feedex.log
+log = /home/lolko/.local/share/feedex/feedex.log
 
 # Path to news SQLite3 database
-db_path = ~/.local/share/feedex/feedex.db
+db_path = /home/lolko/.local/share/feedex/feedex.db
 # Database timeout
-timeout = 120
+timeout = 5
 
 
-# Command for openning URLs and Images
+# Command for openning URLs, Text files and viewing images
 browser = xdg-open %u
+text_viewer = xdg-open %u
 image_viewer = xdg-open %u
 
 default_rule_weight = 2
 
-
-# What weight should manually added (not fetched from RSS/HTML/Script) items get
-# It will affect ranking. Zero (0) will disable learning on added entries 
+# Learn keywords from manually added entries?
+learn_from_added_entries = True
+# ... what should be the weight?
 default_entry_weight = 2
 
-# Use feature learning at all>
+# Learning and ranking
 use_keyword_learning = True
-# Recommendation algorithm
-recom_algo = 1
-# Limit terms in recommendation queries
-recom_limit = 200
-
-
+rule_limit = 50000
+use_search_habits = True
 
 # Snippet length (to exclude long wildcard matches)
 max_context_length = 500
@@ -51,10 +43,10 @@ default_depth = 5
 
 
 # Limit similarity search results for better performance
-default_similarity_limit = 30
+default_similarity_limit = 20
 
 # How similarity query should increase entry's importance?
-default_similar_weight = 0
+default_similar_weight = 2
 
 # Fetching and WWW connections
 error_threshold = 5
@@ -64,13 +56,16 @@ save_perm_redirects = False
 mark_deleted = True
 ignore_modified = True
 user_agent = UniversalFeedParser/5.0.1 +http://feedparser.org/
-fetch_timeout = 20  # Timeout for fetching remote resources
 
 
-# This UA wil be used for resource download if default fails
-#fallback_user_agent = Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0
+
 
 # GUI options
+# Ignore image handling and download for performance
+ignore_images = False
+# Ignore streaming audio/video media for performance
+ignore_media = False
+
 gui_new_color = #0f0fdadacaca
 gui_deleted_color = #bababdbdb6b6
 gui_hilight_color = #00000000ffff
@@ -84,20 +79,19 @@ gui_key_new_entry = n
 gui_key_new_rule = r
 gui_layout = 0
 gui_orientation = 0
-
+gui_startup_page = 2
 search_engine = https://duckduckgo.com/?t=ffab&q=%Q&ia=web
-
-# Clear cache (thumbnails, temp files) from items older than ...
 gui_clear_cache = 30
 
 # Desktop integration options 
-# Exclude those strings from window names when adding entry from desktop selection buffer
 window_name_exclude = Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird
 
 # CLI display beautifiers
 # Available colors: WHITE, WHITE_BOLD, YELLOW, YELLOW_BOLD, CYAN, CYAN_BOLD, BLUE, BLUE_BOLD, RED, RED_BOLD, GREEN, GREEN_BOLD, PURPLE, PURPLE_BOLD, LIGHT_RED, LIGHT_RED_BOLD
 
 #normal_color = WHITE
+#read_color = WHITE_BOLD
+#flag_color = YELLOW_BOLD
 #bold_color = CYAN_BOLD
 
 # Bold markup (e.g. for snippets and contexts

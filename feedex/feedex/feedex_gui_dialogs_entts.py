@@ -11,8 +11,8 @@ class NewFromURL(Gtk.Dialog):
     """ Add from URL dialog with category and handler choice """
     def __init__(self, parent, feed, **kargs):
 
-        self.feed = feed
-        self.parent = parent
+        if isinstance(feed, FeedContainer): self.feed = feed
+        else: raise TypeError
 
         Gtk.Dialog.__init__(self, title=_("Add Channel from URL"), transient_for=parent, flags=0)
         self.set_border_width(10)
@@ -20,13 +20,13 @@ class NewFromURL(Gtk.Dialog):
         box = self.get_content_area()
 
         self.url_entry = Gtk.Entry()
-        self.url_entry.set_text( scast(self.feed.get('url'), str, '')  )
+        self.url_entry.set_text( scast(self.feed['url'], str, '')  )
 
-        self.cat_combo = f_feed_combo(self.parent, tooltip=_("Choose Category to assign this Channel to\nCategories are useful for quick filtering and organizing Channels") )
-        f_set_combo(self.cat_combo, self.feed.get('parent_id'))
+        self.cat_combo = f_feed_combo(parent.FX, tooltip=_("Choose Category to assign this Channel to\nCategories are useful for quick filtering and organizing Channels") )
+        f_set_combo(self.cat_combo, self.feed['parent_id'])
 
         self.handler_combo = f_handler_combo(local=False, connect=self.on_changed )
-        f_set_combo(self.handler_combo, self.feed.get('handler'))
+        f_set_combo(self.handler_combo, self.feed['handler'])
 
         self.add_button = f_button(_('Add'),'list-add-symbolic', connect=self.on_add)
         self.cancel_button = f_button(_('Cancel'),'action-unavailable-symbolic', connect=self.on_cancel)
@@ -57,7 +57,10 @@ class NewFromURL(Gtk.Dialog):
 
     def on_changed(self, *args):
         handler = f_get_combo(self.handler_combo)
-        if handler in ('rss', 'html'): self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
+        if handler == 'rss':
+            self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
+        else:
+            self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
 
     def get_data(self, *args):
         """ Populate result from form contents """
@@ -86,7 +89,6 @@ class EditCategory(Gtk.Dialog):
     """ Edit category dialog (change title and subtitle) """
     def __init__(self, parent, category, **kargs):
 
-        self.parent = parent
         self.category = category
         self.new = kargs.get('new',True)
         if self.new: title = _("Add New Category")
@@ -97,15 +99,16 @@ class EditCategory(Gtk.Dialog):
         self.set_default_size(kargs.get('width',800), kargs.get('height',150))
         box = self.get_content_area()
 
-        name_label = f_label(_('Name:'), wrap=False, xalign=1)
-        subtitle_label = f_label(_('Subtitle:'), wrap=False, xalign=1)
+        name_label = f_label(_('Name:'), wrap=False)
+        subtitle_label = f_label(_('Subtitle:'), wrap=False)
         self.name_entry = Gtk.Entry()
         self.name_entry.set_tooltip_markup(_('Enter Category name here'))
         self.subtitle_entry = Gtk.Entry()
         self.subtitle_entry.set_tooltip_markup(_('Enter subtitle/description name here'))
 
-        icon_label = f_label(_('Icon:'), xalign=1, justify=FX_ATTR_JUS_LEFT)
-        self.icon_combo = f_feed_icon_combo(self.parent, is_category=True, id=self.category.get('id'), tooltip=_('Choose icon for this Category'))
+        icon_label = f_label(_('Icon:'))
+        icon_combo, self.icon_entry = f_feed_icon_combo(tooltip=_('Choose icon for this Category'))
+        self.icon_button = f_button(None, 'folder-symbolic', connect=self._on_choose_icon, tooltip=_('Search local machine for icons'))        
 
         save_button = f_button(_('Save'),'object-select-symbolic', connect=self.on_save)
         cancel_button = f_button(_('Cancel'),'action-unavailable-symbolic', connect=self.on_cancel)
@@ -120,12 +123,13 @@ class EditCategory(Gtk.Dialog):
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
         
-        grid.attach(name_label, 1,1, 2,1)
-        grid.attach(subtitle_label, 1,2, 2,1)
-        grid.attach(self.name_entry, 3,1, 12,1)
-        grid.attach(self.subtitle_entry, 3,2, 12,1)
-        grid.attach(icon_label, 1,3, 2,1)
-        grid.attach(self.icon_combo, 3,3, 4,1)
+        grid.attach(name_label, 1,1, 3,1)
+        grid.attach(subtitle_label, 1,2, 3,1)
+        grid.attach(self.name_entry, 4,1, 12,1)
+        grid.attach(self.subtitle_entry, 4,2, 12,1)
+        grid.attach(icon_label, 1,3, 3,1)
+        grid.attach(icon_combo, 4,3, 4,1)
+        grid.attach(self.icon_button, 8,3, 1,1)
         
         vbox = Gtk.Box()
         vbox.set_orientation(Gtk.Orientation.HORIZONTAL)
@@ -147,17 +151,39 @@ class EditCategory(Gtk.Dialog):
         """ Restore data to defaults """
         self.name_entry.set_text(scast(self.category.backup_vals.get('name'), str, ''))
         self.subtitle_entry.set_text(scast(self.category.backup_vals.get('subtitle'), str, ''))
-        f_set_combo(self.icon_combo, scast(self.category.backup_vals.get('icon_name'), str, ''))
+        self.icon_entry.set_text(scast(self.category.backup_vals.get('icon_name'), str, ''))
 
     def get_data(self):
         idict = {
         'name': nullif(self.name_entry.get_text(),''),
         'title': nullif(self.name_entry.get_text(),''),
         'subtitle': nullif(self.subtitle_entry.get_text(),''),
-        'icon_name': nullif(f_get_combo(self.icon_combo),''),
+        'icon_name': nullif(self.icon_entry.get_text(),''),
         'is_category': 1
         }
         self.category.add_to_update(idict)
+
+
+    def _choose_file(self, *args, **kargs):
+        dialog = Gtk.FileChooserDialog(kargs.get('title',_("Choose file")), parent=self, action=Gtk.FileChooserAction.OPEN)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+
+        dialog.set_current_folder(kargs.get('start_dir', os.getcwd()))
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            filename = dialog.get_filename()
+        else: filename = False
+        dialog.destroy()
+        return filename
+
+    def _on_choose_icon(self, *args, **kargs):
+        sfile = scast(self.category.backup_vals.get('icon_name',''), str, '')
+        if os.path.isfile(sfile):
+            start_dir = os.path.dirname(sfile)
+        else: start_dir = os.getcwd()
+
+        filename = self._choose_file(title=_('Choose Image'), start_dir=start_dir)
+        if filename is not False: self.icon_entry.set_text(filename)
 
 
     def on_cancel(self, *args):
@@ -178,10 +204,11 @@ class EditCategory(Gtk.Dialog):
 
 class EditEntry(Gtk.Dialog):
     """ Edit Entry dialog """
-    def __init__(self, parent, entry, **kargs):
+    def __init__(self, parent, config, entry, **kargs):
 
         self.entry = entry
-        self.parent = parent
+
+        self.short = kargs.get('short',False)
 
         self.new = kargs.get('new',True)
         if self.new:
@@ -191,10 +218,10 @@ class EditEntry(Gtk.Dialog):
             title = _('Edit Entry')
             restore_label = _('Restore')
 
-        self.config = self.parent.config
+        self.config = config
 
         Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
-        self.set_default_size(kargs.get('width',800), kargs.get('height',700))
+        self.set_default_size(kargs.get('width',800), kargs.get('height',500))
         box = self.get_content_area()
 
         self.set_border_width(10)
@@ -202,57 +229,47 @@ class EditEntry(Gtk.Dialog):
         self.set_position(Gtk.WindowPosition.CENTER)
 
         self.result = {}
-        self.curr_image = None
-        self.new_image = None
         self.response = 0
         
-        self._extract_image()
-
-        self.cat_combo = f_feed_combo(self.parent, with_feeds=True, no_empty=True, ellipsize=True, tooltip=_("""Choose <b>Category</b> or <b>Channel</b> to assign this Entry to.
+        self.cat_combo = f_feed_combo(parent.FX, with_feeds=True, no_empty=True, icons=parent.icons, tooltip=_("""Choose <b>Category</b> or <b>Channel</b> to assign this Entry to.
 It is a good idea to have categories exclusively for manually added entries for quick access to notes, hilights etc.
 <i>Every Entry needs to be assigned to a Category or a Channel</i>"""))
 
         self.note_combo = f_note_combo(search=False, tooltip=_("""How should this entry be classified?"""))
 
-        self.image_button = f_image_button( os.path.join(self.parent.DB.img_path, f"""{self.entry['id']}.img"""), connect=self.on_change_image, tooltip=_("""Add local image to display with this Entry"""))
-
-        title_label = f_label(f'<b>{_("Title")}:</b>', wrap=False, markup=True, xalign=1)
+        title_label = f_label(f'<b>{_("Title")}:</b>', wrap=False, markup=True)
         self.title_entry = Gtk.Entry()
         self.title_entry.set_tooltip_markup(_("Enter Entry's title here"))
 
-        author_label = f_label(f'<b>{_("Author")}:</b>', wrap=False, markup=True, xalign=1)
+        author_label = f_label(f'<b>{_("Author")}:</b>', wrap=False, markup=True)
         self.author_entry = Gtk.Entry()
 
-        publisher_label = f_label(f'<b>{_("Publisher")}:</b>', wrap=False, markup=True, xalign=1)
+        publisher_label = f_label(f'<b>{_("Publisher")}:</b>', wrap=False, markup=True)
         self.publisher_entry = Gtk.Entry()
 
-        contributors_label = f_label(f'<b>{_("Contributors")}:</b>', wrap=False, markup=True, xalign=1)
+        contributors_label = f_label(f'<b>{_("Contributors")}:</b>', wrap=False, markup=True)
         self.contributors_entry = Gtk.Entry()
 
-        comments_label = f_label(f'<b>{_("Comments")}:</b>', wrap=False, markup=True, xalign=1)
+        comments_label = f_label(f'<b>{_("Comments")}:</b>', wrap=False, markup=True)
         self.comments_entry = Gtk.Entry()
 
-        author_contact_label = f_label(f'<b>{_("Author contact")}:</b>', wrap=False, markup=True, xalign=1)
+        author_contact_label = f_label(f'<b>{_("Author contact")}:</b>', wrap=False, markup=True)
         self.author_contact_entry = Gtk.Entry()
-        publisher_contact_label = f_label(f'<b>{_("Publisher contact")}:</b>', wrap=False, markup=True, xalign=1)
+        publisher_contact_label = f_label(f'<b>{_("Publisher contact")}:</b>', wrap=False, markup=True)
         self.publisher_contact_entry = Gtk.Entry()
 
 
-        category_label = f_label(f'<b>{_("Category")}:</b>', wrap=False, markup=True, xalign=1)
+        category_label = f_label(f'<b>{_("Category")}:</b>', wrap=False, markup=True)
         self.category_entry = Gtk.Entry()
 
-        tags_label = f_label(f'<b>{_("Tags")}:</b>', wrap=False, markup=True, xalign=1)
+        tags_label = f_label(f'<b>{_("Tags")}:</b>', wrap=False, markup=True)
         self.tags_entry = Gtk.Entry()
 
-        link_label = f_label(f'<b>{_("Link")}:</b>', wrap=False, markup=True, xalign=1)
+        link_label = f_label(f'<b>{_("Link")}:</b>', wrap=False, markup=True)
         self.link_entry = Gtk.Entry()
 
-        image_label = f_label(f'<b>{_("Image(s)")}:</b>', wrap=False, markup=True, xalign=1)
-        self.image_entry = Gtk.Entry()
 
 
-        desc_box = Gtk.VBox()
-        desc_box.set_homogeneous(False)
         desc_label = f_label(f'<b>{_("Description")}:</b>',  wrap=False, markup=True)
         desc_sw = Gtk.ScrolledWindow()
         self.desc_text = Gtk.TextBuffer()
@@ -260,11 +277,7 @@ It is a good idea to have categories exclusively for manually added entries for 
         desc_entry.set_tooltip_markup(_("Enter Entry's details/description here"))
         desc_entry.set_wrap_mode(Gtk.WrapMode.WORD)
         desc_sw.add(desc_entry)
-        desc_box.pack_start(desc_label, False, False, 2)
-        desc_box.pack_start(desc_sw, True, True, 2)
 
-        text_box = Gtk.VBox()
-        text_box.set_homogeneous(False)
         text_label = f_label(f'<b>{_("Additional text")}:</b>',  wrap=False, markup=True)
         text_sw = Gtk.ScrolledWindow()
         self.text_text = Gtk.TextBuffer()
@@ -272,22 +285,6 @@ It is a good idea to have categories exclusively for manually added entries for 
         text_entry.set_tooltip_markup(_('Enter additional text here'))
         text_entry.set_wrap_mode(Gtk.WrapMode.WORD)
         text_sw.add(text_entry)
-        text_box.pack_start(text_label, False, False, 2)
-        text_box.pack_start(text_sw, True, True, 2)
-
-        div_box = Gtk.VBox()
-        div_box.set_homogeneous(False)
-        self.div_horiz = Gtk.VPaned()
-        self.div_horiz.pack1(desc_box, resize=True, shrink=True)
-        self.div_horiz.pack2(text_box, resize=True, shrink=True)
-        div_box.add(self.div_horiz)
-
-        self.flag_combo = f_flag_combo(filters=False, tooltip=_("""Select flag for this Entry""") ) 
-
-        read_label = f_label(f'<b>{_("Weight/Read")}:</b>', wrap=False, markup=True, xalign=1)
-        self.read_entry = Gtk.Entry()
-        self.read_entry.set_tooltip_markup(_("""Read counter or feature learning multiplier
-<i>The higher it is the more this Entry contributes to ranking</i>"""))
 
         self.learn_button = Gtk.CheckButton.new_with_label(_('Learn rules?'))
         self.learn_button.set_tooltip_markup(_("""Should Feedex extract Rules from this entry for ranking incomming entries by importance?
@@ -299,37 +296,34 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         self.clear_button = f_button(restore_label ,'edit-redo-rtl-symbolic', connect=self.on_restore)
 
         header_grid = Gtk.Grid()
-        header_grid.set_column_spacing(5)
-        header_grid.set_row_spacing(5)
+        header_grid.set_column_spacing(1)
+        header_grid.set_row_spacing(1)
         header_grid.set_column_homogeneous(True)
         header_grid.set_row_homogeneous(True)
 
         header_grid.attach(self.cat_combo, 1,1, 11, 1)
-        header_grid.attach(self.note_combo, 15,1, 3, 1)
-        header_grid.attach(self.image_button, 1,2, 2, 2)
+        header_grid.attach(self.note_combo, 13,1, 3, 1)
 
-        header_grid.attach(title_label, 3,2, 3,1)
-        header_grid.attach(self.title_entry, 6,2, 12,1)
-        header_grid.attach(author_label, 3,3, 3,1)
-        header_grid.attach(self.author_entry, 6,3, 12,1)
+        header_grid.attach(title_label, 1,2, 3,1)
+        header_grid.attach(self.title_entry, 4,2, 10,1)
+        header_grid.attach(author_label, 1,3, 3,1)
+        header_grid.attach(self.author_entry, 4,3, 10,1)
         header_grid.attach(category_label, 1,4, 3,1)
-        header_grid.attach(self.category_entry, 4,4, 14,1)
+        header_grid.attach(self.category_entry, 4,4, 10,1)
         header_grid.attach(link_label, 1,5, 3,1)
-        header_grid.attach(self.link_entry, 4,5, 14,1)
+        header_grid.attach(self.link_entry, 4,5, 10,1)
         header_grid.attach(tags_label, 1,6, 3,1)
-        header_grid.attach(self.tags_entry, 4,6, 14,1)
+        header_grid.attach(self.tags_entry, 4,6, 10,1)
         header_grid.attach(publisher_label, 1,7, 3,1)
-        header_grid.attach(self.publisher_entry, 4,7, 14,1)
+        header_grid.attach(self.publisher_entry, 4,7, 10,1)
         header_grid.attach(contributors_label, 1,8, 3,1)
-        header_grid.attach(self.contributors_entry, 4,8, 14,1)
+        header_grid.attach(self.contributors_entry, 4,8, 10,1)
         header_grid.attach(comments_label, 1,9, 3,1)
-        header_grid.attach(self.comments_entry, 4,9, 14,1)
+        header_grid.attach(self.comments_entry, 4,9, 10,1)
         header_grid.attach(author_contact_label, 1,10, 3,1)
-        header_grid.attach(self.author_contact_entry, 4,10, 14,1)
+        header_grid.attach(self.author_contact_entry, 4,10, 10,1)
         header_grid.attach(publisher_contact_label, 1,11, 3,1)
-        header_grid.attach(self.publisher_contact_entry, 4,11, 14,1)
-        header_grid.attach(image_label, 1,12, 3,1)
-        header_grid.attach(self.image_entry, 4,12, 14,1)
+        header_grid.attach(self.publisher_contact_entry, 4,11, 10,1)
 
 
         scrbox_header = Gtk.ScrolledWindow()
@@ -341,14 +335,24 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
 
-        grid.attach(scrbox_header, 1,1, 15, 3)
+        if self.short:
+            grid.attach(scrbox_header, 1,1, 15, 3)
 
-        grid.attach(div_box, 1,4, 15, 17)
+            grid.attach(desc_label, 1,4 , 4,1)
+            grid.attach(desc_sw, 1,5, 15,12)
+            grid.attach(text_label, 1,18, 4,1)
+            grid.attach(text_sw, 1,19, 15,5)
 
-        grid.attach(self.flag_combo, 1, 25, 4,1)
+        else:
+            grid.attach(scrbox_header, 1,1, 15, 8)
 
-        grid.attach(read_label, 7, 25, 3,1)
-        grid.attach(self.read_entry, 11, 25, 4,1)
+            grid.attach(desc_label, 1,10 , 4,1)
+            grid.attach(desc_sw, 1,11, 15,6)
+            grid.attach(text_label, 1,18, 4,1)
+            grid.attach(text_sw, 1,19, 15,5)
+
+        if self.new:
+            grid.attach(self.learn_button, 1, 25, 6,1)
 
         hbox_buttons = Gtk.Box()
         hbox_buttons.set_orientation(Gtk.Orientation.HORIZONTAL)
@@ -363,40 +367,14 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         self.err_label = f_label('', wrap=False, markup=True)
         box.add(self.err_label)
         box.add(hbox_buttons)
-
-        self.div_horiz.set_position(self.parent.gui_cache.get('div_entry_edit', 500))
-
+    
         self.on_restore()
         self.show_all()
 
         self.title_entry.grab_focus()
 
-        self.connect("destroy", self._on_close)
 
 
-
-    def on_change_image(self, *args, **kargs):
-        """ Image change dialog """
-        if self.new_image not in (-1, None): start_dir = os.path.dirname(self.new_image)
-        elif self.curr_image is not None: start_dir = os.path.dirname(self.curr_image)
-        else: start_dir = None
-
-        filename = f_chooser(self, self.parent, action='choose_image', header=_('Import image...'), start_dir=start_dir )
-        if filename is False: return 0
-        elif filename == -1:
-            self.new_image = -1
-            self._remove_image(
-            f_set_button_image(self.image_button, '')
-            )
-        else:
-            err = f_set_button_image(self.image_button, filename)
-            if err == 0:
-                if filename != self.curr_image: self.new_image = filename
-                self._remove_image()
-                self._add_image()
-            else: self.new_image = None
-
-        
 
     def get_data(self):
         idict = { 'feed_or_cat': f_get_combo(self.cat_combo),
@@ -409,18 +387,17 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
                     'category': nullif(self.category_entry.get_text(),''), 
                     'tags': nullif(self.tags_entry.get_text(),''), 
                     'link': nullif(self.link_entry.get_text(),''), 
-                    'images': nullif(self.image_entry.get_text(),''), 
 
                     'comments': nullif(self.comments_entry.get_text(),''), 
                     'author_contact': nullif(self.author_contact_entry.get_text(),''), 
                     'publisher_contact': nullif(self.publisher_contact_entry.get_text(),''), 
 
                     'desc': nullif(self.desc_text.get_text(self.desc_text.get_start_iter(), self.desc_text.get_end_iter(), False),''), 
-                    'text': nullif(self.text_text.get_text(self.text_text.get_start_iter(), self.text_text.get_end_iter(), False),''),
+                    'text': nullif(self.text_text.get_text(self.text_text.get_start_iter(), self.text_text.get_end_iter(), False),'')}
 
-                    'flag': f_get_combo(self.flag_combo),
-                    'read': scast(self.read_entry.get_text(), int, '')
-        }
+        if self.learn_button.get_active(): self.entry.learn = True
+        else: self.entry.learn = False
+
         if self.new: 
             idict['pubdate_str'] = datetime.now()
             self.entry.merge(idict)
@@ -441,30 +418,18 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         self.comments_entry.set_text(scast(self.entry.backup_vals.get('comments'), str, ''))
         self.author_contact_entry.set_text(scast(self.entry.backup_vals.get('author_contact'), str, ''))
         self.publisher_contact_entry.set_text(scast(self.entry.backup_vals.get('publisher_contact'), str, ''))
-        self.image_entry.set_text(scast(self.entry.backup_vals.get('images'), str, ''))
 
         self.desc_text.set_text(scast(self.entry.backup_vals.get('desc'), str, ''))
         self.text_text.set_text(scast(self.entry.backup_vals.get('text'), str, ''))
-
-        f_set_combo(self.flag_combo, self.entry.backup_vals.get('flag'))
-        if self.new:
-            self.read_entry.set_text(scast(self.config.get('default_entry_weight',2), str, '0'))            
-        else:
-            self.read_entry.set_text(scast(self.entry.backup_vals.get('read'), str, '0'))
-
-        if self.new_image is not None:
-            self.new_image = None
-            if self.curr_image is not None: f_set_button_image(self.image_button, self.curr_image)
-
+        if self.config.get('learn_from_added_entries',True): self.learn_button.set_active(True)        
+        else: self.learn_button.set_active(False)
 
     def validate(self):
         err = self.entry.validate()
-        if err != 0:
-            self.err_label.set_markup(gui_msg(*err))
+        if err != 0: 
+            self.err_label.set_markup(gui_msg(err))
             return False                    
         return True
-
-    def _on_close(self, *args, **kargs): self.parent.gui_cache['div_entry_edit'] = self.div_horiz.get_position()
 
     def on_save(self, *args):
         self.get_data()
@@ -477,30 +442,6 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         self.get_data()
         self.close()
 
-    def _extract_image(self, *args, **kargs):
-        self.curr_image = None
-        for l in scast(self.entry['images'], str, '').splitlines():
-            if l.startswith('<local>') and l.endswith('</local>'):
-                im = l.split('<local>')[1]
-                im = im.split('</local>')[0]
-                self.curr_image = im
-
-
-    def _remove_image(self, *args, **kargs):
-        new_imgs = ''
-        for l in scast(self.entry['images'], str, '').splitlines():
-            if l.startswith('<local>') and l.endswith('</local>'): continue
-            new_imgs = f"""{new_imgs}
-{l}"""
-        self.entry['images'] = nullif(new_imgs,'')
-
-
-    def _add_image(self, *args, **kargs):
-        im_str = scast(self.entry['images'], str, '')
-        self.entry['images'] = f"""{im_str}
-{self.new_image}"""
-
-
 
 
 
@@ -508,18 +449,17 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
 
 class EditFlag(Gtk.Dialog):
     """ Rule Edit dialog """
-    def __init__(self, parent, flag, **kargs):
+    def __init__(self, parent, config, flag, **kargs):
 
         self.new = kargs.get('new',True)
 
         if self.new: title = _('Add new Flag')
         else: title = _('Edit Flag')
 
-        self.parent = parent
-        self.config = self.parent.config
-
+        self.config = config
         self.flag = flag
 
+        self.parent = parent
 
         Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
         self.set_default_size(kargs.get('width',500), kargs.get('height',200))
@@ -532,50 +472,50 @@ class EditFlag(Gtk.Dialog):
         self.result = {}
         self.response = 0
 
-        name_label = f_label(_('Name:'), wrap=False, xalign=1)
+        name_label = f_label(_('Name:'), wrap=False)
         self.name_entry = Gtk.Entry()
         self.name_entry.set_tooltip_markup(_('Display name for this Flag used in Queries etc.'))
-        desc_label = f_label('Description:', wrap=False, xalign=1)
+        desc_label = f_label('Description:', wrap=False)
         self.desc_entry = Gtk.Entry()
 
-        color_label = f_label(_('Color:'), xalign=1)
-        color = Gdk.color_parse( coalesce( fdx.get_flag_color(self.flag['id']), self.config.get('gui_default_flag_color','blue') )  )
+        color_label = f_label(_('Color:'))
+        color = Gdk.color_parse( coalesce( self.parent.FX.get_flag_color(self.flag['id']), self.config.get('gui_default_flag_color','blue') )  )
         self.color_button = Gtk.ColorButton(color=color)
 
-        color_cli_label = f_label(_('Color (CLI):'), xalign=1)
+        color_cli_label = f_label(_('Color (CLI):'))
         self.color_cli_combo = f_cli_color_combo()
 
-        id_label = f_label(_('ID:'), wrap=False, xalign=1)
+        id_label = f_label(_('ID:'), wrap=False)
         self.id_entry = Gtk.Entry()
         self.id_entry.set_tooltip_markup(_("""Sometimes it is useful to set up ID manually e.g. to add description to flag deleted before""") )
 
-        self.err_label = f_label('', wrap=False, xalign=0, justify=FX_ATTR_JUS_LEFT)
+        self.err_label = f_label('', wrap=False)
 
         self.save_button = f_button(_('Save'),'object-select-symbolic', connect=self.on_save)
         self.cancel_button = f_button(_('Cancel'),'action-unavailable-symbolic', connect=self.on_cancel)
         self.restore_button = f_button(_('Restore'),'edit-redo-rtl-symbolic', connect=self.on_restore)
 
         grid = Gtk.Grid()
-        grid.set_column_spacing(8)
-        grid.set_row_spacing(8)
+        grid.set_column_spacing(2)
+        grid.set_row_spacing(2)
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
  
         grid.attach(name_label, 1,1, 2,1)
-        grid.attach(self.name_entry, 3,1, 11,1)
+        grid.attach(self.name_entry, 4,1, 5,1)
         grid.attach(desc_label, 1,2, 2,1)
-        grid.attach(self.desc_entry, 3,2, 11,1)
+        grid.attach(self.desc_entry, 4,2, 5,1)
 
         grid.attach(color_label, 1,3, 2,1)
-        grid.attach(self.color_button, 3,3, 2,1)
+        grid.attach(self.color_button, 4,3, 1,1)
 
-        grid.attach(color_cli_label, 7,3, 2,1)
-        grid.attach(self.color_cli_combo, 9,3, 5,1)
+        grid.attach(color_cli_label, 1,4, 2,1)
+        grid.attach(self.color_cli_combo, 4,4, 2,1)
 
-        grid.attach(id_label, 1,4, 2,1)
-        grid.attach(self.id_entry, 3,4, 4,1)
+        grid.attach(id_label, 1,5, 3,1)
+        grid.attach(self.id_entry, 4,5, 2,1)
  
-        grid.attach(self.err_label, 1,5, 12,1)
+        grid.attach(self.err_label, 1,6, 8,1)
 
         vbox = Gtk.Box()
         vbox.set_orientation(Gtk.Orientation.HORIZONTAL)
@@ -608,7 +548,7 @@ class EditFlag(Gtk.Dialog):
     def validate(self):
         err = self.flag.validate()
         if err != 0: 
-            self.err_label.set_markup(gui_msg(*err))
+            self.err_label.set_markup(gui_msg(err))
             return False                    
         return True
 
@@ -643,153 +583,22 @@ class EditFlag(Gtk.Dialog):
 
 
 
-class EditPlugin(Gtk.Dialog):
-    """ Plugin Edit dialog """
-    def __init__(self, parent, plugin, **kargs):
-
-        from feedex_docs import FEEDEX_HELP_PLUGINS
-
-        self.new = kargs.get('new',True)
-
-        if self.new: title = _('Add new Plugin')
-        else: title = _('Edit Plugin')
-
-        self.parent = parent
-        self.config = self.parent.config
-
-        self.plugin = plugin
-
-
-        Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
-        self.set_default_size(kargs.get('width',500), kargs.get('height',200))
-        box = self.get_content_area()
-
-        self.set_border_width(10)
-        self.set_resizable(False)
-        self.set_position(Gtk.WindowPosition.CENTER)
-
-        self.result = {}
-        self.response = 0
-
-        name_label = f_label(_('Name:'), wrap=False, xalign=1)
-        self.name_entry = Gtk.Entry()
-        self.name_entry.set_tooltip_markup(_('Display name for this Plugin used in context menus'))
-        
-        command_label = f_label(_('Command or Script:'), wrap=False, xalign=1)
-        self.command_entry = Gtk.Entry()
-        self.command_entry.set_tooltip_markup(f"""<small>{FEEDEX_HELP_PLUGINS}</small>""")
-        self.script_button = f_button(None, 'system-run-symbolic', connect=self._on_choose_script, tooltip=_('Search local machine for script file') )
-
-        desc_label = f_label(_('Description:'), wrap=False, xalign=1)
-        self.desc_entry = Gtk.Entry()
-        self.desc_entry.set_tooltip_markup(_('Short description for context menu tooltip'))
-
-        self.plugin_type_combo = f_plugin_type_combo(tooltip=_('Type of entity this plugin can process (a hook for context menu)'))
-
-        self.err_label = f_label('', wrap=False)
-
-        self.save_button = f_button(_('Save'),'object-select-symbolic', connect=self.on_save)
-        self.cancel_button = f_button(_('Cancel'),'action-unavailable-symbolic', connect=self.on_cancel)
-        self.restore_button = f_button(_('Restore'),'edit-redo-rtl-symbolic', connect=self.on_restore)
-
-        grid = Gtk.Grid()
-        grid.set_column_spacing(8)
-        grid.set_row_spacing(8)
-        grid.set_column_homogeneous(True)
-        grid.set_row_homogeneous(True)
- 
-        grid.attach(name_label, 1,1, 2,1)
-        grid.attach(self.name_entry, 3,1, 5,1)
-        grid.attach(self.plugin_type_combo, 9,1, 6,1)
-        grid.attach(command_label, 1,2, 2,1)
-        grid.attach(self.command_entry, 3,2, 11,1)
-        grid.attach(self.script_button, 14,2, 1,1)
-        grid.attach(desc_label, 1,3, 2,1)
-        grid.attach(self.desc_entry, 3,3, 12,1)
-
-        grid.attach(self.err_label, 1,4, 14,1)
-
-        vbox = Gtk.Box()
-        vbox.set_orientation(Gtk.Orientation.HORIZONTAL)
-        vbox.set_homogeneous(False)
-        vbox.set_border_width(5)
-
-        vbox.pack_start(self.cancel_button, False, False, 5)
-        vbox.pack_start(self.restore_button, False, False, 5)
-        vbox.pack_end(self.save_button, False, False, 5)
-            
-        box.add(grid)
-        box.add(vbox)
-        self.on_restore()
-        self.show_all()
-
-        self.name_entry.grab_focus()
-
-
-
-
-    def _on_choose_script(self, *args, **kargs):
-        filename = f_chooser(self, self.parent, action='open_file', header=_('Choose Script File'))
-        if filename is not False: self.command_entry.set_text(filename)
-
-
-
-    def on_restore(self, *args):
-        self.name_entry.set_text(coalesce(self.plugin.backup_vals.get('name',''),''))
-        self.command_entry.set_text(coalesce(self.plugin.backup_vals.get('command',''),''))
-        self.desc_entry.set_text(coalesce(self.plugin.backup_vals.get('desc',''),''))
-        f_set_combo(self.plugin_type_combo, self.plugin.backup_vals.get('type'))
-
-
-    def validate(self):
-        err = self.plugin.validate()
-        if err != 0: 
-            self.err_label.set_markup(gui_msg(*err))
-            return False                    
-        return True
-
-
-    def get_data(self):
-        idict = {   'name': nullif(self.name_entry.get_text().strip(),''),
-                    'command': nullif(self.command_entry.get_text(),''), 
-                    'desc': nullif(self.desc_entry.get_text(),''), 
-                    'type': f_get_combo(self.plugin_type_combo),
-                    }
-        self.plugin.merge(idict)
-    
-
-    def on_save(self, *args):
-        self.get_data()            
-        if self.validate():
-            self.response = 1
-            self.close()
-
-    def on_cancel(self, *args):
-        self.response = 0
-        self.get_data()
-        self.close()
-
-
-
-
-
-
-
 
 
 
 class EditRule(Gtk.Dialog):
     """ Rule Edit dialog """
-    def __init__(self, parent, rule, **kargs):
+    def __init__(self, parent, config, rule, **kargs):
 
         self.new = kargs.get('new',True)
 
         if self.new: title = _('Add new Rule')
         else: title = _('Edit Rule')
 
-        self.parent = parent
-        self.config = self.parent.config
+        self.config = config
         self.rule = rule
+
+        self.FX = parent.FX
 
         Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
         self.set_default_size(kargs.get('width',1000), kargs.get('height',400))
@@ -802,36 +611,36 @@ class EditRule(Gtk.Dialog):
         self.result = {}
         self.response = 0
 
-        name_label = f_label(_('Name:'), wrap=False, xalign=1)
+        name_label = f_label(_('Name:'), wrap=False)
         self.name_entry = Gtk.Entry()
         self.name_entry.set_tooltip_markup(_('Display name for this rule (<i>not used in matching</i>)'))
-        string_label = f_label(_('Search string:'), wrap=False, xalign=1)
+        string_label = f_label(_('Search string:'), wrap=False)
         self.string_entry = Gtk.Entry()
         self.string_entry.set_tooltip_markup(_("""String or Pattern used for search and matching
 It is used according to <b>Type</b> and should be compatibile with it (e.g. REGEX string)""") )
 
-        type_label = f_label(_('Type:'), wrap=False, xalign=1)
+        type_label = f_label(_('Type:'), wrap=False)
         self.type_combo = f_query_type_combo(connect=self.on_changed, rule=True)
-        feed_label = f_label(_('Channel or Category:'), wrap=False, xalign=1)
-        self.feed_combo = f_feed_combo(self.parent, icons=parent.icons, with_feeds=True, empty_label=_('-- Every Feed --'), tooltip=_("Which Feed/Channel should this Rule filter?") )
-        field_label = f_label(_('Field:'),wrap=False, xalign=1)
+        feed_label = f_label(_('Channel or Category:'), wrap=False)
+        self.feed_combo = f_feed_combo(parent.FX, icons=parent.icons, with_feeds=True, empty_label=_('-- Every Feed --'), tooltip=_("Which Feed/Channel should this Rule filter?") )
+        field_label = f_label(_('Field:'),wrap=False)
         self.field_combo = f_field_combo(connect=self.on_changed)
-        lang_label = f_label(_('Language:'), wrap=False, xalign=1)
-        self.lang_combo = f_lang_combo(connect=self.on_changed, tooltip=_("Which language should this rule use for Full Text Search?") )
-        case_label = f_label(_('Case:'), wrap=False, xalign=1)
+        lang_label = f_label(_('Language:'), wrap=False)
+        self.lang_combo = f_lang_combo(parent.FX, connect=self.on_changed, tooltip=_("Which language should this rule use for Full Text Search?") )
+        case_label = f_label(_('Case:'), wrap=False)
         self.case_combo = f_dual_combo( ((0,_("Case sensitive")),(1,_("Case insensitive"))), connect=self.on_changed, tooltip=_('Should this Rule be case sensitive?') )
 
-        weight_label = f_label(_('Weight:'), wrap=False, xalign=1)
+        weight_label = f_label(_('Weight:'), wrap=False)
         self.weight_entry = Gtk.Entry()
         self.weight_entry.set_tooltip_markup(_("""Weight is used to increase article's <b>importance</b> when matched
 Articles are then sorted by importance to keep the most important ones on top.
 Weights from leaned rules as well as the ones from manually added ones sum up and position an Article""") )
             
-        self.flag_combo = f_flag_combo(filters=False, tooltip=_("""Main reason for manually added rules is to flag interesting incomming articles independently of importance ranking
+        self.flag_combo = f_flag_combo(self.FX, filters=False, tooltip=_("""Main reason for manually added rules is to flag interesting incomming articles independently of importance ranking
 Sometimes, however, a rule can simply increase importance by its <b>weight</b> without flagging""") ) 
         self.additive_button = Gtk.CheckButton.new_with_label(_('Are matches weights additive?'))
 
-        self.err_label = f_label('', wrap=False, xalign=0)
+        self.err_label = f_label('', wrap=False)
 
         self.save_button = f_button(_('Save'),'object-select-symbolic', connect=self.on_save)
         self.cancel_button = f_button(_('Cancel'),'action-unavailable-symbolic', connect=self.on_cancel)
@@ -843,24 +652,24 @@ Sometimes, however, a rule can simply increase importance by its <b>weight</b> w
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
  
-        grid.attach(name_label, 1,1, 2,1)
-        grid.attach(self.name_entry, 3,1, 10,1)
-        grid.attach(string_label, 1,2, 2,1)
-        grid.attach(self.string_entry, 3,2, 10,1)
-        grid.attach(type_label, 1,3, 2,1)        
-        grid.attach(self.type_combo, 3,3, 4,1)
-        grid.attach(feed_label, 1,4, 2,1)        
-        grid.attach(self.feed_combo, 3,4, 10,1)
-        grid.attach(field_label, 1,5, 2,1)        
-        grid.attach(self.field_combo, 3,5, 5,1)
-        grid.attach(case_label, 1,6, 2,1)        
-        grid.attach(self.case_combo, 3,6, 4,1)
-        grid.attach(lang_label, 1,7, 2,1)        
-        grid.attach(self.lang_combo, 3,7, 4,1)
-        grid.attach(weight_label, 1,8, 2,1)
-        grid.attach(self.weight_entry, 3,8, 3,1)
-        grid.attach(self.flag_combo, 2,9, 4,1)
-        grid.attach(self.additive_button, 6,9, 4,1)
+        grid.attach(name_label, 1,1, 3,1)
+        grid.attach(self.name_entry, 4,1, 10,1)
+        grid.attach(string_label, 1,2, 3,1)
+        grid.attach(self.string_entry, 4,2, 10,1)
+        grid.attach(type_label, 1,3, 3,1)        
+        grid.attach(self.type_combo, 4,3, 4,1)
+        grid.attach(feed_label, 1,4, 3,1)        
+        grid.attach(self.feed_combo, 4,4, 10,1)
+        grid.attach(field_label, 1,5, 3,1)        
+        grid.attach(self.field_combo, 4,5, 5,1)
+        grid.attach(case_label, 1,6, 3,1)        
+        grid.attach(self.case_combo, 4,6, 4,1)
+        grid.attach(lang_label, 1,7, 3,1)        
+        grid.attach(self.lang_combo, 4,7, 4,1)
+        grid.attach(weight_label, 1,8, 3,1)
+        grid.attach(self.weight_entry, 4,8, 3,1)
+        grid.attach(self.flag_combo, 1,9, 4,1)
+        grid.attach(self.additive_button, 5,9, 4,1)
         grid.attach(self.err_label, 1, 10, 10, 1) 
 
         vbox = Gtk.Box()
@@ -909,7 +718,7 @@ Sometimes, however, a rule can simply increase importance by its <b>weight</b> w
     def validate(self):
         err = self.rule.validate()
         if err != 0: 
-            self.err_label.set_markup(gui_msg(*err))
+            self.err_label.set_markup(gui_msg(err))
             return False                    
         return True
 
@@ -952,27 +761,27 @@ Sometimes, however, a rule can simply increase importance by its <b>weight</b> w
 
 class EditFeedRegex(Gtk.Dialog):
     """ Edit REGEX strings for parsing HTML input """
-    def __init__(self, parent, regexes, ifeed, **kargs):
+    def __init__(self, parent, FX, regexes, ifeed, **kargs):
         
         self.response = 0
         self.result = {}
 
+        self.FX = FX
         self.parent = parent
-        self.DB = self.parent.parent.DB
 
         self.regexes = regexes
-        self.ifeed = FeedexFeed(self.DB, replace_nones=True)
+        self.ifeed = FeedContainer(self.FX, replace_nones=True)
         self.ifeed.merge(ifeed)
         self.ifeed.merge(self.regexes)
 
-        self.short = kargs.get('short',False)
+        self.short = kargs.get('short',False)       
 
         if self.short: 
-            self.handler = FeedexRSSHandler(self.DB)
+            self.handler = FeedexRSSHandler(self.FX)
             title = _('Custom REGEX string for resource link extraction')
             height = 200
         else: 
-            self.handler = FeedexHTMLHandler(self.DB)
+            self.handler = FeedexHTMLHandler(self.FX)
             title = _("REGEX strings for HTML parsing")
             height = 500
 
@@ -982,10 +791,10 @@ class EditFeedRegex(Gtk.Dialog):
 
         if self.short:
 
-            images_label = f_label(_("REGEX for extracting Images:"), xalign=1)
+            images_label = f_label(f'<b>{_("REGEX for extracting Images:")}</b>', markup=True)
             self.images_entry = Gtk.Entry()
             self.images_entry.set_tooltip_markup(_("""This REGEX will extract links to images from Description and Contents instead of builtin""") )
-            links_label = f_label(_("REGEX for extracting Links:"), xalign=1)
+            links_label = f_label(f'<b>{_("REGEX for extracting Links:")}</b>', markup=True)
             self.links_entry = Gtk.Entry()
             self.links_entry.set_tooltip_markup(_("""This REGEX will extract additional links to resources from Description and Contents instead of builtin"""))
 
@@ -1002,38 +811,38 @@ class EditFeedRegex(Gtk.Dialog):
 
 
         else:
-            entries_label = f_label(f'<b>{_("Entries:")}</b>', markup=True, xalign=1)
+            entries_label = f_label(f'<b>{_("Entries:")}</b>', markup=True)
             self.entries_entry = Gtk.Entry()
             self.entries_entry.set_tooltip_markup(_("""This REGEX should extract list of strings for Entries to be parsed by entry-specific REGEXes
 Parsing will be done match by match with each REGEX below""" ))
         
-            title_label = f_label(_('Title:'), xalign=1)
+            title_label = f_label(_('Title:'))
             self.title_entry = Gtk.Entry()
-            link_label = f_label(_('Link:'), xalign=1)
+            link_label = f_label(_('Link:'))
             self.link_entry = Gtk.Entry()
             self.link_entry.set_tooltip_markup(_("""Link to entry. If exctracted link is a relative URL, i.e. it starts with a '/' symbol, Channel's homepage will be prepended to it automatically"""))
-            desc_label = f_label(_('Description:'), xalign=1)
+            desc_label = f_label(_('Description:'))
             self.desc_entry = Gtk.Entry()
-            author_label = f_label(_('Author:'), xalign=1)
+            author_label = f_label(_('Author:'))
             self.author_entry = Gtk.Entry()
-            category_label = f_label(_('Category:'), xalign=1)
+            category_label = f_label(_('Category:'))
             self.category_entry = Gtk.Entry()
-            text_label = f_label(_('Additional Text:'), xalign=1)
+            text_label = f_label(_('Additional Text:'))
             self.text_entry = Gtk.Entry()
-            images_label = f_label(_('Images:'), xalign=1)
+            images_label = f_label(_('Images:'))
             self.images_entry = Gtk.Entry()
-            pubdate_label = f_label(_('Published Date:'), xalign=1)
+            pubdate_label = f_label(_('Published Date:'))
             self.pubdate_entry = Gtk.Entry()
 
-            title_feed_label = f_label(_("Feed's Title:"), xalign=1)
+            title_feed_label = f_label(_("Feed's Title:"))
             self.title_feed_entry = Gtk.Entry()
-            pubdate_feed_label = f_label(_("Feed's: Published Date:"), xalign=1)
+            pubdate_feed_label = f_label(_("Feed's: Published Date:"))
             self.pubdate_feed_entry = Gtk.Entry()
-            image_feed_label = f_label(_("Feed's Image:"), xalign=1)
+            image_feed_label = f_label(_("Feed's Image:"))
             self.image_feed_entry = Gtk.Entry()
-            charset_feed_label = f_label(_("Feed's Encoding:"), xalign=1)
+            charset_feed_label = f_label(_("Feed's Encoding:"))
             self.charset_feed_entry = Gtk.Entry()
-            lang_feed_label = f_label(_("Feed's Language:"), xalign=1)
+            lang_feed_label = f_label(_("Feed's Language:"))
             self.lang_feed_entry = Gtk.Entry()
 
 
@@ -1045,43 +854,43 @@ Parsing will be done match by match with each REGEX below""" ))
 
 
             edit_grid.attach(title_feed_label, 1,1, 3,1)
-            edit_grid.attach(self.title_feed_entry, 4,1, 13,1)
+            edit_grid.attach(self.title_feed_entry, 4,1, 10,1)
             edit_grid.attach(pubdate_feed_label, 1,2, 3,1)
-            edit_grid.attach(self.pubdate_feed_entry, 4,2, 13,1)
+            edit_grid.attach(self.pubdate_feed_entry, 4,2, 10,1)
             edit_grid.attach(image_feed_label, 1,3, 3,1)
-            edit_grid.attach(self.image_feed_entry, 4,3, 13,1)
+            edit_grid.attach(self.image_feed_entry, 4,3, 10,1)
             edit_grid.attach(charset_feed_label, 1,4, 3,1)
-            edit_grid.attach(self.charset_feed_entry, 4,4, 13,1)
+            edit_grid.attach(self.charset_feed_entry, 4,4, 10,1)
             edit_grid.attach(lang_feed_label, 1,5, 3,1)
-            edit_grid.attach(self.lang_feed_entry, 4,5, 13,1)
+            edit_grid.attach(self.lang_feed_entry, 4,5, 10,1)
 
             edit_grid.attach(entries_label, 1,6, 3,1)
-            edit_grid.attach(self.entries_entry, 4,6, 13,1)
+            edit_grid.attach(self.entries_entry, 4,6, 10,1)
         
             edit_grid.attach(title_label, 1,7, 3,1)
-            edit_grid.attach(self.title_entry, 4,7, 13,1)
+            edit_grid.attach(self.title_entry, 4,7, 10,1)
             edit_grid.attach(link_label, 1,8, 3,1)
-            edit_grid.attach(self.link_entry, 4,8, 13,1)
+            edit_grid.attach(self.link_entry, 4,8, 10,1)
             edit_grid.attach(desc_label, 1,9, 3,1)
-            edit_grid.attach(self.desc_entry, 4,9, 13,1)
+            edit_grid.attach(self.desc_entry, 4,9, 10,1)
             edit_grid.attach(author_label, 1,10, 3,1)
-            edit_grid.attach(self.author_entry, 4,10, 13,1)
+            edit_grid.attach(self.author_entry, 4,10, 10,1)
             edit_grid.attach(category_label, 1,11, 3,1)
-            edit_grid.attach(self.category_entry, 4,11, 13,1)
+            edit_grid.attach(self.category_entry, 4,11, 10,1)
             edit_grid.attach(text_label, 1,12, 3,1)
-            edit_grid.attach(self.text_entry, 4,12, 13,1)
+            edit_grid.attach(self.text_entry, 4,12, 10,1)
             edit_grid.attach(images_label, 1,13, 3,1)
-            edit_grid.attach(self.images_entry, 4,13, 13,1)
+            edit_grid.attach(self.images_entry, 4,13, 10,1)
             edit_grid.attach(pubdate_label, 1,14, 3,1)
-            edit_grid.attach(self.pubdate_entry, 4,14, 13,1)
+            edit_grid.attach(self.pubdate_entry, 4,14, 10,1)
 
         self.edit_window = Gtk.ScrolledWindow()
         self.edit_window.add(edit_grid)
 
         self.prev_box_html = Gtk.ScrolledWindow()
         self.prev_box_parsed = Gtk.ScrolledWindow()
-        self.prev_label_html = f_label('', justify=FX_ATTR_JUS_LEFT, selectable=True, wrap=False, markup=False, xalign=0)
-        self.prev_label_parsed = f_label('', justify=FX_ATTR_JUS_LEFT, selectable=True, wrap=False, markup=True, xalign=0)
+        self.prev_label_html = f_label('', justify=FX_ATTR_JUS_LEFT, selectable=True, wrap=False, markup=False, xalign=2)
+        self.prev_label_parsed = f_label('', justify=FX_ATTR_JUS_LEFT, selectable=True, wrap=False, markup=True, xalign=2)
 
         self.prev_box_html.add(self.prev_label_html)
         self.prev_box_parsed.add(self.prev_label_parsed)
@@ -1089,13 +898,12 @@ Parsing will be done match by match with each REGEX below""" ))
         self.prev_notebook = Gtk.Notebook()
         self.prev_notebook.set_scrollable(True)
 
-        if self.short: self.prev_notebook.append_page(self.prev_box_html, f_label(_("Entries"))) 
-        else: self.prev_notebook.append_page(self.prev_box_html, f_label(_("HTML")))
+        self.prev_notebook.append_page(self.prev_box_html, f_label(_("HTML")))
         self.prev_notebook.append_page(self.prev_box_parsed, f_label(_("Parsing Preview")))
 
         self.load_from_button = f_button(_('Load from...'),'object-select-symbolic', connect=self.on_load_from, tooltip=_("Load REGEXes from other Chanel"))
-        if self.short: self.feed_combo = f_feed_combo(self.parent.parent, no_empty=True, with_categories=False, with_feeds=True, with_short_templates=True) 
-        else: self.feed_combo = f_feed_combo(self.parent.parent, no_empty=True, with_categories=False, with_feeds=True, with_templates=True)
+        if self.short: self.feed_combo = f_feed_combo(self.FX, no_empty=True, with_categories=False, with_feeds=True, with_short_templates=True) 
+        else: self.feed_combo = f_feed_combo(self.FX, no_empty=True, with_categories=False, with_feeds=True, with_templates=True)
 
         self.err_label = f_label('', markup=True)
 
@@ -1155,7 +963,7 @@ Parsing will be done match by match with each REGEX below""" ))
 
     def on_test_regex(self, *args, **kargs):
         if self.ifeed.get('url') in ('',None):
-            self.err_label.set_markup(gui_msg(-1, _('Link URL is empty. Cannot download resource') ) )
+            self.err_label.set_markup(gui_msg( (-1, _('Link URL is empty. Cannot download resource') ) ))
             return -1
 
         self.get_data()
@@ -1175,8 +983,8 @@ Parsing will be done match by match with each REGEX below""" ))
 
         if not downloaded:
             err = self.handler.download()
-            if err != 0 or self.handler.error:
-                self.err_label.set_markup(gui_msg(FX_ERROR_HANDLER, _('Error while downloading resource!')))
+            if err != 0: 
+                self.err_label.set_markup(gui_msg( (-1, f'{_("Handler error:")} {err}') ))
                 return -1
 
         prev_str = ''
@@ -1191,7 +999,7 @@ Parsing will be done match by match with each REGEX below""" ))
             prev_str = f"""{prev_str}\n\n------------------------------------------------------------\n"""
             feed_prev_str = f"""{feed_prev_str}\n\n------------------------------------------------------------\n"""
             title = e.get('title','')
-            desc, im, ls = fdx.strip_markup(e.get('description'), rx_images=rx_images, rx_links=rx_links, test=True)
+            desc, im, ls = strip_markup(e.get('description'), rx_images=rx_images, rx_links=rx_links, test=True)
             feed_prev_str = f"""{feed_prev_str}<b>{esc_mu(title)}</b>
 {esc_mu(desc)}"""
             for i in im:
@@ -1203,7 +1011,7 @@ Parsing will be done match by match with each REGEX below""" ))
             content = e.get('content')
             if content is not None:
                 for c in content:
-                    txt, im, ls = fdx.strip_markup(c.get('value'), html=True, rx_images=rx_images, rx_links=rx_links, test=True)
+                    txt, im, ls = strip_markup(c.get('value'), html=True, rx_images=rx_images, rx_links=rx_links, test=True)
                     feed_prev_str = f"""{feed_prev_str}\n\n{esc_mu(txt)}\n"""
                     if txt not in (None, ''):
                         for i in im:
@@ -1226,7 +1034,7 @@ Parsing will be done match by match with each REGEX below""" ))
         feed_title, feed_pubdate, feed_img, feed_charset, feed_lang, entry_sample, entries = self.handler.test_download(force=True)
         if not downloaded: self.prev_label_html.set_text(scast(self.handler.feed_raw.get('raw_html'), str, ''))
         if self.handler.error:
-            self.err_label.set_markup(gui_msg(FX_ERROR_VAL, _('Error while validating REGEX!')))
+            self.err_label.set_markup(gui_msg( (-1, f'{_("Handler error:")} {self.handler.error_str}') ))
             return -1
 
         demo_string = f"""
@@ -1280,8 +1088,8 @@ Parsing will be done match by match with each REGEX below""" ))
             self._do_restore(feed=feed)
             return 0
 
-        feed = ResultFeed()
-        for f in fdx.feeds_cache:
+        feed = FeedContainerBasic()
+        for f in self.FX.MC.feeds:
             feed.populate(f)
             if feed['id'] == feed_id:
                 self._do_restore(feed=feed)
@@ -1350,7 +1158,7 @@ Parsing will be done match by match with each REGEX below""" ))
         if self.short: err = self.ifeed.validate_regexes2()
         else: err = self.ifeed.validate_regexes()
         if err != 0:
-            self.err_label.set_markup(gui_msg(*err))
+            self.err_label.set_markup(gui_msg(err))
             return False
         return True
 
@@ -1376,13 +1184,11 @@ class EditFeed(Gtk.Dialog):
     """ Edit Feed dialog """
     def __init__(self, parent, feed, **kargs):
 
-        from feedex_docs import FEEDEX_HELP_SCRIPTING
-
         self.new = kargs.get('new',True)
 
         self.response = 0
+        self.config = kargs.get('config',DEFAULT_CONFIG)
         self.parent = parent
-        self.config = self.parent.config
 
         self.feed = feed
         self.regexes = {}
@@ -1395,26 +1201,26 @@ class EditFeed(Gtk.Dialog):
         self.set_default_size(kargs.get('width',1000), kargs.get('height',500))
         box = self.get_content_area()
 
-        self.cat_combo = f_feed_combo(self.parent, tooltip=_("""Choose <b>Category</b> to assign this Feed to
+        self.cat_combo = f_feed_combo(self.feed.FX, tooltip=_("""Choose <b>Category</b> to assign this Feed to
 Categories are useful for bulk-filtering and general organizing""") )
 
         self.handler_combo = f_handler_combo(connect=self.on_changed, local=True)
         
-        name_label = f_label(_('Name:'), xalign=1)
+        name_label = f_label(_('Name:'))
         self.name_entry = Gtk.Entry() 
         self.name_entry.set_tooltip_markup(_("Display name for this Channel"))        
 
-        title_label = f_label(_('Title:'), xalign=1)
+        title_label = f_label(_('Title:'))
         self.title_entry = Gtk.Entry()
         self.title_entry.set_tooltip_markup(_("This is a title given by publisher and downloaded from Feed's page") )        
 
-        subtitle_label = f_label(_('Subtitle:'), xalign=1)
+        subtitle_label = f_label(_('Subtitle:'))
         self.subtitle_entry = Gtk.Entry()
 
-        url_label = f_label(_('URL:'), xalign=1)
+        url_label = f_label(_('URL:'))
         self.url_entry = Gtk.Entry()
         
-        home_label = f_label(_('Homepage:'), xalign=1)
+        home_label = f_label(_('Homepage:'))
         self.home_entry = Gtk.Entry()
         self.home_entry.set_tooltip_markup(_("URL to Channel's Homepage"))
 
@@ -1426,61 +1232,64 @@ Categories are useful for bulk-filtering and general organizing""") )
         self.fetch_button.set_tooltip_markup(_("""If disabled, Channel's news will not be fetched unless manually requested"""))
 
 
-        interval_label = f_label(_('Fetch interval:'), xalign=1)
+        interval_label = f_label(_('Fetch interval:'))
         self.interval_entry = Gtk.Entry()
         self.interval_entry.set_tooltip_markup(_('Set news checking/fetching interval for this Channel'))
 
-        author_label = f_label(_('Author:'), xalign=1)
+        author_label = f_label(_('Author:'))
         self.author_entry = Gtk.Entry()
 
-        author_contact_label = f_label(_('Author contact:'), xalign=1)
+        author_contact_label = f_label(_('Author contact:'))
         self.author_contact_entry = Gtk.Entry()
 
-        publisher_label = f_label(_('Publisher:'), xalign=1)
+        publisher_label = f_label(_('Publisher:'))
         self.publisher_entry = Gtk.Entry()
 
-        publisher_contact_label = f_label(_('Publisher contact:'), xalign=1)
+        publisher_contact_label = f_label(_('Publisher contact:'))
         self.publisher_contact_entry = Gtk.Entry()
 
-        contributors_label = f_label(_('Contributors:'), xalign=1)
+        contributors_label = f_label(_('Contributors:'))
         self.contributors_entry = Gtk.Entry()
 
-        category_label = f_label(_('Category:'), xalign=1)
+        category_label = f_label(_('Category:'))
         self.category_entry = Gtk.Entry()
         
-        tags_label = f_label(_('Tags:'), xalign=1)
+        tags_label = f_label(_('Tags:'))
         self.tags_entry = Gtk.Entry()
 
         self.auth_combo = f_auth_combo(connect=self.on_changed)
 
-        domain_label = f_label(_('Domain:'), xalign=1)
+        domain_label = f_label(_('Domain:'))
         self.domain_entry = Gtk.Entry()
         self.domain_entry.set_tooltip_markup(_("""Domain used in authentication process"""))
 
-        login_label = f_label(_('Login:'), xalign=1)
+        login_label = f_label(_('Login:'))
         self.login_entry = Gtk.Entry()
         self.login_entry.set_tooltip_markup(_("""Login used in authentication process"""))
 
-        password_label = f_label(_('Password:'), xalign=1)
+        password_label = f_label(_('Password:'))
         self.password_entry = Gtk.Entry()
         self.password_entry.set_visibility(False)
         self.password_entry.set_tooltip_markup(_("""Password used in authentication process"""))
 
 
-        user_agent_label = f_label(_('Custom User Agent:'), xalign=1)
+        user_agent_label = f_label(_('Custom User Agent:'))
         user_agent_combo, self.user_agent_entry = f_user_agent_combo()
 
-        script_file_label = f_label(_('Fetching script:'), xalign=1)
+        script_file_label = f_label(_('Fetching script:'))
         self.script_entry = Gtk.Entry()
-        self.script_entry.set_tooltip_markup(f"""<small>{FEEDEX_HELP_SCRIPTING}</small>""")
+        self.script_entry.set_tooltip_markup(_("""Script/command to be executed to fetch entries for this Channel. 
+This script should return a <b>JSON string</b>
+See <b><i>feedex --help-scripting</i></b> for detailed specification"""))
         self.script_button = f_button(None, 'system-run-symbolic', connect=self._on_choose_script, tooltip=_('Search local machine for script file') )
 
-        icon_label = f_label(_('Icon:'), xalign=1)
-        self.icon_combo = f_feed_icon_combo(self.parent, is_category=False, id=self.feed.get('id'), tooltip=_('Choose icon for this Channel'))
+        icon_label = f_label(_('Icon:'))
+        icon_combo, self.icon_entry = f_feed_icon_combo()
+        self.icon_button = f_button(None, 'folder-symbolic', connect=self._on_choose_icon, tooltip=_('Search local machine for icons') )
 
         self.regex_button = f_button(_('REGEX'),None, connect=self._on_define_regex, tooltip=_("Define <b>REGEX strings</b> for <b>HTML</b> parsing") )
 
-        self.err_label = f_label('', markup=True, xalign=0)
+        self.err_label = f_label('', markup=True)
 
 
         self.save_button = f_button(_('Save'),'object-select-symbolic', connect=self.on_save)
@@ -1545,7 +1354,8 @@ Categories are useful for bulk-filtering and general organizing""") )
         grid.attach(self.script_button, 9,16, 1,1)
 
         grid.attach(icon_label, 10,16, 3,1)
-        grid.attach(self.icon_combo, 13,16, 4,1)
+        grid.attach(icon_combo, 13,16, 4,1)
+        grid.attach(self.icon_button, 17,16, 1,1)
 
 
         grid.attach(self.err_label, 1, 17, 12,1)
@@ -1578,12 +1388,24 @@ Categories are useful for bulk-filtering and general organizing""") )
     def _on_define_regex(self, *args, **kargs):
         """ Run new window for defining REGEXes"""
         handler = f_get_combo(self.handler_combo)
-        if handler == 'html': dialog = EditFeedRegex(self, self.regexes, self.get_data(for_regex=True))
-        else: dialog = EditFeedRegex(self, self.regexes, self.get_data(for_regex=True), short=True)
+        if handler == 'html': dialog = EditFeedRegex(self, self.parent.FX, self.regexes, self.get_data(for_regex=True))
+        else: dialog = EditFeedRegex(self, self.parent.FX, self.regexes, self.get_data(for_regex=True), short=True)
         dialog.run()
         if dialog.response == 1: self.regexes = dialog.result.copy()
         dialog.destroy()
 
+
+    def _choose_file(self, *args, **kargs):
+        dialog = Gtk.FileChooserDialog(kargs.get('title',_("Choose file")), parent=self, action=Gtk.FileChooserAction.OPEN)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+
+        dialog.set_current_folder(kargs.get('start_dir', os.getcwd()))
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            filename = dialog.get_filename()
+        else: filename = False
+        dialog.destroy()
+        return filename
 
 
 
@@ -1593,8 +1415,18 @@ Categories are useful for bulk-filtering and general organizing""") )
             start_dir = os.path.dirname(sfile)
         else: start_dir = os.getcwd()
 
-        filename = f_chooser(self, self.parent, action='open_file', start_dir=start_dir, header=_('Choose Script File'))
+        filename = self._choose_file(title=_('Choose Script File'), start_dir=start_dir)
         if filename is not False: self.script_entry.set_text(filename)
+
+    def _on_choose_icon(self, *args, **kargs):
+        sfile = scast(self.feed.backup_vals.get('icon_name',''), str, '')
+        if os.path.isfile(sfile):
+            start_dir = os.path.dirname(sfile)
+        else: start_dir = os.getcwd()
+
+        filename = self._choose_file(title=_('Choose Image'), start_dir=start_dir)
+        if filename is not False: self.icon_entry.set_text(filename)
+
 
 
 
@@ -1666,14 +1498,14 @@ Scripted feeds are updated by script defined below during fetching""") )
 
         self.user_agent_entry.set_text(coalesce(self.feed.backup_vals.get('user_agent',''),''))
         self.script_entry.set_text(coalesce(self.feed.backup_vals.get('script_file',''),''))
-        f_set_combo(self.icon_combo, coalesce(self.feed.backup_vals.get('icon_name',''),''))
- 
+        self.icon_entry.set_text(coalesce(self.feed.backup_vals.get('icon_name',''),''))
+
 
 
     def validate_entries(self, *args):
         err = self.feed.validate()
         if err != 0:
-            self.err_label.set_markup(gui_msg(*err))
+            self.err_label.set_markup(gui_msg(err))
             return False
         return True
     
@@ -1706,7 +1538,7 @@ Scripted feeds are updated by script defined below during fetching""") )
 
         idict['user_agent'] = nullif(scast(self.user_agent_entry.get_text(), str, '').strip(),'')
         idict['script_file'] = nullif(scast(self.script_entry.get_text(), str, '').strip(),'')
-        idict['icon_name'] = nullif(scast(f_get_combo(self.icon_combo), str, '').strip(),'')
+        idict['icon_name'] = nullif(scast(self.icon_entry.get_text(), str, '').strip(),'')
 
         if kargs.get('for_regex',False): return idict
 

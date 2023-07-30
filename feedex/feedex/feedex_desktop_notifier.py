@@ -21,7 +21,7 @@ class DesktopNotifier:
     """ Desktop notification handler for FEEDEX. Displays notifications given a result list """
     def __init__(self, **kargs):
         Notify.init("Feedex")
-        self.entry = ResultEntry()
+        self.entry = SQLContainer('entries', RESULTS_SQL_TABLE + ('sim','cnt','rank',))
         self.notif_list = []
         self.parent = kargs.get('parent')
         self.icons = kargs.get('icons',{})
@@ -59,10 +59,10 @@ class DesktopNotifier:
 
     def notify(self, title:str, body:str, icon:int):
         """ Quickly send a desktop notification """
-        if icon == 0: icon = os.path.join(FEEDEX_SYS_ICON_PATH, 'script.svg')
-        elif icon == -1: icon = os.path.join(FEEDEX_SYS_ICON_PATH, 'error.svg')
-        elif icon == -2: icon = os.path.join(FEEDEX_SYS_ICON_PATH, 'ok.svg')
-        elif icon == -3: icon = os.path.join(FEEDEX_SYS_ICON_PATH, 'rss.svg')
+        if icon == 0: icon = f'{FEEDEX_SYS_ICON_PATH}{DIR_SEP}script.svg'
+        elif icon == -1: icon = f'{FEEDEX_SYS_ICON_PATH}{DIR_SEP}error.svg'
+        elif icon == -2: icon = f'{FEEDEX_SYS_ICON_PATH}{DIR_SEP}ok.svg'
+        elif icon == -3: icon = f'{FEEDEX_SYS_ICON_PATH}{DIR_SEP}rss.svg'
         else: icon = self.icons.get(icon)
 
         n = Notify.Notification.new(title, body, icon)
