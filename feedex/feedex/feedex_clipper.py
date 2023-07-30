@@ -15,11 +15,11 @@ from feedex_headers import *
 
 
 
-class Clipper:
+class FeedexClipper:
     """ Clipboard and Window support. Gets selection and window name."""
     def __init__(self, **kargs) -> None:
 
-        self.config = kargs.get('config', DEFAULT_CONFIG)
+        self.config = kargs.get('config', fdx.config)
         self.error = None
 
 
@@ -31,17 +31,17 @@ class Clipper:
             
         if selection in (None, ''): 
             self.error = _('Empty selection!')
-            cli_msg(-1, _('Empty selection!'))
+            msg(FX_ERROR, _('Empty selection!'))
 
         scr = Wnck.Screen.get_default()
         scr.force_update()
         window = scr.get_active_window().get_name()
-        # Exclude phrases (to avoid littering database with rowser headers etc...)...
+        # Exclude phrases (to avoid littering database with browser headers etc...)...
         exclude = scast(self.config.get('window_name_exclude'), str, '')
         for excl in exclude.split(','): window = window.replace(excl,'')
 
         arg_list = []
-        for a in args: 
+        for a in args:
             if type(a) is str: arg_list.append(self.parse_for_clipboard(a, selection, window)) 
             else: arg_list.append(None)
 
