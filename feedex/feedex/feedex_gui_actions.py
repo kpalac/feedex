@@ -602,7 +602,7 @@ class FeedexGUIActions:
                 if self.MW.flags_tab != -1:
                     if new:
                         self.MW._get_upn_page_obj(self.MW.flags_tab).apply(FX_ACTION_ADD, item.vals.copy()) 
-                        self.new_flag.clear()
+                        self.MW.new_flag.clear()
                     else: self.MW._get_upn_page_obj(self.MW.flags_tab).apply(FX_ACTION_EDIT, item.vals.copy())
                     self.reload_flag_combos()
         dialog.destroy()   
