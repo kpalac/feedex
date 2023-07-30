@@ -868,10 +868,10 @@ Escape: \ (only if before wildcards and field markers)""") )
                 err = QP.query('', filters, no_history=True)
 
 
-            if QP.phrase.get('empty',False):
+            if empty:
                 if feed_name is None: self.final_status = _('Results')
                 else: self.final_status = f'<b>{esc_mu(feed_name, ell=50)}</b>'
-            else: 
+            else:
                 if feed_name is None: self.final_status = f'{_("Search for ")}<b>{esc_mu(qr, ell=50)}</b>'
                 else: self.final_status = f'{_("Search for ")}<b>{esc_mu(qr, ell=50)}</b> {_("in")} <b><i>{esc_mu(feed_name, ell=50)}</i></b>'
 
@@ -1079,6 +1079,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         """ Wrapper for filtering by feed """
         if self.busy: return 0
         self.busy = True
+        if self.table.result_no == 0: return 0
         self.block_search(_('Filtering...'))
         ids = args[-1]
         self.search_thread = threading.Thread(target=self.on_filter_by_feed_thr, args=(ids,))

@@ -734,8 +734,9 @@ It will also take some time to perform""") ))
             if coalesce(item.get('is_deleted'),0) == 0:
                 mark_menu = Gtk.Menu()
                 mark_menu.append( f_menu_item(1, _('Read (+1)'), self.act.on_mark, args=('read', item,), icon='bookmark-new-symbolic', tooltip=_("Number of reads if counted towards this entry keyword's weight when ranking incoming articles") ) )
+                mark_menu.append( f_menu_item(1, _('Read (+5)'), self.act.on_mark, args=('read+5', item,), icon='bookmark-new-symbolic', tooltip=_("Number of reads if counted towards this entry keyword's weight when ranking incoming articles") ) )
+                mark_menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 mark_menu.append( f_menu_item(1, _('Unread'), self.act.on_mark, args=('unread', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Unread document does not contriute to ranking rules") ) )
-                mark_menu.append( f_menu_item(1, _('Unimportant'), self.act.on_mark, args=('unimp', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Mark this as unimportant and learn negative rules") ) )
                 menu.append( f_menu_item(3, _('Mark as...'), mark_menu, icon='bookmark-new-symbolic') )
 
                 flag_menu = Gtk.Menu()
@@ -1610,7 +1611,6 @@ It will also take some time to perform""") ))
         if self.curr_prev != FX_PREV_STARTUP:
             for c in self.prev_images.get_children(): self.prev_images.remove(c)
             self.prev_images.pack_start(self.icons['large']['main_emblem'], True, True, 0)
-
         self.curr_prev = FX_PREV_STARTUP
 
         startup_text = f"""

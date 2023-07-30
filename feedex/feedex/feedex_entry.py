@@ -144,11 +144,9 @@ class FeedexEntry(SQLContainerEditable):
         else:
             self.DB.close_ixer()
             msg(_('Keywords learned'))
-            if not fdx.single_run:
-                err = self.DB.load_terms()
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading learned terms after successfull open!'))
+            err = self.DB.update_stats( {self.vals['feed_id']:1} )
 
-        return 0                        
+        return err                        
 
 
 
@@ -204,6 +202,8 @@ class FeedexEntry(SQLContainerEditable):
         
         if self.vals['note'] not in (None, 0,1): return FX_ERROR_VAL, _('Note marker must be 0 or 1!')
 
+        if coalesce(self.vals['read'],0) < 0: return FX_ERROR_VAL, _('Read marker must be >= 0!')
+
         date = convert_timestamp(self.vals['pubdate_str'])
         if date is None: return FX_ERROR_VAL, _('Invalid published date string (pubdate_str)!')
         else: self.vals['pubdate'] = date
@@ -225,6 +225,8 @@ class FeedexEntry(SQLContainerEditable):
         if not self.updating: return 0
         if not self.exists: return FX_ERROR_NOT_FOUND
 
+        stats_delta = {}
+
         self.vals['adddate_str'] = datetime.now()
 
         if kargs.get('validate', True): 
@@ -233,8 +235,11 @@ class FeedexEntry(SQLContainerEditable):
                 self.restore()
                 return msg(*err)
 
-        if coalesce(self.vals['deleted'],0) == 0 and coalesce(self.backup_vals['deleted'],0) >= 1: restoring = True
-        else: restoring = False
+        if coalesce(self.vals['deleted'],0) == 0 and coalesce(self.backup_vals['deleted'],0) >= 1: 
+            stats_delta['dc'] = 1
+            restoring = True
+        else: 
+            restoring = False
 
         self.relearn = False
         self.reindex = False
@@ -249,11 +254,15 @@ class FeedexEntry(SQLContainerEditable):
         for f in self.to_update:
             if f in REINDEX_LIST: self.reindex = True
             
+        read = coalesce(self.vals['read'],0)
+        old_read = coalesce(self.backup_vals['read'],0)
+
         if self.config.get('use_keyword_learning', True):
-            if self.reindex and coalesce(self.vals['read'],0) > 0: self.relearn = True
-            if coalesce(self.vals['read'],0) > 0 and coalesce(self.backup_vals['read'],0) == 0: self.relearn = True
-            if coalesce(self.vals['read'],0) < 0 and coalesce(self.backup_vals['read'],0) == 0: self.relearn = True
-            if coalesce(self.vals['read'],0) >= 0 and coalesce(self.backup_vals['read'],0) < 0: self.relearn = True
+            if self.reindex and read > 0: self.relearn = True
+            if read > 0 and old_read <= 0: self.relearn = True
+
+        if restoring and read > 0: stats_delta[self.vals['feed_id']] = read
+        elif read != old_read: stats_delta[self.vals['feed_id']] = read - old_read
 
         if self.relearn or self.reindex:
             if self.reindex:  msg(_('Reindexing statistics ...'))
@@ -293,13 +302,9 @@ class FeedexEntry(SQLContainerEditable):
             for i,u in enumerate(self.to_update):
                 if u in self.immutable or u == 'id': del self.to_update[i]
 
-            if self.relearn and not fdx.single_run: 
-                err = self.DB.load_terms()
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading learned terms after successfull update!'))
-
-            if restoring: 
-                err = self.DB.update_stats()
-                if err != 0: return msg(FX_ERROR_DB, _('Error updating DB stats after successfull update!'))
+            if stats_delta != {}:
+                err = self.DB.update_stats(stats_delta)
+                if err != 0: return err
 
             if len(self.to_update) > 1: msg(_('Entry %a updated successfuly!'), self.vals['id'], log=True)
             else:
@@ -354,6 +359,8 @@ class FeedexEntry(SQLContainerEditable):
         id = self.vals.get('id')
         if id is None: return FX_ERROR_NOT_FOUND
 
+        stats_delta = {}
+
         if self.vals.get('deleted',0) == 1:
             err = self.DB.run_sql_multi_lock(
                 ("delete from terms where context_id = :id", {'id':id}),\
@@ -381,6 +388,9 @@ class FeedexEntry(SQLContainerEditable):
                 if err != 0:
                     err = self.DB.run_sql_lock("update entries set deleted = 0 where id = :id", {'id':id})
                     if err != 0: return msg(FX_ERROR_DB, _('Error reverting changes! Delete failed miserably'))
+            
+            stats_delta['dc'] = -1
+            stats_delta[self.vals['feed_id']] = -coalesce(self.vals['read'],0)
 
         if err != 0: return err
 
@@ -393,11 +403,8 @@ class FeedexEntry(SQLContainerEditable):
                 try: os.remove(im_file)
                 except (OSError, IOError,) as e: msg(FX_ERROR_IO, f"""{_('Error removing image %a')}: {e}""", im_file)
 
-            if not fdx.single_run: 
-                err = self.DB.load_terms()
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading learned terms after successfull delete!'))
-            err = self.DB.update_stats()
-            if err != 0: return msg(FX_ERROR_DB,_('Error updating DB stats after successfull delete!'))
+            err = self.DB.update_stats(stats_delta)
+            if err != 0: return err
 
             if self.vals.get('deleted',0) == 1:
                 self.vals['deleted'] = 2
@@ -470,12 +477,14 @@ class FeedexEntry(SQLContainerEditable):
             else: msg(_('Keywords learned for entry %a'), self.vals['id'])
 
         if kargs.get('update_stats',True):
+            stats_delta = { 'dc':1, self.vals['feed_id']:coalesce(self.vals['read'],0) }
+            err = self.DB.update_stats(stats_delta)
+            if err != 0: return err
+
             if not fdx.single_run: 
                 err = self.DB.load_terms()
                 if err != 0: return msg(FX_ERROR_DB, _('Error reloading learned terms after successfull add!'))
 
-            err = self.DB.update_stats()
-            if err != 0: return msg(-2, _('Error updating DB stats after successfull add'))
 
         if self.vals['note'] in (0,None): return msg(_('Entry %a added as News item'), self.vals['id'])
         else: return msg(_('Entry %a added as a Note'), self.vals['id'])

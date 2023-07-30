@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS "feeds" (
 	"script_file"	TEXT,
 	"icon_name"	TEXT,
 	"display_order"	INTEGER,
+	"recom_weight" INTEGER,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 
@@ -224,6 +225,6 @@ CREATE INDEX IF NOT EXISTS "idx_terms_term_desc" ON "terms" ( "term" DESC);
 CREATE INDEX IF NOT EXISTS "idx_terms_context_id" ON "terms" ( "context_id"	ASC );
 CREATE INDEX IF NOT EXISTS "idx_terms_context_id_desc" ON "terms" ( "context_id"	DESC );
 
-
+INSERT INTO params (name, val) VALUES ('doc_count',0);
 
 COMMIT;

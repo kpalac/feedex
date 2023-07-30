@@ -572,9 +572,7 @@ class FeedexFlag(SQLContainerEditable):
 
         if self.DB.rowcount > 0:
 
-            if not fdx.single_run:
-                err = self.DB.load_flags(ignore_lock=True)
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading flags after successfull update!'))
+            if not fdx.single_run: self.DB.load_flags(ignore_lock=True)
             
             for i,u in enumerate(self.to_update):
                 if u in self.immutable: del self.to_update[i]
@@ -612,9 +610,7 @@ class FeedexFlag(SQLContainerEditable):
         if err != 0: return err
         
         if self.DB.rowcount > 0: 
-            if not fdx.single_run: 
-                err = self.DB.load_flags(ignore_lock=True)
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading flags after successfull delete!'))
+            if not fdx.single_run: self.DB.load_flags(ignore_lock=True)
 
             return msg(_('Flag %a deleted'), self.vals['id'], log=True)
 
@@ -644,9 +640,7 @@ class FeedexFlag(SQLContainerEditable):
         self.vals['id'] = self.DB.lastrowid
         self.DB.last_rule_id = self.vals['id']
 
-        if not fdx.single_run: 
-            err = self.DB.load_flags(ignore_lock=True)
-            if err != 0: return msg(FX_ERROR_DB, _('Error reloading flags after successfull add!'))
+        if not fdx.single_run: self.DB.load_flags(ignore_lock=True)
 
         return msg(_('Flag %a added successfully'), self.name(with_id=True), log=True)
     

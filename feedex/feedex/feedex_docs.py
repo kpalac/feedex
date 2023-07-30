@@ -184,9 +184,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --mark [ID] [N]                         Mark entry as read N times (important for future recommendation)
                                                 options:
                                                 --learn,--no-learn         Extract patterns from Entry?
-        --mark-unimportant [ID]                 Mark entry as unimportant for future recommendations
-                                                options:
-                                                --learn,--no-learn         Extract patterns from Entry?
+        --unmark [ID]                           Unmark entry
 
         --flag [ID] [N]                         Set entry's flag
 
@@ -692,6 +690,8 @@ Below are field descriptions:
     <b>icon_name</b>                           Stock icon name for display for this Channel (it overwrites downloaded image)
 
     <b>display_order</b>                       Order in which a Channel/Category should be displayed in CLI and GUI
+    
+    <b>recom_weight</b>                        Aggregate of marked entries for this feed, used in recommendation
 
 
 

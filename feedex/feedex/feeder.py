@@ -318,19 +318,19 @@ class FeedexDatabase:
         if isinstance(self.ixer_db, xapian.WritableDatabase): 
             self.ixer = None
 
-            if commit: 
-                debug(2,'Writing to Index...')
+            if commit:
+                msg(_('Writing to index...'))
                 try: self.ixer_db.commit_transaction()
                 except (xapian.Error,) as e:
                     self.ixer_db.cancel_transaction()
                     self.ixer_db.close()
                     return msg(FX_ERROR_INDEX, _('Indexer error: %a'), e)                 
             if rollback:
-                debug(2,'Index changes cancelled!')
+                msg(_('Reverting index changes...'))
                 self.ixer_db.cancel_transaction()
             
             self.ixer_db.close()
-            debug(2,'Done.')
+            msg(_('Done.'))
 
         self.ixer_db = None
         return 0
@@ -569,16 +569,22 @@ class FeedexDatabase:
     def load_feed_freq(self, **kargs):
         """ Load feed read frequency for recommendations """
         debug(2, f'Loading marked entries freq ({self.conn_id})...')
+        self.cache_feeds()
         
-        feed_freq_list = self.qr_sql(LOAD_FEED_FREQ_SQL, all=True)
-        if self.status != 0: raise FeedexDataError('Error caching feed freqs: %a', self.error)
-        
-        # Normalize to 0-1 range
-        max_freq = slist(feed_freq_list, 0, (0,0))[1]
-        feed_freq_dict = {}
-        for f in feed_freq_list: feed_freq_dict[f[0]] = (max_freq - f[1])/max_freq
+        max_freq = 0
+        feed_freq = {}
+        for f in fdx.feeds_cache:
+            freq = coalesce(f[FEEDS_SQL_TABLE.index('recom_weight')], 0)
+            if freq < 0: freq = 0
+            if freq > max_freq: max_freq = freq
+            feed_freq[f[FEEDS_SQL_TABLE.index('id')]] = freq
 
-        fdx.feed_freq_cache = feed_freq_dict
+        if max_freq > 0:
+            for k,v in feed_freq.items(): feed_freq[k] = 1 - ((max_freq - v)/max_freq)
+        
+        fdx.feed_freq_cache = feed_freq
+        #for k,v in feed_freq.items(): print(f'{k}: {v}')
+        return 0
 
 
     def load_terms(self, **kargs):
@@ -596,7 +602,7 @@ class FeedexDatabase:
         if self.status != 0: raise FeedexDataError('Error caching learned terms: %a', self.error)
 
         # Build query string for recommendations (better do it once at the beginning)        
-        limit = self.config.get('recom_limit', 250)
+        limit = scast(self.config.get('recom_limit', 250), int, 250)
 
         qr_str = ''        
         for i,t in enumerate(fdx.terms_cache):
@@ -727,7 +733,7 @@ class FeedexDatabase:
     def maintenance(self, **kargs): return self.run_fetch_locked(self._maintenance, **kargs)
     def _maintenance(self, **kargs):
         """ Performs database maintenance to increase performance at large sizes """
-        msg(_('Starting DB miantenance'))
+        msg(_('Starting DB miantenance'), log=True)
 
         msg(_('Performing VACUUM'))
         err = self.run_sql_lock('VACUUM')
@@ -739,13 +745,19 @@ class FeedexDatabase:
             err = self.run_sql_lock('REINDEX')
 
         if err == 0:
-            msg(_('Updating document statistics'))
-            doc_count = slist(self.qr_sql(DOC_COUNT_SQL, one=True),0, 0)
-            doc_count = scast(doc_count, int, 0)
+            err = self._update_doc_count()
+            doc_count = self.get_doc_count()
 
-            err = self.run_sql_lock("insert into params values('doc_count', :doc_count)", {'doc_count':doc_count})
-            if err == 0: err = self.run_sql_lock("""insert into actions values('maintenance',:doc_count)""", {'doc_count':doc_count})
-        
+            msg(_('Updating feed recomm. weights...'))            
+            err = self.run_sql_lock("""update feeds set recom_weight = 0""")
+            stats_delta = {}
+            if err == 0:
+                feed_weight_list = self.qr_sql(FEED_FREQ_MAINT_SQL, all=True)
+                for w in feed_weight_list: stats_delta[w[0]] = w[1]
+                err = self.update_stats(stats_delta, ignore_lock=True)
+
+
+        if err == 0: err = self.run_sql_lock("""insert into actions values('maintenance',:doc_count)""", {'doc_count':doc_count})
         if err == 0:
             self.conn.commit()
             msg(_('DB maintenance completed'), log=True)
@@ -771,35 +783,65 @@ class FeedexDatabase:
     #
 
 
-    def update_stats(self):
+    def update_stats(self, idict:dict, **kargs):
         """ Get DB statistics and save them to params table for quick retrieval"""
-        debug(2, "Updating database document statistics...")
 
-        doc_count = scast( self.qr_sql(DOC_COUNT_SQL, one=True)[0], int, 0)
-        if self.status != 0: return self.status
+        msg(_("Updating DB statistics..."))
 
-        fdx.doc_count = doc_count
-        err = self.run_sql_multi_lock(
-        ("delete from params where name = 'doc_count'",),\
-        ("insert into params values('doc_count', :doc_count)", {'doc_count':doc_count})
-        )
+        err = 0
+        dc_delta = scast(idict.get('dc'), int, 0)
+        if dc_delta != 0:
+            doc_count = self.get_doc_count() + dc_delta
+            err = self.run_sql_multi_lock(
+                    ("delete from params where name = 'doc_count'",),\
+                    ("insert into params values('doc_count', :doc_count)", {'doc_count':doc_count})
+                    )
+            
+        if err != 0: return err
 
-        debug(2,f"Done. Doc count: {doc_count}")
+        do_reload = False
+        for k,v in idict.items():
+            if type(k) is not int: continue
+            delta = scast(v, int, 0)
+            if delta != 0:
+                if fdx.feeds_cache is None: self.load_feeds(**kargs)
+                for i,f in enumerate(fdx.feeds_cache):
+                    if f[FEEDS_SQL_TABLE.index('id')] == k and f[FEEDS_SQL_TABLE.index('is_category')] != 1:
+                        do_reload = True
+                        err = self.run_sql_lock('update feeds set recom_weight = coalesce(recom_weight,0) + :delta where id = :id', {'delta':delta, 'id':k})
+
+
+        if not fdx.single_run and do_reload and err == 0: 
+            self.load_feeds(**kargs)
+            self.load_terms(**kargs)
+
         return err
 
+
+        
+
+    def _update_doc_count(self, **kargs):
+        """ Calculate doc count and cache it in params table """
+        msg(_('Calculating document count...'))
+        doc_count = scast( slist(self.qr_sql(DOC_COUNT_MAINT_SQL, one=True),0, 0), int, 0)
+        if self.status != 0: return FX_ERROR
+        err = self.run_sql_multi_lock(
+                    ("delete from params where name = 'doc_count'",),\
+                    ("insert into params values('doc_count', :doc_count)", {'doc_count':doc_count})
+                    )
+        return err
+        
 
 
     def get_doc_count(self, **kargs):
         """ Retrieve entry count from params"""
         if fdx.doc_count is not None: return fdx.doc_count
         
-        doc_count = self.qr_sql("select val from params where name = 'doc_count'", one=True)
-        if doc_count in (None, (None,),()):
-            self.update_stats()
-            doc_count = self.qr_sql("select val from params where name = 'doc_count'", one=True)
-            if doc_count in (None, (None,),()): return fdx.doc_count
-        doc_count = scast(slist(doc_count,0, -1), int, 1)
-        if doc_count != -1: fdx.doc_count = doc_count
+        doc_count = scast( slist(self.qr_sql("select val from params where name = 'doc_count'", one=True), 0, None), int, None)
+        if doc_count is None:
+            err = self._update_doc_count()
+            if err == 0: doc_count = scast( slist(self.qr_sql("select val from params where name = 'doc_count'", one=True), 0, None), int, 1)
+            else: return 1
         return doc_count
 
 
@@ -840,7 +882,7 @@ class FeedexDatabase:
         stat_dict['ix_size'] = sanitize_file_size(stat_dict['ix_size'])
         stat_dict['cache_size'] = sanitize_file_size(stat_dict['cache_size'])
 
-        stat_dict['doc_count'] = slist(self.qr_sql("select val from params where name='doc_count'", one=True, ignore_errors=False), 0, 0)
+        stat_dict['doc_count'] = self.get_doc_count()
         stat_dict['last_doc_id'] = self.get_last_docid()
         stat_dict['last_update'] = slist(self.qr_sql("select max(time) from actions where name = 'fetch'", one=True, ignore_errors=False), 0, '<???>')
         stat_dict['first_update'] = slist(self.qr_sql("select min(time) from actions where name = 'fetch'", one=True, ignore_errors=False), 0, '<???>')
@@ -913,7 +955,8 @@ class FeedexDatabase:
 
 
         entries_sql_q = [] # SQL statemets to be executed, adding entries
-        terms_sql_d = {} # Extracted keywords 
+        terms_sql_d = {} # Extracted keywords
+        stats_delta = {} # Marked entry frequencies
 
         if pipe: msg(_('Importing entries ...'))
         else: msg(_('Importing entries from %a...'), efile)
@@ -939,8 +982,11 @@ class FeedexDatabase:
                 continue
 
             learn = False
-            if scast(entry['read'], int, 0) != 0: learn = True
-            
+            read = scast(entry['read'], int, 0)
+            if read > 0: 
+                learn = True
+                stats_delta[entry['feed_id']] = scast(stats_delta.get(entry['feed_id']), int, 0) + read
+
             err = entry.ling(index=True, rank=True, learn=learn, save_terms=False, counter=i)
             if err != 0: 
                 self.close_ixer(rollback=True)
@@ -991,7 +1037,9 @@ class FeedexDatabase:
 
         # stat
         if num_added > 0:
-            self.update_stats()
+            stats_delta['dc'] = num_added
+            #for k,v in stats_delta.items(): print(f"{k}: {v}")
+            self.update_stats(stats_delta, ignore_lock=True)
             if not fdx.single_run: self.load_terms()
             msg(_('Added %a new entries from %b items'), num_added, elist_len, log=True)
         
@@ -1282,7 +1330,6 @@ class FeedexDatabase:
                             msg(_('Saving new items ...'))
                             err = self.run_sql_lock(self.entry.insert_sql(all=True), entries_sql)
                             if err == 0: 
-                                msg(_('Indexing new items ...'))
                                 err = self.close_ixer()                 
                                 if err != 0:
                                     msg(_('Reverting changes...'))
@@ -1383,7 +1430,6 @@ class FeedexDatabase:
                 msg(_('Saving new items ...'))
                 err = self.run_sql_lock(self.entry.insert_sql(all=True), entries_sql)
                 if err == 0: 
-                    msg(_('Indexing new items ...'))
                     err = self.close_ixer()
                     if err != 0:
                         msg(_('Reverting changes...'))
@@ -1409,10 +1455,7 @@ class FeedexDatabase:
             if err != 0: return err
             elif not fdx.single_run: self.load_fetches()
 
-        if kargs.get('update_stats',True):
-            if self.new_items > 0: 
-                msg(_('Updating statistics ...'))
-                self.update_stats()
+            if kargs.get('update_stats',True): self.update_stats({'dc':self.new_items})
 
         finished_raw = datetime.now()
         finished = int(finished_raw.timestamp())
@@ -1563,7 +1606,6 @@ class FeedexDatabase:
 
         msg(_('Recalculation finished!'), log=True)
 
-        self.update_stats()
         if learn: 
             if not fdx.single_run: self.load_terms()
 

@@ -61,6 +61,7 @@ class FeedexFeedTab(Gtk.ScrolledWindow):
 Double-click on a place to quickly load entries  
 Double-click on feed or category to filter results by chosen item
 Right click for more options
+
 Hit <b>Ctrl-F</b> for interactive search
 Hit <b>F2</b> for Menu
 Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
@@ -365,7 +366,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
 
         if kargs.get('load',True):
             self.MW.DB.load_icons()
-            self.MW.act.get_icons()
+            self.MW.act.get_icons_feeds()
 
         adj = self.feed_tree.get_vadjustment()
         self.vadj_val = adj.get_value()

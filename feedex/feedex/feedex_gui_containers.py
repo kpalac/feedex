@@ -192,7 +192,7 @@ class ResultGUINote(ResultGUIEntry):
 
         self.gui_vals['gui_icon'] = self.MW.icons['large'].get(self.vals["feed_id"], self.MW.icons['large']['default'])
         
-        if self.vals.get('flag',0) > 0:
+        if coalesce(self.vals.get('flag'),0) > 0:
             color = fdx.get_flag_color(self.vals.get('flag',0)) 
             flag_str = f"""<b><span foreground="{color}">{esc_mu(self.vals.get("flag_name",''))}</span></b>: """
         else: flag_str = ''    

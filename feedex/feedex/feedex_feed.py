@@ -71,6 +71,8 @@ class FeedexFeed(SQLContainerEditable):
                 break
 
 
+    def get_doc_count(self, **kargs):
+        return scast( slist(self.DB.qr_sql("select count(id) from entries where feed_id = :feed_id", {'feed_id':coalesce(self.vals['id'],-1)}, one=True), 0, -1), int, 0)
 
 
 
@@ -188,15 +190,12 @@ class FeedexFeed(SQLContainerEditable):
 
         if self.DB.rowcount > 0:
 
-            if not fdx.single_run: 
-                err = self.DB.load_feeds(ignore_lock=True)
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading Feeds after successfull update!'))
+            if not fdx.single_run: self.DB.load_feeds(ignore_lock=True)
 
             if restoring:
-                err = self.DB.update_stats()
-                if err != 0: return msg(FX_ERROR_DB, _('Error updating DB stats after successfull update!'))
-                err = self.DB.load_terms()
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading learned keywords after successfull update!'))
+                err = self.DB.update_stats({'dc':self.get_doc_count()})
+                if err == 0: err = self.DB.load_terms()
+                if err != 0: return err
 
             if self.vals['is_category'] == 1: stype = _('Category')
             else: stype = _('Channel')
@@ -252,6 +251,8 @@ class FeedexFeed(SQLContainerEditable):
         """ Remove channel/cat with entries and keywords if required """
         if not self.exists: return FX_ERROR_NOT_FOUND
 
+        stats_delta = {}
+
         deleted = self.vals['deleted']
 
         id = {'id': self.vals['id']}
@@ -275,26 +276,24 @@ class FeedexFeed(SQLContainerEditable):
                     self.DB.close_ixer(rollback=True)
                     return msg(FX_ERROR_DB, _('Index error: %a'), e)
                 self.DB.close_ixer()
+            
+            if err != 0: return err
 
 
         else:
             # Simply mark as deleted
             err = self.DB.run_sql_lock("update feeds set deleted = 1 where id = :id", id)
-
-        if err != 0: return err
+            if err != 0: return err
+            # ... and update general doc count stats
+            stats_delta['dc'] = -self.get_doc_count()          
 
 
 
         if self.DB.rowcount > 0:
 
-            if not fdx.single_run: 
-                err = self.DB.load_feeds(ignore_lock=True)
-                if err == 0: err = self.DB.load_terms()
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading data after successfull delete!'))
-            
-            err = self.DB.update_stats()
-            if err != 0: return msg(FX_ERROR_DB, _('Error updating DB stats after successfull delete!'))
-
+            if not fdx.single_run: self.DB.load_feeds(ignore_lock=True)
+            err = self.DB.update_stats(stats_delta)
+            if err != 0: return err
 
             if self.vals['is_category'] == 1: stype = _('Category')
             else: stype = _('Channel')
@@ -339,9 +338,7 @@ class FeedexFeed(SQLContainerEditable):
         self.vals['id'] = self.DB.lastrowid
         self.DB.last_feed_id = self.vals['id']
 
-        if not fdx.single_run and not kargs.get('no_reload', False):
-            err = self.DB.load_feeds(ignore_lock=True)
-            if err != 0: return msg(FX_ERROR_DB, _('Error reloading Feeds after successfull add!'))
+        if not fdx.single_run and not kargs.get('no_reload', False): self.DB.load_feeds(ignore_lock=True)
 
         if self.vals['is_category'] == 1: stype = _('Category')
         else: stype = _('Channel')
@@ -377,17 +374,13 @@ class FeedexFeed(SQLContainerEditable):
 
         err = self.add(validate=False)
         if err != 0: return err
-        print(self)
+
         if kargs.get('no_fetch',False): return 0 # Sometimes fetching must be ommitted to allow further editing (e.g. authentication)
         if self.vals['handler'] in ('local','html','script'): return 0 # ...also, don't fetch if channel is not RSS etc.
 
-        err = self.DB.load_feeds()
-        if err == 0:
-            self.DB.fetch(id=self.vals['id'], force=True, ignore_interval=True)
-        else:
-            return msg(FX_ERROR_DB, _('Error while reloading Feeds for fetching!'))
-        
-        return 0
+        self.DB.load_feeds()
+        err = self.DB.fetch(id=self.vals['id'], force=True, ignore_interval=True)        
+        return err
 
 
 
@@ -684,13 +677,13 @@ class FeedexCatalog(ResultCatItem):
         self.curr_id = 0
         self.results = []
         self.catalog_download_category('World News', 'https://blog.feedspot.com/world_news_rss_feeds/', 'www')
-        self.catalog_download_category('US News', 'https://rss.feedspot.com/usa_news_rss_feeds/', 'rss')
-        self.catalog_download_category('Europe News', 'https://rss.feedspot.com/european_news_rss_feeds/', 'rss')
-        self.catalog_download_category('Indian News', 'https://rss.feedspot.com/indian_news_rss_feeds/', 'rss')
-        self.catalog_download_category('Asian News', 'https://rss.feedspot.com/asian_news_rss_feeds/', 'rss')
-        self.catalog_download_category('Chinese News', 'https://rss.feedspot.com/chinese_news_rss_feeds/?_src=tagcloud', 'rss')
-        self.catalog_download_category('UK News', 'https://rss.feedspot.com/uk_news_rss_feeds/?_src=tagcloud', 'rss')
-        self.catalog_download_category('Russian News', 'https://rss.feedspot.com/russian_news_rss_feeds/', 'rss')
+        self.catalog_download_category('US News', 'https://rss.feedspot.com/usa_news_rss_feeds/', 'radio')
+        self.catalog_download_category('Europe News', 'https://rss.feedspot.com/european_news_rss_feeds/', 'radio')
+        self.catalog_download_category('Indian News', 'https://rss.feedspot.com/indian_news_rss_feeds/', 'radio')
+        self.catalog_download_category('Asian News', 'https://rss.feedspot.com/asian_news_rss_feeds/', 'radio')
+        self.catalog_download_category('Chinese News', 'https://rss.feedspot.com/chinese_news_rss_feeds/?_src=tagcloud', 'radio')
+        self.catalog_download_category('UK News', 'https://rss.feedspot.com/uk_news_rss_feeds/?_src=tagcloud', 'radio')
+        self.catalog_download_category('Russian News', 'https://rss.feedspot.com/russian_news_rss_feeds/', 'radio')
         
         self.catalog_download_category('Technology', 'https://rss.feedspot.com/technology_rss_feeds/', 'electronics')
         self.catalog_download_category('Science', 'https://rss.feedspot.com/science_rss_feeds/', 'science')

@@ -237,9 +237,9 @@ def main():
                 argument, argument2 = slist(sys.argv, i+1, None), slist(sys.argv, i+2, None)
                 break	
 
-            elif arg == '--mark-unimportant':
-                action = 'mark_unimportant'
-                argument = slist(sys.argv, i+1, None)
+            elif arg == '--unmark':
+                action = 'mark'
+                argument, argument2 = slist(sys.argv, i+1, None), 0
                 break	
 
             elif arg == '--flag':
@@ -847,9 +847,6 @@ Make sure that:
     elif action == 'mark':
         entry = FeedexEntry(feedex, id=argument)
         entry.update({'read': argument2})
-    elif action == 'mark_unimportant':
-        entry = FeedexEntry(feedex, id=argument)
-        entry.update({'read': -1})
     elif action == 'flag':
         entry = FeedexEntry(feedex, id=argument)
         entry.update({'flag': argument2})

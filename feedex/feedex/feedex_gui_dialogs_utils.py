@@ -727,6 +727,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
             fdx.config = self.result.copy()
             self.parent.config = self.result.copy()
             err = fdx.save_config()
+            fdx.validate_config(load=True, strict=False)
             if err == 0:
                 
                 self.response = 1

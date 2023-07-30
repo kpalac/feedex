@@ -375,7 +375,7 @@ if [[ "$1" == 'actions_entry' || "$1" == "all" ]]; then
     F_Exec /usr/bin/feedex --debug -o 157
     F_Exec /usr/bin/feedex --debug --mark 157 0
     F_Exec /usr/bin/feedex --debug --mark 157 1
-    F_Exec /usr/bin/feedex --debug --mark-unimportant 88157 1
+    F_Exec /usr/bin/feedex --debug --unmark 88157
     F_Exec /usr/bin/feedex --debug --flag 157 2
     F_Exec /usr/bin/feedex --debug --flag 157 0
     F_Exec /usr/bin/feedex --debug --flag 881579999999999 0

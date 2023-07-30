@@ -286,10 +286,8 @@ class FeedexGUIActions:
             fdx.busy = False
             return -1
 
-        if mode == 'read': 
-            if coalesce(item['read'],0) < 0: idict = {'read': scast(item['read'],int,0)+1}
-            else: idict = {'read': scast(item['read'],int,0)+1}
-        elif mode == 'unimp': idict = {'read': -1}
+        if mode == 'read': idict = {'read': scast(item['read'],int,0)+1}
+        elif mode == 'read+5': idict = {'read': scast(item['read'],int,0)+5}
         elif mode == 'unread': idict = {'read': 0}
         elif mode == 'unflag': idict = {'flag': 0}
         elif mode == 'restore': idict = {'deleted': 0}
@@ -864,8 +862,8 @@ class FeedexGUIActions:
         if fdx.busy: return -1
         dialog = YesNoDialog(self.MW, _('Clear Cache'), _('Do you want to delete all downloaded and cached images/thumbnails?'),  emblem='edit-clear-all-symbolic')
         dialog.run()
+        dialog.destroy()
         if dialog.response == 1:
-            dialog.destroy()
             fdx.bus_append(FX_ACTION_BLOCK_DB)
             fdx.busy = True
             t = threading.Thread(target=self.on_clear_cache_thr)
@@ -1225,11 +1223,7 @@ class FeedexGUIActions:
 
 
 
-
-    def get_icons(self, **kargs):
-        """ Sets up a dictionary with feed icon pixbufs for use in lists """
-        self.MW.icons = {}
-        self.MW.icons['large'] = {}
+    def get_icons_feeds(self, **kargs):
         for f,ic in fdx.icons_cache.items():
             try: 
                 self.MW.icons[f] = GdkPixbuf.Pixbuf.new_from_file_at_size(ic, 16, 16)
@@ -1243,6 +1237,12 @@ class FeedexGUIActions:
             except Exception as e: self.MW.icons['large'][f] = self.MW.icons.get(f)
 
 
+    def get_icons(self, **kargs):
+        """ Sets up a dictionary with feed icon pixbufs for use in lists """
+        self.MW.icons = {}
+        self.MW.icons['large'] = {}
+
+        self.get_icons_feeds()
 
         self.MW.icons['main']  = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'feedex.png'), 82, 82)
         self.MW.icons['large']['main_emblem'] = Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_size(  os.path.join(FEEDEX_SYS_ICON_PATH,'feedex.png'), 120, 120))

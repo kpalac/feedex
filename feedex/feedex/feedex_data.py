@@ -11,8 +11,8 @@ from feedex_headers import *
 
 
 # Constants
-FEEDEX_VERSION = "1.2.0"
-FEEDEX_DB_VERSION_COMPAT = "1.2.0"
+FEEDEX_VERSION = "1.2.1"
+FEEDEX_DB_VERSION_COMPAT = "1.2.1"
 FEEDEX_RELEASE="2023"
 FEEDEX_AUTHOR ="""Karol Pałac"""
 FEEDEX_CONTACT="""palac.karol@gmail.com"""
@@ -116,14 +116,14 @@ SPLIT_RE = re.compile("""\s|/|\\|\.|;|:|@|#|_|-""")
 
 
 # SQL...
-DOC_COUNT_SQL="""
+DOC_COUNT_MAINT_SQL="""
 select count(e.id)
 from entries e 
 join feeds f on f.id = e.feed_id and coalesce(f.deleted, 0) = 0
 where coalesce(e.deleted,0) = 0
 """
 
-LOAD_FEED_FREQ_SQL="""
+FEED_FREQ_MAINT_SQL="""
 select
 f.id,
 sum(coalesce(e.read,0)) as freq
@@ -133,6 +133,8 @@ where f.is_category <> 1 and coalesce(f.deleted,0) = 0 and coalesce(e.deleted, 0
 group by f.id
 order by freq desc
 """
+
+
 
 LOAD_TERMS_ALGO_1_SQL="""
 select
@@ -286,11 +288,11 @@ FEEDS_SQL_TABLE       =  ('id','charset','lang','generator','url','login','domai
                                 'autoupdate','http_status','etag','modified','version','is_category','parent_id', 'handler','deleted', 'user_agent', 'fetch',
                                 'rx_entries','rx_title', 'rx_link', 'rx_desc', 'rx_author', 'rx_category', 'rx_text', 'rx_images', 'rx_pubdate', 
                                 'rx_pubdate_feed', 'rx_image_feed', 'rx_title_feed', 'rx_charset_feed', 'rx_lang_feed',
-                                'script_file', 'icon_name', 'display_order')
+                                'script_file', 'icon_name', 'display_order', 'recom_weight')
 FEEDS_SQL_TYPES = (int,  str, str, str, str, str,str, str, str, str, str,str, str, str, str, str,str, str, str, str, str, str, str,
                   int, int, int,   str, str, str, str,   int, int,    str, int,     str, int,
                   str, str, str, str, str, str, str, str, str, str, str, str, str, str,
-                  str, str, int)
+                  str, str, int, int)
 FEEDS_SQL_TABLE_PRINT = (n_("ID"), n_("Character encoding"), n_("Language"), n_("Feed generator"), n_("URL"), n_("Login"), n_("Domain"), n_("Password"), n_("Authentication method"), n_("Author"), n_("Author - contact"),
                                 n_("Publisher"), n_("Publisher - contact"), n_("Contributors"), n_("Copyright"), n_("Home link"), n_("Title"), n_("Subtitle"), n_("Category"), n_("Tags"), n_("Name"), n_("Last read date (Epoch)"),
                                 n_("Last check date (Epoch)"), n_("Update interval"), n_("Errors"), n_("Autoupdate?"), n_("Last connection HTTP status"), n_("ETag"), n_("Modified tag"), n_("Protocol version"), n_("Is category?"), 
@@ -298,7 +300,7 @@ FEEDS_SQL_TABLE_PRINT = (n_("ID"), n_("Character encoding"), n_("Language"), n_(
                                 n_("Entries REGEX (HTML)"), n_("Title REGEX (HTML)"), n_("Link REGEX (HTML)"), n_("Description REGEX (HTML)"), n_("Author REGEX (HTML)"), n_("Category REGEX (HTML)"), 
                                 n_("Additional Text REGEX (HTML)"), n_("Image extraction REGEX (HTML)"), n_("Published date REGEX (HTML)"),
                                 n_("Published date - Feed REGEX (HTML)"), n_("Image/Icon - Feed REGEX (HTML)"), n_("Title REGEX - Feed (HTML)"), n_("Charset REGEX - Feed (HTML)"), 
-                                n_("Lang REGEX - Feed (HTML)"), n_("Script file"), n_("Icon name"), n_("Display Order"))
+                                n_("Lang REGEX - Feed (HTML)"), n_("Script file"), n_("Icon name"), n_("Display Order"), n_('Recomm. Weight'))
 
 FEEDS_SQL_TABLE_RES = FEEDS_SQL_TABLE + ('parent_category_name','sdeleted', 'sautoupdate', 'is_node','children_no')
 FEEDS_SQL_TYPES_RES = FEEDS_SQL_TYPES + (str,   str,str,   int, int)
