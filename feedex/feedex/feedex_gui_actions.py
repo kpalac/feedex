@@ -8,6 +8,12 @@ from feedex_gui_utils import *
 
 
 
+
+
+
+
+
+
 class FeedexGUIActions:
     """ This is the main container for Feedex GUI actions """
     def __init__(self, parent, **kargs) -> None:
@@ -17,22 +23,44 @@ class FeedexGUIActions:
 
 
 
+    def start_thread(self, **kargs):
+        aargs = []
+        aargs.append(kargs.get('target'))
+        for a in kargs.get('args', ()): aargs.append(a)
+
+        fdx.task_counter += 1
+
+        t = threading.Thread(target=self.run_thread, args=tuple(aargs))
+        t.start()
+
+
+    def run_thread(self, *args):
+        """ Wrapper for running threads """
+        aargs = []
+        target = None
+        for a in args:
+            if target is None: target = a
+            else: aargs.append(a)
+
+        if target is None: return 0
+        ret_code = target(*aargs)
+        fdx.task_counter -= 1
+        return ret_code
+
+        
 
 
     def on_load_news_feed(self, *args):
         if not self._fetch_lock(): return 0
-        t = threading.Thread(target=self.load_news_thr, args=(args[-1],))
-        t.start()
+        self.start_thread(target=self.load_news_thr, args=(args[-1],))
 
     def on_load_news_all(self, *args):
         if not self._fetch_lock(): return 0
-        t = threading.Thread(target=self.load_news_thr, args=(None,))
-        t.start()
+        self.start_thread(target=self.load_news_thr, args=(None,))
 
     def on_load_news_background(self, *args):
         if not self._fetch_lock(): return 0
-        t = threading.Thread(target=self.load_news_thr, args=(0,))
-        t.start()
+        self.start_thread(target=self.load_news_thr, args=(0,))
 
     def _fetch_lock(self, *args):
         """ Handle fetching lock gracefully """
@@ -48,7 +76,6 @@ class FeedexGUIActions:
     def load_news_thr(self, *args):
         """ Fetching news/articles from feeds """
         msg(_('Checking for news ...'))
-        fdx.busy = True
         fdx.bus_append(FX_ACTION_BLOCK_FETCH)
 
         item = args[-1]
@@ -66,11 +93,9 @@ class FeedexGUIActions:
                 ignore_interval = True
                 ignore_modified = True
             else: 
-                fdx.busy = False
                 fdx.bus_append(FX_ACTION_UNBLOCK_FETCH)
                 return -1
-        else: 
-            fdx.busy = False
+        else:
             return -1
 
         DB = FeedexDatabase(connect=True)
@@ -100,7 +125,6 @@ class FeedexGUIActions:
                     fx_notifier.show()
 
         DB.close()
-        fdx.busy = False
         fdx.bus_append(FX_ACTION_UNBLOCK_FETCH)
         fdx.bus_append(FX_ACTION_RELOAD_FEEDS)
 
@@ -114,21 +138,18 @@ class FeedexGUIActions:
         if item['is_category'] == 1: return 0
         if not self._fetch_lock(): return 0
         msg(_('Updating channel...'))
-        t = threading.Thread(target=self.update_feed_thr, args=(item['id'],))
-        t.start()
+        self.start_thread(target=self.update_feed_thr, args=(item['id'],))
 
 
 
     def on_update_feed_all(self, *args):
         if not self._fetch_lock(): return 0
         msg(_('Updating all channels...'))
-        t = threading.Thread(target=self.update_feed_thr, args=(None,))
-        t.start()
+        self.start_thread(target=self.update_feed_thr, args=(None,))
 
 
     def update_feed_thr(self, *args):
         """ Updates metadata for all/selected feed """
-        fdx.busy = True
         fdx.bus_append(FX_ACTION_BLOCK_FETCH)
 
         feed_id = args[-1]
@@ -136,11 +157,10 @@ class FeedexGUIActions:
         DB.fetch(id=feed_id, update_only=True, force=True)
 
         self.MW.lock.acquire()
-        self.get_icons()
+        self.MW.get_icons()
         self.MW.lock.release()
 
         DB.close()
-        fdx.busy = False
         fdx.bus_append(FX_ACTION_UNBLOCK_FETCH)
         fdx.bus_append(FX_ACTION_RELOAD_FEEDS)
 
@@ -150,7 +170,6 @@ class FeedexGUIActions:
     def add_from_url_thr(self, item):
         """ Add from URL - threading """
         msg(_('Adding Channel...') )
-        fdx.busy = True
         fdx.bus_append(FX_ACTION_BLOCK_FETCH)
 
         DB = FeedexDatabase(connect=True)
@@ -167,7 +186,6 @@ class FeedexGUIActions:
         self.MW.lock.release()
 
         DB.close()
-        fdx.busy = False
         fdx.bus_append(FX_ACTION_UNBLOCK_FETCH)
         fdx.bus_append(FX_ACTION_RELOAD_FEEDS)
 
@@ -175,7 +193,6 @@ class FeedexGUIActions:
 
     def on_add_from_url(self, *args):
         """ Adds a new feed from URL - dialog """
-        if fdx.busy: return 0
         if not self._fetch_lock(): return 0
 
         item = FeedexFeed(self.DB)
@@ -186,8 +203,7 @@ class FeedexGUIActions:
         self.MW.new_feed_url = item.vals.copy()
         if dialog.response == 1:
             if not self._fetch_lock(): return 0
-            t = threading.Thread(target=self.add_from_url_thr, args=(item,))
-            t.start()
+            self.start_thread(target=self.add_from_url_thr, args=(item,))
         dialog.destroy()
 
 
@@ -216,9 +232,7 @@ class FeedexGUIActions:
         if dialog.response == 1:
             if new: msg(_('Adding entry...') )
             else: msg(_('Writing changes to Entry...') )
-            fdx.busy = True
-            t = threading.Thread(target=self.edit_entry_thr, args=(new, item, dialog.new_image) )
-            t.start()
+            self.start_thread(target=self.edit_entry_thr, args=(new, item, dialog.new_image) )
         dialog.destroy()
 
 
@@ -251,7 +265,6 @@ class FeedexGUIActions:
                 except (OSError, IOError,) as e: msg(FX_ERROR_IO, f"""{_('Error importing %a file: ')}{e}""", new_image)
 
         DB.close()
-        fdx.busy = False
 
 
 
@@ -282,9 +295,7 @@ class FeedexGUIActions:
         """ Marks entry as read """
         DB = FeedexDatabase(connect=True)
         item = item.convert(FeedexEntry, DB, id=item['id'])
-        if not item.exists:
-            fdx.busy = False
-            return -1
+        if not item.exists: return -1
 
         if mode == 'read': idict = {'read': scast(item['read'],int,0)+1}
         elif mode == 'read+5': idict = {'read': scast(item['read'],int,0)+5}
@@ -293,15 +304,12 @@ class FeedexGUIActions:
         elif mode == 'restore': idict = {'deleted': 0}
         elif mode == 'delete' : idict = {}
         elif type(mode) is int: idict = {'flag': mode}
-        else:
-            fdx.busy = False
-            return -1
+        else: return -1
 
         if mode == 'delete': err = item.delete()
         else: err = item.update(idict)
         
         DB.close()
-        fdx.busy = False
         if err == 0: fdx.bus_append( (FX_ACTION_EDIT, item.vals.copy(), FX_TT_ENTRY,) )
 
 
@@ -309,10 +317,8 @@ class FeedexGUIActions:
     def on_mark(self, *args):
         item = args[-1]
         mode = args[-2]
-        fdx.busy = True
         msg(_('Updating ...') )
-        t = threading.Thread(target=self.mark_thr, args=(mode, item,))
-        t.start()
+        self.start_thread(target=self.mark_thr, args=(mode, item,))
 
 
     def open_entry_thr(self, item, *args):
@@ -321,7 +327,6 @@ class FeedexGUIActions:
         item = item.convert(FeedexEntry, DB, id=item['id'])
         item.open()
         DB.close()
-        fdx.busy = False
         fdx.bus_append((FX_ACTION_EDIT, item.vals.copy(), FX_TT_ENTRY,))
         msg(_('Done...'))
 
@@ -329,13 +334,9 @@ class FeedexGUIActions:
 
     def on_open_entry(self, *args, **kargs):
         """ Run in browser and learn """
-        fdx.busy = True
         msg(_('Opening ...'))
         item = args[-1]
-        t = threading.Thread(target=self.open_entry_thr, args=(item,))
-        t.start()
-
-
+        self.start_thread(target=self.open_entry_thr, args=(item,))
 
 
 
@@ -830,22 +831,18 @@ class FeedexGUIActions:
         err = DB.maintenance()
         DB.close()
         fdx.bus_append(FX_ACTION_UNBLOCK_DB)
-        fdx.busy = False
 
 
     def on_maintenance(self, *args, **kargs):
         """ BD Maintenance """
         if not self._fetch_lock(): return 0
-        if fdx.busy: return -1
         
         dialog = YesNoDialog(self.MW, _('DB Maintenance'), _('Are you sure you want to DB maintenance? This may take a long time...'), emblem='system-run-symbolic' )  
         dialog.run()
         dialog.destroy()
         if dialog.response == 1:
             fdx.bus_append(FX_ACTION_BLOCK_DB)
-            fdx.busy = True
-            t = threading.Thread(target=self.on_maintenance_thr)
-            t.start()
+            self.start_thread(target=self.on_maintenance_thr)
 
 
 
@@ -853,26 +850,21 @@ class FeedexGUIActions:
         DB = FeedexDatabase(connect=True)
         DB.clear_cache(-1)
         DB.close()
-        fdx.busy = False
         fdx.bus_append(FX_ACTION_UNBLOCK_DB)
 
 
     def on_clear_cache(self, *args, **kargs):
         """ Clear image cache """
-        if fdx.busy: return -1
         dialog = YesNoDialog(self.MW, _('Clear Cache'), _('Do you want to delete all downloaded and cached images/thumbnails?'),  emblem='edit-clear-all-symbolic')
         dialog.run()
         dialog.destroy()
         if dialog.response == 1:
             fdx.bus_append(FX_ACTION_BLOCK_DB)
-            fdx.busy = True
-            t = threading.Thread(target=self.on_clear_cache_thr)
-            t.start()
+            self.start_thread(target=self.on_clear_cache_thr)
 
     
     def del_learned_keywords(self, *args):
         """ Wrapper for deleting learned keywords from DB """
-        if fdx.busy: return -1
         if not self._fetch_lock(): return 0
         dialog = YesNoDialog(self.MW, _('Delete Learned Keywords?'), _('Do you want delete all learned Keywords used for recommendations?'), 
                              subtitle=_('<i>This action is permanent. Relearning can be time consuming</i>'),  emblem='dialog-warning-symbolic')
@@ -896,13 +888,11 @@ class FeedexGUIActions:
         DB.load_terms()
         DB.close()
         if self.MW.learned_tab != -1: self.MW._get_upn_page_obj(self.MW.learned_tab).query(None, None)
-        fdx.busy = False
         fdx.bus_append(FX_ACTION_UNBLOCK_DB)
 
 
     def relearn_keywords(self, *args):
         """ Wrapper for relearning keywords """
-        if fdx.busy: return -1
         if not self._fetch_lock(): return 0
         dialog = YesNoDialog(self.MW, _('Relearn Keywords?'), _('Do you want to relearn Keywords for recommendations?'), 
                              subtitle=_('<i>This may take a long time</i>'),  emblem='applications-engineering-symbolic')
@@ -910,9 +900,7 @@ class FeedexGUIActions:
         dialog.destroy()
         if dialog.response == 1:
             fdx.bus_append(FX_ACTION_BLOCK_DB)
-            fdx.busy = True
-            t = threading.Thread(target=self.relearn_keywords_thr)
-            t.start()
+            self.start_thread(target=self.relearn_keywords_thr)
 
 
     def on_unlock_fetching(self, *args):
@@ -974,7 +962,6 @@ class FeedexGUIActions:
 
     def import_feeds(self, *args):
         if not self._fetch_lock(): return 0
-        if fdx.busy: return -1
 
         filename = f_chooser(self.MW, self.MW, action='open_file', header=_('Import Feeds from...') )
         if filename is False: return 0
@@ -991,7 +978,6 @@ class FeedexGUIActions:
 
     def import_rules(self, *args):
         if not self._fetch_lock(): return 0
-        if fdx.busy: return -1
 
         filename = f_chooser(self.MW, self.MW, action='open_file', header=_('Import Rules from...') )
         if filename is False: return 0
@@ -1003,7 +989,6 @@ class FeedexGUIActions:
 
     def import_flags(self, *args):
         if not self._fetch_lock(): return 0
-        if fdx.busy: return -1
 
         filename = f_chooser(self.MW, self.MW, action='open_file', header=_('Import Flags from...') )
         if filename is False: return 0
@@ -1018,7 +1003,6 @@ class FeedexGUIActions:
         DB = FeedexDatabase(connect=True)
         err = DB.import_entries(efile=efile)
         DB.close()
-        fdx.busy = False
         fdx.bus_append(FX_ACTION_UNBLOCK_DB)
 
 
@@ -1026,10 +1010,8 @@ class FeedexGUIActions:
         filename = f_chooser(self.MW, self.MW, action='open_file', header=_('Import Entries from...') )
         if filename is False: return 0
         if not self._fetch_lock(): return 0
-        fdx.busy = True
         fdx.bus_append(FX_ACTION_BLOCK_DB)
-        t = threading.Thread(target=self.import_entries_thr, args=(filename,))
-        t.start()
+        self.start_thread(target=self.import_entries_thr, args=(filename,))
 
 
 
@@ -1037,7 +1019,7 @@ class FeedexGUIActions:
         filename = f_chooser(self.MW, self.MW, action='open_file', header=_('Import Plugins from...') )
         if filename is False: return 0
 
-        new_plugins = self.validate_gui_plugins( load_json(filename, [], create_file=False) )
+        new_plugins = self.MW.validate_gui_plugins( load_json(filename, [], create_file=False) )
         if len(new_plugins) > 0:
             self.MW.gui_plugins = list(self.MW.gui_plugins)
             max_id = len(self.MW.gui_plugins) + 1
@@ -1097,7 +1079,6 @@ class FeedexGUIActions:
         item.feed.set_interface(DB)
         item.do_import()
         DB.close()
-        fdx.busy = False
         fdx.bus_append(FX_ACTION_UNBLOCK_DB)
         fdx.bus_append(FX_ACTION_RELOAD_FEEDS)
 
@@ -1114,158 +1095,11 @@ class FeedexGUIActions:
         dialog.run()
         if dialog.response == 1:
             if not self._fetch_lock(): return 0
-            fdx.busy = True
             fdx.bus_append(FX_ACTION_BLOCK_DB)
-            t = threading.Thread(target=self.import_catalog_thr, args=(item,))
-            t.start()
+            self.start_thread(target=self.import_catalog_thr, args=(item,))
         dialog.destroy()
 
 
 
 
 
-########################################################################################33
-#
-#       Utilities
-#
-
-
-
-
-    def validate_gui_cache(self, gui_attrs):
-        """ Validate GUI attributes in case the config file is not right ( to prevent crashing )"""
-    
-    
-        new_gui_attrs = {}
-    
-        new_gui_attrs['win_width'] = scast(gui_attrs.get('win_width'), int, 1500)
-        new_gui_attrs['win_height'] = scast(gui_attrs.get('win_height'), int, 800)
-        new_gui_attrs['win_maximized'] = scast(gui_attrs.get('win_maximized'), bool, True)
-
-        new_gui_attrs['div_horiz'] = scast(gui_attrs.get('div_horiz'), int, 400)
-        new_gui_attrs['div_vert2'] = scast(gui_attrs.get('div_vert2'), int, 700)
-        new_gui_attrs['div_vert'] = scast(gui_attrs.get('div_vert'), int, 250)
-
-        new_gui_attrs['div_entry_edit'] = scast(gui_attrs.get('div_entry_edit'), int, 500)
-
-        new_gui_attrs['new_items'] = scast(gui_attrs.get('new_items'), int, 0)
-        new_gui_attrs['new_n'] = scast(gui_attrs.get('new_n'), int, 1)
-
-        new_gui_attrs['last_dir'] = scast(gui_attrs.get('last_dir'), str, '')
-
-
-        new_gui_attrs['feeds_expanded'] = scast(gui_attrs.get('feeds_expanded',{}).copy(), dict, {})
-        for v in new_gui_attrs['feeds_expanded'].values():
-            if type(v) is not bool: 
-                new_gui_attrs['feeds_expanded'] = {}
-                msg(FX_ERROR_VAL, _('Expanded feeds invalid. Defaulting...') )
-                break
-
-        new_gui_attrs['layouts'] = scast(gui_attrs.get('layouts'), dict, {})
-        if new_gui_attrs['layouts'] == {}:
-            msg(FX_ERROR_VAL, _('No valid layouts found. Defaulting...'))
-            new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
-
-        if new_gui_attrs['layouts'].keys() != FX_DEF_LAYOUTS.keys(): 
-            msg(FX_ERROR_VAL, _('Invalid layout list. Defaulting...'))
-            new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
-    
-        for k,v in new_gui_attrs['layouts'].items():
-            if type(v) not in (tuple, list) or len(v) == 0:
-                msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
-                new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
-                continue
-
-            for i,c in enumerate(v):
-                if type(c) not in (tuple, list): 
-                    msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
-                    new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
-                    break
-                if type(slist(c,0,None)) is not str or type(slist(c,1,None)) is not int or slist(c,1,0) <= 0:
-                    msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
-                    new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
-                    break
-
-
-    
-        new_gui_attrs['default_search_filters'] = scast(gui_attrs.get('default_search_filters',FEEDEX_GUI_DEFAULT_SEARCH_FIELDS).copy(), dict, {})    
-        new_gui_attrs['tabs'] = gui_attrs.get('tabs',[]).copy()
-
-        return new_gui_attrs
-
-
-
-
-
-
-
-
-    def validate_gui_plugins(self, gui_plugins):
-        """ Initial validation of plugin list """
-        new_gui_plugins = []
-        plugin = FeedexPlugin()
-        plugin_len = len(plugin.fields)
-        for p in gui_plugins:
-            if type(p) not in (list, tuple): 
-                msg(FX_ERROR_VAL, _('Plugin item %a not a valid list! Ommiting'), p)
-                continue
-            if len(p) != plugin_len:
-                msg(FX_ERROR_VAL, _('Invalid plugin item %a! Ommiting'), p)
-                continue
-            plugin.populate(p)
-            if plugin.validate() != 0: continue
-            new_gui_plugins.append(p)
-    
-        return new_gui_plugins
-
-
-
-
-
-
-    def get_icons_feeds(self, **kargs):
-        for f,ic in fdx.icons_cache.items():
-            try: 
-                self.MW.icons[f] = GdkPixbuf.Pixbuf.new_from_file_at_size(ic, 16, 16)
-            except Exception as e:
-                try: os.remove(ic)
-                except OSError as ee: msg(FX_ERROR_IO, f"""_('Error removing %a:'){ee}""", ic)
-                msg(FX_ERROR_IO, _('Image error: %a'), e)
-                continue
-
-            try: self.MW.icons['large'][f] = GdkPixbuf.Pixbuf.new_from_file_at_size(ic, 32, 32)
-            except Exception as e: self.MW.icons['large'][f] = self.MW.icons.get(f)
-
-
-    def get_icons(self, **kargs):
-        """ Sets up a dictionary with feed icon pixbufs for use in lists """
-        self.MW.icons = {}
-        self.MW.icons['large'] = {}
-
-        self.get_icons_feeds()
-
-        self.MW.icons['main']  = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'feedex.png'), 82, 82)
-        self.MW.icons['large']['main_emblem'] = Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_size(  os.path.join(FEEDEX_SYS_ICON_PATH,'feedex.png'), 120, 120))
-        self.MW.icons['db'] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, 'db.svg'), 64, 64)
-
-        self.MW.icons['default']  = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 16, 16)
-        self.MW.icons['error'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'error.svg'), 16, 16)
-        self.MW.icons['doc'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'document.svg'), 16, 16)
-        self.MW.icons['trash'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'trash.svg'), 16, 16)
-        self.MW.icons['new'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'new.svg'), 16, 16)
-        self.MW.icons['flag'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'flag.svg'), 16, 16)
-
-        self.MW.icons['large']['default']  = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 32, 32)
-        self.MW.icons['large']['error'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'error.svg'), 32, 32)
-        self.MW.icons['large']['doc'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'document.svg'), 32, 32)
-        self.MW.icons['large']['trash'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'trash.svg'), 32, 32)
-        self.MW.icons['large']['new'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'new.svg'), 32, 32)
-        self.MW.icons['large']['flag'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'flag.svg'), 32, 32)
-
-
-        for ico in FEEDEX_GUI_ICONS:
-            self.MW.icons[ico] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, f'{ico}.svg'), 16, 16)
-            self.MW.icons['large'][ico] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, f'{ico}.svg'), 32, 32)
-        
-
-        return 0

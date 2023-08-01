@@ -12,13 +12,16 @@ from feedex_gui_utils import *
 
 
 
-
-class FeedexMainWin(Gtk.Window):
+class FeedexMainWin(Gtk.Window, FeedexGUISession):
     """ Main window for Feedex """
 
     def __init__(self, *args, **kargs):
-    
-        self.config = kargs.get('config', fdx.config)
+        
+        FeedexGUISession.__init__(self, *args, **kargs)
+        
+        # Init main bus vars
+        fdx.task_counter = 0
+        
 
         # Main DB interface - init and check for lock and/or DB errors
         self.connect_db(None) 
@@ -29,9 +32,9 @@ class FeedexMainWin(Gtk.Window):
 
         # Load and init paths, caches and profile-dependent data
         self.set_profile()
-        self.gui_cache = self.act.validate_gui_cache( load_json(self.gui_cache_path, {}) ) #Load cached GUI settings/layouts/tabs from previous session
-        self.gui_plugins = self.act.validate_gui_plugins( load_json(self.gui_plugins_path, FX_DEFAULT_PLUGINS, create_file=True) ) # Load and validate plugin list
-        self.act.get_icons()
+        self.gui_cache = self.validate_gui_cache( load_json(self.gui_cache_path, {}) ) #Load cached GUI settings/layouts/tabs from previous session
+        self.gui_plugins = self.validate_gui_plugins( load_json(self.gui_plugins_path, FX_DEFAULT_PLUGINS, create_file=True) ) # Load and validate plugin list
+        self.get_icons()
         self.cat_icons = {}
 
 
@@ -62,10 +65,6 @@ class FeedexMainWin(Gtk.Window):
         self.prev_entry = {}
         self.prev_entry_links = []
         self.curr_prev = None
-
-
-        # Action flags for caching and comparing with main bus
-        self.busy = fdx.busy # Mainly for spinner display
 
         # String containing all log messages from this session
         self.log_string = ''
@@ -236,47 +235,6 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
 
 
-#####################################################################################
-#
-#       DB Connection
-#
-
-    def connect_db(self, parent, **kargs):
-        """ Establish database connection and elegantly handle errors """
-        db_path = kargs.get('db_path', self.config.get('db_path'))
-        self.DB = FeedexDatabase(db_path=db_path, allow_create=True, main_conn=True)
-        try:
-            self.DB.connect(defaults=True, default_feeds=False, unlock=kargs.get('unlock'))
-            self.DB.load_all()
-            self.DB.cache_icons()
-            self.DB.connect_LP()
-            self.DB.connect_QP()
-
-
-        except FeedexDatabaseLockedError as e:
-            
-            dialog = YesNoDialog(parent, _("Feedex: Database is Locked"), f"<b>{_('Database is Locked! Proceed and unlock?')}</b>", emblem='system-lock-screen-symbolic',
-                                 subtitle=_("Another instance can be performing operations on Database or Feedex did not close properly last time. Proceed anyway?"))
-            dialog.run()
-            dialog.destroy()
-            if dialog.response == 1:
-                self.connect_db(unlock=True)
-            else:
-                self.DB.close()
-                sys.exit(e.code)
-                
-        except Exception as e:
-
-            if not isinstance(e, FeedexError): err_msg = f'<span foreground="red">{esc_mu(str(e))}</span>'
-            else: err_msg = gui_msg(e.bus_message)
-
-            dialog = BasicDialog(parent, _("Feedex: Critical Error!"), f"""{_('Error occurred while connecting')} <b>{db_path}</b> \n{_('Application could not be started. I am sorry for inconvenience :(')}""", 
-                            subtitle=f'<small>{err_msg}</small>', emblem='dialog-error-symbolic')
-            dialog.run()
-            dialog.destroy()
-            def_db_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex.db')
-            if db_path == def_db_path: sys.exit(e.code)
-            else: self.connect_db(db_path=def_db_path)
 
 
 #######################################################################################
@@ -425,6 +383,17 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         if self.sec_frac_counter > 4:
             self.sec_frac_counter = 0
             self.sec_counter += 1
+            
+            # Update processing spinner and handle main bus flag chnges
+            if fdx.task_counter == 0:
+                if self.status_spinner.get_visible():
+                    self.status_spinner.stop()
+                    self.status_spinner.hide()
+            else: 
+                if not self.status_spinner.get_visible():
+                    self.status_spinner.show()
+                    self.status_spinner.start()
+
 
         # Fetch news if specified in config
         if self.sec_counter > 60:
@@ -446,7 +415,6 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 mssg = gui_msg(*m)
                 self.status_bar.set_markup(mssg)
                 self.log_string = f"""{self.log_string}\n{mssg}"""
-                self._check_spinner()
 
             elif code == FX_ACTION_RELOAD_FEEDS: self.feed_tab.reload()
 
@@ -469,7 +437,6 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 self.preview_box.set_sensitive(True)
 
             elif code == FX_ACTION_FINISHED_SEARCH:
-                if not self.busy: self.status_bar.set_markup('')
                 uid = m[1]
                 for i in range(self.upper_notebook.get_n_pages()):
                     tb = self.upper_notebook.get_nth_page(i)
@@ -480,7 +447,6 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                         break
 
             elif code == FX_ACTION_FINISHED_FILTERING:
-                if not self.busy: self.status_bar.set_markup('')
                 uid = m[1]
                 for i in range(self.upper_notebook.get_n_pages()):
                     tb = self.upper_notebook.get_nth_page(i)
@@ -512,21 +478,11 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
             fdx.bus_del(0)
 
-        # Update processing spinner and handle main bus flag chnges
-        if fdx.busy is not self.busy: self._check_spinner()
- 
+
         return True
 
 
 
-    def _check_spinner(self):
-        self.busy = fdx.busy
-        if fdx.busy:
-            self.status_spinner.show()
-            self.status_spinner.start()
-        else:
-            self.status_spinner.stop()
-            self.status_spinner.hide()
 
 
 
@@ -709,10 +665,12 @@ It will also take some time to perform""") ))
 
         if tab.type == FX_TAB_RULES:
             menu = Gtk.Menu()
-            menu.append( f_menu_item(1, _('Add Rule'), self.act.on_edit_rule, args=(None,), icon='list-add-symbolic') )
+            if not fdx.db_fetch_lock:
+                menu.append( f_menu_item(1, _('Add Rule'), self.act.on_edit_rule, args=(None,), icon='list-add-symbolic') )
         elif tab.type == FX_TAB_FLAGS:
             menu = Gtk.Menu()
-            menu.append( f_menu_item(1, _('Add Flag'), self.act.on_edit_flag, args=(None,), icon='list-add-symbolic') )
+            if not fdx.db_fetch_lock:
+                menu.append( f_menu_item(1, _('Add Flag'), self.act.on_edit_flag, args=(None,), icon='list-add-symbolic') )
         elif tab.type == FX_TAB_PLUGINS:
             menu = Gtk.Menu()
             menu.append( f_menu_item(1, _('Add Plugin'), self.act.on_edit_plugin, args=(None,), icon='list-add-symbolic') )
@@ -789,9 +747,10 @@ It will also take some time to perform""") ))
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             if item['id'] is not None:
-                menu.append( f_menu_item(1, _('Edit Rule'), self.act.on_edit_rule, args=(item,), icon='edit-symbolic') )
-                menu.append( f_menu_item(1, _('Delete Rule'), self.act.on_del_rule, args=(item,), icon='edit-delete-symbolic') )
-                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                if not fdx.db_fetch_lock:
+                    menu.append( f_menu_item(1, _('Edit Rule'), self.act.on_edit_rule, args=(item,), icon='edit-symbolic') )
+                    menu.append( f_menu_item(1, _('Delete Rule'), self.act.on_del_rule, args=(item,), icon='edit-delete-symbolic') )
+                    menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Search for this Rule'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'query':item['string'], 'filters':{'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Show this Rule\'s Contexts'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS, 'query':item['string'], 'filters':{'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='view-list-symbolic'))  
                 menu.append( f_menu_item(1, _('Show Terms related to this Rule'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'query':item['string'], 'filters':{'...-...':True, 'logic':'phrase'} }, icon='emblem-shared-symbolic'))  
@@ -836,9 +795,10 @@ It will also take some time to perform""") ))
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             if item['id'] is not None:
-                menu.append( f_menu_item(1, _('Edit Flag'), self.act.on_edit_flag, args=(item,), icon='edit-symbolic') )
-                menu.append( f_menu_item(1, _('Delete Flag'), self.act.on_del_flag, args=(item,), icon='edit-delete-symbolic') )
-                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                if not fdx.db_fetch_lock:
+                    menu.append( f_menu_item(1, _('Edit Flag'), self.act.on_edit_flag, args=(item,), icon='edit-symbolic') )
+                    menu.append( f_menu_item(1, _('Delete Flag'), self.act.on_del_flag, args=(item,), icon='edit-delete-symbolic') )
+                    menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Search for this Flag'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'filters':{'flag':item['id']}}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Time Series search for this Flag'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'flag':item['id']}}, icon='histogram-symbolic'))  
 
@@ -875,7 +835,7 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Show from newest (wide view)...'), self.add_tab, kargs={'type':FX_TAB_NOTES, 'do_search':True, 'filters':{'feed_or_cat':item['id'], '...-...':True, 'rank':FX_RANK_LATEST}}, icon='format-unordered-list-symbolic', tooltip=_("Show articles sorted from newest in an extended view") ) )
                 menu.append( f_menu_item(1, _('Summary...'), self.add_tab, kargs={'type':FX_TAB_TREE, 'do_search':True, 'filters':{'feed_or_cat':item['id'], 'last':True, 'group':'daily', 'rank':FX_RANK_TREND}}, icon='view-filter-symbolic', tooltip=_("Show item's Summary Tree ranked by Trends") ) )
 
-                if not fdx.busy and tab.type == FX_TAB_FEEDS:
+                if not fdx.db_fetch_lock and tab.type == FX_TAB_FEEDS:
                     menu.append( f_menu_item(0, 'SEPARATOR', None) )
                     menu.append( f_menu_item(1, _('Add Channel'), self.act.on_feed_cat, args=('new_channel', None), icon='list-add-symbolic') )
                     menu.append( f_menu_item(1, _('Add Category'), self.act.on_feed_cat, args=('new_category', None), icon='folder-new-symbolic') )
@@ -884,7 +844,7 @@ It will also take some time to perform""") ))
                     if item['is_category'] == 1: menu.append( f_menu_item(1, _('Move Category...'), self.feed_tab.copy_feed, icon='edit-cut-symbolic') ) 
                     else: menu.append( f_menu_item(1, _('Move Feed...'), self.feed_tab.copy_feed, icon='edit-cut-symbolic') ) 
                     
-                    if not fdx.busy and self.feed_tab.copy_selected.get('id') is not None:
+                    if not fdx.db_fetch_lock and self.feed_tab.copy_selected.get('id') is not None:
                         if self.feed_tab.copy_selected['is_category'] == 1:
                             if item['is_category'] == 1:
                                 menu.append( f_menu_item(1, f'{_("Insert")} {esc_mu(self.feed_tab.copy_selected.get("name",""))} {_("here ...")}', self.feed_tab.insert_feed, args=(item,), icon='edit-paste-symbolic') )
@@ -898,7 +858,7 @@ It will also take some time to perform""") ))
                 if item['is_category'] != 1:
                     menu.append( f_menu_item(1, _('Go to Channel\'s Homepage'), self.act.on_go_home, args=(item,), icon='user-home-symbolic') )
         
-                    if not fdx.busy:
+                    if not fdx.db_fetch_lock:
                         menu.append( f_menu_item(0, 'SEPARATOR', None) )
                         menu.append( f_menu_item(1, _('Fetch from selected Channel'), self.act.on_load_news_feed, args=(item,), icon='rss-symbolic') )
                         menu.append( f_menu_item(1, _('Update metadata for Channel'), self.act.on_update_feed, args=(item,), icon='system-run-symbolic') )
@@ -915,14 +875,14 @@ It will also take some time to perform""") ))
 
                     plugin_filter.append(FX_PLUGIN_FEED)
 
-                elif not fdx.busy:
+                elif not fdx.db_fetch_lock:
                     menu.append( f_menu_item(1, _('Edit Category'), self.act.on_feed_cat, args=('edit',item,), icon='edit-symbolic') )
                     menu.append( f_menu_item(1, _('Remove Category'), self.act.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
 
                     plugin_filter.append(FX_PLUGIN_CATEGORY)
 
 
-            elif item['deleted'] == 1 and tab.type == FX_TAB_FEEDS:
+            elif (not fdx.db_fetch_lock) and item['deleted'] == 1 and tab.type == FX_TAB_FEEDS:
                 menu.append( f_menu_item(1, _('Restore...'), self.act.on_restore_feed, args=(item,), icon='edit-redo-rtl-symbolic') )
                 menu.append( f_menu_item(1, _('Remove Permanently'), self.act.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
 
@@ -931,7 +891,7 @@ It will also take some time to perform""") ))
 
 
         if ( (isinstance(item, SQLContainer) and coalesce(item['deleted'],0) > 0 ) or \
-            (self.curr_place == FX_PLACE_TRASH_BIN and self.curr_upper.type == FX_TAB_PLACES)) and not fdx.busy:
+            (self.curr_place == FX_PLACE_TRASH_BIN and self.curr_upper.type == FX_TAB_PLACES)) and not fdx.db_fetch_lock:
             
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -939,7 +899,7 @@ It will also take some time to perform""") ))
 
         else:
             
-            if tab.type == FX_TAB_LEARNED:
+            if tab.type == FX_TAB_LEARNED and not fdx.db_fetch_lock:
                 if menu is None: menu = Gtk.Menu()
                 else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Delete Learned Keywords'), self.act.del_learned_keywords, icon='dialog-warning-symbolic', tooltip=_('Remove all learned rules from database. Be careful!') ) )
@@ -1254,7 +1214,7 @@ It will also take some time to perform""") ))
         else: 
             self.feed_tab.redecorate((), {})
 
-        if self.curr_upper.top_entry_prev: self.load_preview(self.curr_upper.top_entry, footer=self.curr_upper.prev_footer)
+        if self.curr_upper.top_entry_prev: self.load_preview(self.curr_upper.top_entry)
         elif isinstance(self.curr_upper.table.result, (ResultEntry, ResultContext, ResultRule, ResultCatItem,)): self.curr_upper._on_changed_selection()
         else: self.startup_decor()
 

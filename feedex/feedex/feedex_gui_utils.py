@@ -1421,26 +1421,239 @@ def build_res_tooltip(res):
 #       UTILITIES
 #
 
-def quick_find_case_ins(self, model, column, key, rowiter, *args):
+def quick_find_case_ins(model, column, key, rowiter, view, scol, *args):
     """ Guick find 'equals' fundction - case insensitive """
-    column=args[-1]
     row = model[rowiter]
-    if key.lower() in scast(list(row)[column], str, '').lower(): return False
+    if key.lower() in scast(list(row)[scol], str, '').lower(): return False
     return True
 
-def quick_find_case_ins_tree(self, model, column, key, rowiter, *args):
+def quick_find_case_ins_tree(model, column, key, rowiter, view, scol, *args):
     """ Quick find 'equals' function - basically case insensitivity """
-    column = args[-1]
-    tree = args[-2]
     row = model[rowiter]
-    if key.lower() in scast(list(row)[column], str, '').lower(): return False
+    if key.lower() in scast(list(row)[scol], str, '').lower(): return False
 
     # Search in child rows.  If one of the rows matches, expand the row so that it will be open in later checks.
     for inner in row.iterchildren():
         if key.lower() in scast(list(inner)[column], str, '').lower():
-            tree.expand_to_path(row.path)
+            view.expand_to_path(row.path)
             return False
     return True
+
+
+
+
+###############################################################################################
+#
+#   SESSION
+#
+
+
+
+
+
+class FeedexGUISession:
+    """ GUI session skeleton class """
+
+    def __init__(self, *args, **kargs) -> None:
+
+        self.config = kargs.get('config', fdx.config)        
+
+
+#####################################################################################
+#
+#       DB Connection
+#
+
+    def connect_db(self, parent, **kargs):
+        """ Establish database connection and elegantly handle errors """
+        db_path = kargs.get('db_path', self.config.get('db_path'))
+        self.DB = FeedexDatabase(db_path=db_path, allow_create=True, main_conn=True)
+        try:
+            self.DB.connect(defaults=True, default_feeds=False, unlock=kargs.get('unlock'))
+            if kargs.get('load_all', True):
+                self.DB.load_all()
+                self.DB.cache_icons()
+                self.DB.connect_LP()
+                self.DB.connect_QP()
+            
+            elif kargs.get('load_min', False):
+                self.DB.load_feeds()
+                self.DB.load_flags()
+                self.DB.load_icons()
+
+
+        except FeedexDatabaseLockedError as e:
+            
+            dialog = YesNoDialog(parent, _("Feedex: Database is Locked"), f"<b>{_('Database is Locked! Proceed and unlock?')}</b>", emblem='system-lock-screen-symbolic',
+                                 subtitle=_("Another instance can be performing operations on Database or Feedex did not close properly last time. Proceed anyway?"))
+            dialog.run()
+            dialog.destroy()
+            if dialog.response == 1:
+                self.connect_db(unlock=True)
+            else:
+                self.DB.close()
+                sys.exit(e.code)
+                
+        except Exception as e:
+
+            if not isinstance(e, FeedexError): err_msg = f'<span foreground="red">{esc_mu(str(e))}</span>'
+            else: err_msg = gui_msg(e.bus_message)
+
+            dialog = BasicDialog(parent, _("Feedex: Critical Error!"), f"""{_('Error occurred while connecting')} <b>{db_path}</b> \n{_('Application could not be started. I am sorry for inconvenience :(')}""", 
+                            subtitle=f'<small>{err_msg}</small>', emblem='dialog-error-symbolic')
+            dialog.run()
+            dialog.destroy()
+            def_db_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex.db')
+            if db_path == def_db_path: sys.exit(e.code)
+            else: self.connect_db(db_path=def_db_path)
+
+
+
+########################################################################################33
+#
+#       Utilities
+#
+
+
+
+
+    def validate_gui_cache(self, gui_attrs):
+        """ Validate GUI attributes in case the config file is not right ( to prevent crashing )"""
+    
+    
+        new_gui_attrs = {}
+    
+        new_gui_attrs['win_width'] = scast(gui_attrs.get('win_width'), int, 1500)
+        new_gui_attrs['win_height'] = scast(gui_attrs.get('win_height'), int, 800)
+        new_gui_attrs['win_maximized'] = scast(gui_attrs.get('win_maximized'), bool, True)
+
+        new_gui_attrs['div_horiz'] = scast(gui_attrs.get('div_horiz'), int, 400)
+        new_gui_attrs['div_vert2'] = scast(gui_attrs.get('div_vert2'), int, 700)
+        new_gui_attrs['div_vert'] = scast(gui_attrs.get('div_vert'), int, 250)
+
+        new_gui_attrs['div_entry_edit'] = scast(gui_attrs.get('div_entry_edit'), int, 500)
+
+        new_gui_attrs['new_items'] = scast(gui_attrs.get('new_items'), int, 0)
+        new_gui_attrs['new_n'] = scast(gui_attrs.get('new_n'), int, 1)
+
+        new_gui_attrs['last_dir'] = scast(gui_attrs.get('last_dir'), str, '')
+
+
+        new_gui_attrs['feeds_expanded'] = scast(gui_attrs.get('feeds_expanded',{}).copy(), dict, {})
+        for v in new_gui_attrs['feeds_expanded'].values():
+            if type(v) is not bool: 
+                new_gui_attrs['feeds_expanded'] = {}
+                msg(FX_ERROR_VAL, _('Expanded feeds invalid. Defaulting...') )
+                break
+
+        new_gui_attrs['layouts'] = scast(gui_attrs.get('layouts'), dict, {})
+        if new_gui_attrs['layouts'] == {}:
+            msg(FX_ERROR_VAL, _('No valid layouts found. Defaulting...'))
+            new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
+
+        if new_gui_attrs['layouts'].keys() != FX_DEF_LAYOUTS.keys(): 
+            msg(FX_ERROR_VAL, _('Invalid layout list. Defaulting...'))
+            new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
+    
+        for k,v in new_gui_attrs['layouts'].items():
+            if type(v) not in (tuple, list) or len(v) == 0:
+                msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
+                new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
+                continue
+
+            for i,c in enumerate(v):
+                if type(c) not in (tuple, list): 
+                    msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
+                    new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
+                    break
+                if type(slist(c,0,None)) is not str or type(slist(c,1,None)) is not int or slist(c,1,0) <= 0:
+                    msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
+                    new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
+                    break
+
+
+    
+        new_gui_attrs['default_search_filters'] = scast(gui_attrs.get('default_search_filters',FEEDEX_GUI_DEFAULT_SEARCH_FIELDS).copy(), dict, {})    
+        new_gui_attrs['tabs'] = gui_attrs.get('tabs',[]).copy()
+
+        return new_gui_attrs
+
+
+
+
+
+
+    def get_icons_feeds(self, **kargs):
+        for f,ic in fdx.icons_cache.items():
+            try: 
+                self.icons[f] = GdkPixbuf.Pixbuf.new_from_file_at_size(ic, 16, 16)
+            except Exception as e:
+                try: os.remove(ic)
+                except OSError as ee: msg(FX_ERROR_IO, f"""_('Error removing %a:'){ee}""", ic)
+                msg(FX_ERROR_IO, _('Image error: %a'), e)
+                continue
+
+            try: self.icons['large'][f] = GdkPixbuf.Pixbuf.new_from_file_at_size(ic, 32, 32)
+            except Exception as e: self.icons['large'][f] = self.icons.get(f)
+
+
+    def get_icons(self, **kargs):
+        """ Sets up a dictionary with feed icon pixbufs for use in lists """
+        self.icons = {}
+        self.icons['large'] = {}
+
+        self.get_icons_feeds()
+
+        self.icons['main']  = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'feedex.png'), 82, 82)
+        self.icons['large']['main_emblem'] = Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_size(  os.path.join(FEEDEX_SYS_ICON_PATH,'feedex.png'), 120, 120))
+        self.icons['db'] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, 'db.svg'), 64, 64)
+
+        self.icons['default']  = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 16, 16)
+        self.icons['error'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'error.svg'), 16, 16)
+        self.icons['doc'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'document.svg'), 16, 16)
+        self.icons['trash'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'trash.svg'), 16, 16)
+        self.icons['new'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'new.svg'), 16, 16)
+        self.icons['flag'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'flag.svg'), 16, 16)
+
+        self.icons['large']['default']  = GdkPixbuf.Pixbuf.new_from_file_at_size(     os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg'), 32, 32)
+        self.icons['large']['error'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'error.svg'), 32, 32)
+        self.icons['large']['doc'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'document.svg'), 32, 32)
+        self.icons['large']['trash'] = GdkPixbuf.Pixbuf.new_from_file_at_size(        os.path.join(FEEDEX_SYS_ICON_PATH, 'trash.svg'), 32, 32)
+        self.icons['large']['new'] = GdkPixbuf.Pixbuf.new_from_file_at_size(          os.path.join(FEEDEX_SYS_ICON_PATH, 'new.svg'), 32, 32)
+        self.icons['large']['flag'] = GdkPixbuf.Pixbuf.new_from_file_at_size(         os.path.join(FEEDEX_SYS_ICON_PATH, 'flag.svg'), 32, 32)
+
+
+        for ico in FEEDEX_GUI_ICONS:
+            self.icons[ico] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, f'{ico}.svg'), 16, 16)
+            self.icons['large'][ico] = GdkPixbuf.Pixbuf.new_from_file_at_size(           os.path.join(FEEDEX_SYS_ICON_PATH, f'{ico}.svg'), 32, 32)
+        
+
+        return 0
+
+
+
+    def validate_gui_plugins(self, gui_plugins):
+        """ Initial validation of plugin list """
+        new_gui_plugins = []
+        plugin = FeedexPlugin()
+        plugin_len = len(plugin.fields)
+        for p in gui_plugins:
+            if type(p) not in (list, tuple): 
+                msg(FX_ERROR_VAL, _('Plugin item %a not a valid list! Ommiting'), p)
+                continue
+            if len(p) != plugin_len:
+                msg(FX_ERROR_VAL, _('Invalid plugin item %a! Ommiting'), p)
+                continue
+            plugin.populate(p)
+            if plugin.validate() != 0: continue
+            new_gui_plugins.append(p)
+    
+        return new_gui_plugins
+
+
+
+
+
 
 
 
@@ -1455,7 +1668,7 @@ from feedex_gui_dialogs_utils import BasicDialog, YesNoDialog, PreferencesDialog
 from feedex_gui_tabs import FeedexTab, FeedexGUITable
 from feedex_gui_feeds import FeedexFeedTab
 from feedex_gui_dialogs_entts import NewFromURL, EditCategory, EditEntry, EditFlag, EditPlugin, EditRule, EditFeedRegex, EditFeed
-from feedex_gui_actions import FeedexGUIActions
+from feedex_gui_actions import FeedexGUIActions, FeedexGUISession
 
 
 

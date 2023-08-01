@@ -176,6 +176,8 @@ class EditCategory(Gtk.Dialog):
 
 
 
+
+
 class EditEntry(Gtk.Dialog):
     """ Edit Entry dialog """
     def __init__(self, parent, entry, **kargs):
@@ -808,7 +810,7 @@ class EditRule(Gtk.Dialog):
         string_label = f_label(_('Search string:'), wrap=False, xalign=1)
         self.string_entry = Gtk.Entry()
         self.string_entry.set_tooltip_markup(_("""String or Pattern used for search and matching
-It is used according to <b>Type</b> and should be compatibile with it (e.g. REGEX string)""") )
+It is used according to <b>Type</b> and should be compatibile with it (e.g. a valid REGEX string)""") )
 
         type_label = f_label(_('Type:'), wrap=False, xalign=1)
         self.type_combo = f_query_type_combo(connect=self.on_changed, rule=True)
@@ -823,12 +825,13 @@ It is used according to <b>Type</b> and should be compatibile with it (e.g. REGE
 
         weight_label = f_label(_('Weight:'), wrap=False, xalign=1)
         self.weight_entry = Gtk.Entry()
-        self.weight_entry.set_tooltip_markup(_("""Weight is used to increase article's <b>importance</b> when matched
-Articles are then sorted by importance to keep the most important ones on top.
-Weights from leaned rules as well as the ones from manually added ones sum up and position an Article""") )
+        self.weight_entry.set_tooltip_markup(_("""Weight is used to increase/decrease article's <b>importance</b> when matched
+When recommending, articles are sorted by importance first to keep the most important ones to you on top.
+Only then, ranking by learned keywords/actions is performed. You can use rules' weight to boost/hide certain articles.
+""") )
             
         self.flag_combo = f_flag_combo(filters=False, tooltip=_("""Main reason for manually added rules is to flag interesting incomming articles independently of importance ranking
-Sometimes, however, a rule can simply increase importance by its <b>weight</b> without flagging""") ) 
+However, a rule can simply increase importance by its <b>weight</b> without flagging""") ) 
         self.additive_button = Gtk.CheckButton.new_with_label(_('Are matches weights additive?'))
 
         self.err_label = f_label('', wrap=False, xalign=0)

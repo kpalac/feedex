@@ -366,7 +366,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
 
         if kargs.get('load',True):
             self.MW.DB.load_icons()
-            self.MW.act.get_icons_feeds()
+            self.MW.get_icons_feeds()
 
         adj = self.feed_tree.get_vadjustment()
         self.vadj_val = adj.get_value()

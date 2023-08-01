@@ -274,7 +274,6 @@ class FeedexEntry(SQLContainerEditable):
                 self.DB.close_ixer(rollback=True)
                 return err
 
-        if coalesce(self.vals['read'], 0) < 0: self.vals['importance'] = 0
 
         # Construct second time, to include recalculated fields
         err = self.constr_update()

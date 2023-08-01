@@ -94,9 +94,6 @@ class FeedexMainBus:
         # Invalid CLI parameters
         self.__dict__['cli_param_error'] = False
 
-        # Action flags to manage traffic
-        self.__dict__['busy'] = False
-
         # Local DB locks
         self.__dict__['db_lock'] = False
         self.__dict__['db_fetch_lock'] = False
@@ -327,48 +324,59 @@ class FeedexMainBus:
         strict = kargs.get('strict', False)
         load = kargs.get('load', True)
 
-        new_config = config.copy()
+        new_config = {}
 
         for k,v in config.items():
 
-            if msg and v is None: continue
-
-            v_int = scast(v, int, None)
-            v_float = scast(v, float, None)
-            v_str = scast(v, str, None)
-            v_bool = scast(v, bool, None)
+            if v is None: continue
 
             if k in CONFIG_INTS_NZ:
-                if v_int is None or v_int <= 0:
+                v = scast(v, int, None)
+                if v is None or v <= 0:
                     if strict: return FX_ERROR_VAL, _('%a must be integer > 0'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
+                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
                     new_config[k] = DEFAULT_CONFIG[k]
-            if k in CONFIG_INTS_Z:
-                if v_int is None or v_int < 0:
+                else: new_config[k] = v
+            
+            elif k in CONFIG_INTS_Z:
+                v = scast(v, int, None)
+                if v is None or v < 0:
                     if strict: return FX_ERROR_VAL, _('%a must be integer >= 0'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
+                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
                     new_config[k] = DEFAULT_CONFIG[k]
-            if k in CONFIG_BOOLS:
-                if v_bool is None:
-                    if strict: return FX_ERROR_VAL, _('%a must be True or False'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
-                    new_config[k] = DEFAULT_CONFIG[k]
-            if k in CONFIG_FLOATS:
-                if v_float is None:
-                    if strict: return FX_ERROR_VAL, _('%a must be a valid number'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
-                    new_config[k] = DEFAULT_CONFIG[k]
-            if k in CONFIG_STRINGS:
-                if v_str is None:
-                    if strict: return FX_ERROR_VAL, _('%a must be a valid string'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
-                    new_config[k] = DEFAULT_CONFIG[k]
-            if k in CONFIG_KEYS:
-                if v_str is None or len(v) > 1:
-                    if strict: return FX_ERROR_VAL, _('%a must be a single character ([a-zA-Z0-9])'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, f'{_("Invalid config option: %a; Defaulting to")} {DEFAULT_CONFIG[k]}', k)
-                    new_config[k] = DEFAULT_CONFIG[k]
+                else: new_config[k] = v
 
+            elif k in CONFIG_BOOLS:
+                v = scast(v, bool, None)
+                if v is None:
+                    if strict: return FX_ERROR_VAL, _('%a must be True or False'), CONFIG_NAMES.get(k)
+                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
+                    new_config[k] = DEFAULT_CONFIG[k]
+                else: new_config[k] = v
+
+            elif k in CONFIG_FLOATS:
+                v = scast(v, float, None)
+                if v is None:
+                    if strict: return FX_ERROR_VAL, _('%a must be a valid number'), CONFIG_NAMES.get(k)
+                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
+                    new_config[k] = DEFAULT_CONFIG[k]
+                else: new_config[k] = v
+
+            elif k in CONFIG_STRINGS:
+                v = scast(v, str, None)
+                if v is None:
+                    if strict: return FX_ERROR_VAL, _('%a must be a valid string'), CONFIG_NAMES.get(k)
+                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
+                    new_config[k] = DEFAULT_CONFIG[k]
+                else: new_config[k] = v
+
+            elif k in CONFIG_KEYS:
+                v = scast(v, str, None)
+                if v is None or len(v) > 1:
+                    if strict: return FX_ERROR_VAL, _('%a must be a single character ([a-zA-Z0-9])'), CONFIG_NAMES.get(k)
+                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
+                    new_config[k] = DEFAULT_CONFIG[k]
+                else: new_config[k] = v
 
         # ... CLI display and markup options ...
         if config.get('normal_color') is not None and config.get('normal_color') in TCOLS.keys():
@@ -393,6 +401,7 @@ class FeedexMainBus:
     
 
 
+
     def get_par(self, arg, **kargs):
         """ Sanitizes 'x=y' parameter """
         rarg = slist(scast(arg, str, '').split('='), 1, None)
@@ -401,69 +410,6 @@ class FeedexMainBus:
 
         
 
-
-    def sanitize_arg(self, arg, tp, default, **kargs):
-        """ Sanitize and error check command line argument """
-
-        if kargs.get('allow_none',False) and arg is None: return None
-
-        exit_fail = kargs.get('exit_fail',True)
-        is_file = kargs.get('is_file',False)
-        is_dir = kargs.get('is_dir',False)
-        stripped = kargs.get('stripped',False)
-        valid_list = kargs.get('valid_list')
-        singleton = kargs.get('singleton',False)
-        arg_name = kargs.get('arg_name','NULL')
-        err_code = kargs.get('err_code',9)
-
-        if not singleton:
-            arg_list = arg.split('=',1)
-            arg_name = slist(arg_list, 0, default)
-            arg_val = slist(arg_list, 1, None)
-        else:
-            arg_val = arg
-
-
-        if arg_val is None:
-            self.msg(FX_ERROR_CL, _("Empty argument (%a)"), arg_name )
-            end_val = None
-            if exit_fail: sys.exit(err_code)
-        else: end_val = scast(arg_val, tp, None)
-
-        arg_name_str = scast(arg_name, str, '')
-        end_val_str = scast(end_val, str, '')
-
-        if end_val is None:
-            self.msg(FX_ERROR_CL, _("Invalid argument type (%a)"), arg_name_str )
-            if exit_fail: sys.exit(err_code)
-
-        if (stripped or is_file or is_dir) and tp == str:
-            end_val = end_val.strip()
-
-        if is_file and not os.path.isfile(end_val):
-            self.msg(FX_ERROR_CL, f"{_('File not found')} ({arg_name_str}, {end_val_str})")
-            end_val = None
-            if exit_fail: sys.exit(err_code)
-
-
-        if is_dir and not os.path.isdir(end_val):
-            self.msg(FX_ERROR_CL, f"{_('Directory not found')} ({arg_name_str}, {end_val_str})")
-            end_val = None
-            if exit_fail: sys.exit(err_code)
-
-
-        if not (valid_list is None):
-            if end_val not in valid_list:
-                self.msg(FX_ERROR_CL, f"{_('Invalid argument value')} ({arg_name_str}, {end_val_str})")
-                if exit_fail: sys.exit(err_code)
-                else: end_val = None
-
-        if end_val is None and not (default is None):
-            self.msg(FX_ERROR_CL, _("Defaulting to %a"), scast(default, str, _('<NONE>')))
-            end_val = default
-
-        return end_val
-    
     
 
     def ext_open(self, command_id, main_arg, **kargs):

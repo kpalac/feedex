@@ -883,7 +883,6 @@ class FeedexQuery(FeedexQueryInterface):
             id_ix = self.result.get_index('id')
 
             filters = kargs.copy()
-            filters['no_weight'] = True
             filters['group'] = None
             filters['allow_group'] = False
             filters['rank'] = True
@@ -892,7 +891,7 @@ class FeedexQuery(FeedexQueryInterface):
             filters['config'] = None
             filters['rev'] = False
             filters['sort'] = None
-            filters['depth'] = int(len(self.results) / depth)
+            filters['depth'] = int(len(self.results)/depth)
 
             node_count = 0
 
@@ -906,13 +905,14 @@ class FeedexQuery(FeedexQueryInterface):
                     tmp_result['is_node'] = 1
                     node_count += 1
                     filters['fallback_sort'] = 'id'
-                    self.similar(r[id_ix], filters)
+                    matched_ids.append(r[id_ix])
+                    self.similar(r[id_ix], filters, no_weight=True)
                     for t in self.results:
                         if t[id_ix] not in matched_ids and r[id_ix] != t[id_ix]: 
                             count += 1
                             matched_ids.append(t[id_ix])
-                            if count >= depth: break
                             node_tmp.append(list(t))
+                            if count >= depth: break
 
                     tmp_result['children_no'] = count
                     results_tmp.append(tmp_result.listify())

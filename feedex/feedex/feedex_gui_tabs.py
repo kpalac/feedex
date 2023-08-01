@@ -1198,10 +1198,10 @@ class FeedexGUITable:
 
         self.feed_sums = {}
 
-        if self.result.search_col:
+        if self.result.search_col is not None:
             self.view.set_enable_search(True)
             if self.is_tree: self.view.set_search_equal_func(quick_find_case_ins_tree, self.view, self.result.search_col) 
-            else: self.view.set_search_equal_func(quick_find_case_ins, self.result.search_col)
+            else: self.view.set_search_equal_func(quick_find_case_ins, self.view, self.result.search_col)
 
 
 
