@@ -57,7 +57,9 @@ class FeedexLP(SmallSem):
         self.ranked_sents = [] # List of tokenized and ranked sentences
         self.last_entry_id = 0  # ID of the last processed entry (for caching)
 
-
+        # Misc
+        self.BOLD_MARKUP_BEG = self.config.get('bold_markup_beg', '<b>')
+        self.BOLD_MARKUP_END = self.config.get('bold_markup_beg', '<\b>')
 
 
 
@@ -301,7 +303,7 @@ class FeedexLP(SmallSem):
         self.DB.connect_QP()
         self.DB.cache_rules()
 
-        debug(10, 'Validating rules...')
+        debug(7, 'Validating rules...')
         remember_lang = self.get_model()
 
         val_rules = []
@@ -311,7 +313,7 @@ class FeedexLP(SmallSem):
             # Stem and prefix all user's FTS rules
             qtype = scast(r[RULES_SQL_TABLE.index('type')], int, 0)
             string = scast(r[RULES_SQL_TABLE.index('string')], str, '')
-            field = scast(r[RULES_SQL_TABLE.index('field_id')], str, None)
+            field = scast(r[RULES_SQL_TABLE.index('field')], str, None)
 
             # Empty strings cause a mess later, so simply invalidate them
             if string == '': string = ''
@@ -351,7 +353,7 @@ class FeedexLP(SmallSem):
         self.set_model(remember_lang)
         
         fdx.rules_val_cache = val_rules
-        debug(10, 'Rules validated...')
+        debug(7, 'Rules validated...')
 
 
 
@@ -448,7 +450,7 @@ class FeedexLP(SmallSem):
                     rule['name'] = name
                     rule['matched'] = matched
                     rule['type'] = qtype
-                    rule['field_id'] = field
+                    rule['field'] = field
                     rule['feed_id'] = feed
                     rule['flag'] = rflag
                     rule['lang'] = lang
@@ -638,7 +640,7 @@ class FeedexLP(SmallSem):
 
     def srange(self, string:str, idx:int, l:int, sl:int, rng:int):
         """ Get range from string - for extracting snippets"""
-        string=string.replace(BOLD_MARKUP_BEG,'').replace(BOLD_MARKUP_END,'').replace('\n','').replace('\r','')
+        string=string.replace(self.BOLD_MARKUP_BEG,'').replace(self.BOLD_MARKUP_END,'').replace('\n','').replace('\r','')
 
         llimit = idx - rng
         if llimit < 0:

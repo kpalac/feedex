@@ -35,7 +35,7 @@ Usage: <b>feedex [parameters|filters] [actions]</b>
         -C, --read-category [ID|NAME]           Get all entries for a specified Category
 
         -q, --query [Phrase]                    Query entries with search phrase (see --help-query option for details)
-        -R, -recommend                          Show recommended articles
+        -R, --recommend                         Show recommended articles
                     
         -qc, --query-catalog [PHRASE]           Query Feed Catalog for Channels to import
         
@@ -108,17 +108,19 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --delimiter2=STR                        Change item separator inside field, e.g. for snippets and contexts (cli/csv), delault ;
         --escape=STR                            Escape sequence for delimiters (useful for CSV)
 
+        --none=STR                              For emtpy values use a string other than <NONE>
         --note_marker=STR, --read_marker=STR    Strings to mark read items and notes in CLI output
 
         --bold_beg=STR, --bold_end=STR          Strings to be inserted as bold markup beginning/end. Used for displaying snippets, to hilight
                                                 the search phrase. Defaults are <b>,</b>
 
-        --desktop-notify                        Show desktop notifications instead CLI output (-g, -c, and --query)
-                                                and inform about adding new entries, rules and feeds from URL
-                                                Useful for scheduled tasks and keyboard shortcuts (e.g. adding a hilighted note with --clipboard)
+        --desktop                               Integrate with desktop environment
+                                                 - Show desktop notifications instead CLI output (-g, -c, and entry queries)
+                                                 - When adding, show dialogs and desktop notifications
+                                                Useful for scheduled tasks and keyboard shortcuts (e.g. fetching and informing on new items)
 
         --clipboard                             Enable destkop clipboard/selection support. Selection and window title can be used in arguments
-                                                for actions: add-entry, add-feed, add-rule, add-regex, add-full-text, add-full-text-exact
+                                                for actions and queries
                                                 Substitutions:  
                                                     %%  -   % character
                                                     %s  -   current text selection
@@ -127,7 +129,9 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
     <b>Fetching:</b>
         -g, --get-news [ID]                     Get news without checking intervals, ETags or Modified tags (force download). Limit by feed ID
+                                                If new items are present, you can use --desktop or --headlines options to see them
         -c, --check [ID]                        Check for news (applying intervals and no force download with etag/modified). Limit by feed ID
+                                                If new items are present, you can use --desktop or --headlines options to see them
 
         -o, --open-in-browser [ID|URL]          Open entry by ID or URL in browser. Openned items are marked as important.
                                                 Features are extracted from it for future recommendations
@@ -140,7 +144,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
     	-L, --list-feeds                        List all registerred feeds
         -a, --add-feed [URL]                    Add feed providing a URL pointing to RSS. 
-                                                Possible parameters: --handler=[rss|html|script|local], --category=[ID/Name]
+                                                Possible parameters: --handler=[rss|html|script|local], --parent_id=[ID], --category=[NAME], --category_id=[ID]
                                                 --no_fetch - do not fetch anything to allow further editting (the same as with 'local/html/script' handlers)
         -u, --update-feeds [ID]                 Update feed data like title, subtitle, tags etc.. Limit by ID
                                                 Providing ID will limit download to specified feed ID
@@ -151,11 +155,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --examine-feed [ID]                     Check feed configuration
         --edit-feed [ID] [FIELD] [VALUE]        Change feed's (by ID) PARAMETER 
                                                 (for param. names check --examine-feed) to VALUE
-                                                NULL or NONE means NULL value
-
-        --insert-feed-before [ID] [TARGET ID]   Change display order of Channel/Category so it is displayed before TARGET IDd Channel/Category
-                                                If IDd is a Channel and TARGET is a Category, then Channel will be assigned to the Category
-                                                This command changes display_order field in feeds table
+                                                <NONE> means EMPTY value
 
         --test-regexes [ID]                     Download URL and perform sample parsing with saved REGEXes for a specified Feed.
                                                 DB will not be updated. For testing.
@@ -168,7 +168,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         --add-category [Title] [Subtitle]       Add new category with given title and subtitle
         --delete-category [ID]                  Remove category with given ID. If category is already in Trash, it will be removed permanently
         --edit-category [ID] [FIELD] [VALUE]    Edit ID'd category - change field's value to [VALUE].
-                                                NULL or NONE means NULL value
+                                                <NONE> means EMPTY value
 
 
     <b>Entries:</b>
@@ -183,26 +183,27 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
 
         --mark [ID] [N]                         Mark entry as read N times (important for future recommendation)
                                                 options:
-                                                --learn,--no-learn         Extract patterns from Entry?
         --unmark [ID]                           Unmark entry
 
         --flag [ID] [N]                         Set entry's flag
 
         -N, --add-entry [TITLE] [TEXT]          Add an entry providing title and text. Useful for saving highlights or notes.
-                                                NULL or NONE means NULL value
+                                                <NONE> means EMPTY value
                                                 Parameters:
-                                                --category=[INT|NAME]   Specifiy Entry's Category
-                                                --feed=[INT]            Specify Entry's Feed
-                                                --learn, --no-learn     Do you want to learn features from this entry for ranking news?
-                                                                        Default is: learn
-                                                                        Learning is useful to find topics that will interest you most based on your notes
+                                                --feed=[ID]             Specify Entry's feed
+                                                --category=[NAME]       Entry's category
+                                                --category_id=[ID]      Entry's category by ID
+                                                --parent_id=[ID]        Entry's feed or category
+                                                --weight=[INT]          Entry's Read/Weight for recommendations
+                                                --flag=[INT|FLAG_NAME]  Entry's initial flag
                                                 --note, --news          Is it a user's Note (default) or News item?
 
+        --gui-add-entry                         Add entry with GUI Dialog. Useful for adding entries from desktop selection
 
 	    --delete-entry [ID]                     Delete entry/news article/note by its ID. If the Entry is already in Trash it will
                                                 be removed permanently with all keywords/rules
         --edit-entry [ID] [FIELD] [VALUE]       Edit ID'd Entry. Change [FIELD] to specified [VALUE]. 
-                                                NULL or NONE means NULL value
+                                                <NONE> means EMPTY value
                                                 See --help-entries for field names
 
         --add-entries-from-file [FILE]          
@@ -261,14 +262,19 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         -K, --add-rule [TEXT]                   Add simple string matching rule ($,^,*) wildcards are allowed
                                                 parameters:
                                                 --case_ins, --case_sens     for c. ins. matching
-                                                --feed=[ID]                 feed ID to be matched exclusively
+                                                --feed=[ID]                 feed to be matched exclusively
+                                                --category=[NAME]           category to be matched exclusively
+                                                --category_id=[ID]          category to be matched exclusively by ID
+                                                --parent_id=[ID]            feed or category to match
+                   
                                                 --field=[NAME]              field name to be exclusively matched (
-                                                                                Available fields:
-                                                                                (author, publisher, contributors,
-                                                                                title, tags, category, comments)
-                                                --weight                    weight ascribed to this rule
-                                                --lang                      language to be matched and used for stemming and tokenizing
-                                                --flag                      choose a flag to use if matched. Possible values: 1-5 or no
+                                                                            Available fields:
+                                                                            (author, publisher, contributors,
+                                                                            title, tags, category, comments)
+                                                --weight=[FLOAT]            weight ascribed to this rule
+                                                --lang=[NAME]               language to be matched and used for stemming and tokenizing
+                                                --flag=[NAME]               choose a flag name to use if matched
+                                                --flag_id=[ID]              as above, but by ID
                                                 
         --add-regex [TEXT]                      Add REGEX rule
                                                 (parameters: as in previous option)
@@ -276,7 +282,7 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
                                                 (parameters: as in previous option)
 
         --edit-rule [ID] [FIELD] [VALUE]        Edit ID'd Rule. Change [FIELD] to specified [VALUE]. 
-                                                \\NULL or \\NONE means NULL value
+                                                <NONE> means EMPTY value
                                                 See --help-rules for field names
 
         --delete-rule [ID]                      Delete rule by its ID (see: --list-rules)
@@ -369,17 +375,19 @@ Usage: <b>feedex [parameters|filters] [actions] [arguments]</b>
         10      Language processing error
         11      Index error
         12      Configuration error
+        14      Request IO Error      
 
     <b>Debug levels:</b>
         1       All
-        2       Database messages
-        3       Handler messages
+        2       Database
+        3       Handlers
         4       Locks
-        5       Query messages
-        6       I/O messages
+        5       Queries
+        6       I/O
         7       Data validation
-        10      Language processing        
-
+        8       Language processing        
+        9       Entities
+        10      GUI
 
 """)
 
@@ -410,26 +418,23 @@ FEEDEX_HELP_EXAMPLES=_("""
         <b>feedex --headlines --group=category --depth=10 --last -q</b>
             Show nicely grouped headlines from last fetch
 
-        <b>feedex --desktop-notify --group=category --depth=10 --last -c</b>
+        <b>feedex --desktop --group=category --depth=10 --last -c</b>
             Fetch news and show grouped headlines from fetch as desktop notifications. Good for scheduled task
 
-        <b>feedex --desktop-notify --group=flag --depth=0 --last -c</b>
+        <b>feedex --desktop --group=flag --depth=0 --last -c</b>
             Fetch news and show flagged entries only from last fetch as desktop notifications
 
-        <b>feedex --desktop-notify --clipboard --weight=10 --parent_category=Notes --add-entry 'Title:%w' '%s'</b>
+        <b>feedex --clipboard --weight=10 --category=Notes --add-entry 'Title:%w' '%s'</b>
             Add new entry to 'Notes' category with title and description suplied from desktop clipboard.
             Convenient to use as a hotkey command
             NOTE! Some desktops (e.g. GNOME) substitute % character, so you will have to escape it, so this command would look like:
-            <b>feedex --desktop-notify --clipboard --weight=10 --parent_category=Notes --add-entry 'Title:%%w' '%%s'</b>
+            <b>feedex --clipboard --weight=10 --category=Notes --add-entry 'Title:%%w' '%%s'</b>
 
-        <b>feedex --clipboard --weight=10 --parent_category=Notes --add-entry 'Title:%w' '%s'</b>
-            The same as above, but silent
-
-        <b>feedex --desktop-notify --weight=10 --parent_category=Notes --add-entry 'Title example' 'Description example'</b>
-            Add new entry and throw desktop notification about it ( useful e.g. for Cron jobs and background script )
-
-        <b>feedex --desktop-notify --clipboard --weight=10 --add-rule '%s'</b>
-            Add new keyword from selected text and notify about it to desktop
+        <b>feedex --clipboard --weight=10 --category=Notes --desktop --add-entry 'Title:%w' '%s'</b>
+            Same as before, but will open a dialog window for a new entry to make some changes
+                       
+        <b>feedex --clipboard --weight=10 --add-rule '%s'</b>
+            Add new keyword rule from selected text
 
         <b>feedex --json_query -q '{"phrase":"test", "last_week":true, "case_sens":true, "read":true}'</b>
             An example usage of JSON query
@@ -493,7 +498,7 @@ Query is defined by by <b>parameters</b>:
     
     --case_ins      query is case insensitive
     --case_sens     query is case sensitive
-    --field=        field to search. 0 or None for all.
+    --field=        field to search. 0 or <NONE> for all fields.
                     Available fields: <b>author, publisher, contributors, title, tags, category, comments</b>
     
     --logic=        How should fts terms be connected by default?
@@ -522,7 +527,9 @@ Query can also be <b>filtered</b> by parameters:
     --last          limit to only recently added (on last update)
     --last_n=       limit to only last N updates
     --feed=         limit to feed specified by ID
-    --category=     limit to category and feeds in category specified by ID
+    --category=     limit to category (by Name)
+    --category_id=  limit to category (by ID)
+    --parent_id=    limit ot feed OR category by ID
     --today         limit to last 24h
     --last_hour     limit to last 1h
     --last_week, --last_month, --last_quarter, --last_six_months, --last_year   limit to 7, 31, 93 or 365 days ago
@@ -535,6 +542,7 @@ Query can also be <b>filtered</b> by parameters:
                             [INT] - choose a flag to filter by (by ID)
     --note, --news   limit to only user's Notes/News items 
     --handler=       limit to feed handler (rss, html, script, local)
+    --location=      limit to feeds by matched location. *, ^, $ wildcards are allowed
     --deleted        indlude deleted feeds, categories and entries
 
     Paging of results:
@@ -622,9 +630,9 @@ Below are field descriptions:
     <b>generator</b>                           RSS/Atom generator software used to generate the feed
     <b>url</b>                                 resource location used during download
 
-    <b>login, domain, passwd</b>               data used if authentication is required (auth field is not NONE)
-    <b>auth</b>                                authentication method: (If changed to not NONE, user will be prompted for auth. data)
-                                               <b>NONE</b> - no auth., <b>detect</b> - detect required method,
+    <b>login, domain, passwd</b>               data used if authentication is required (auth field is not <NONE>)
+    <b>auth</b>                                authentication method: (If changed to not <NONE>, user will be prompted for auth. data)
+                                               <b><NONE></b> - no auth., <b>detect</b> - detect required method,
                                                <b>digest</b>, <b>basic</b> - use these methods
     <b>author, author_contact,
     publisher, publisher_contact,
@@ -652,7 +660,7 @@ Below are field descriptions:
     <b>is_category</b>                         is this feed a category? This is because categories are stored in the same table. 
                                                 <i>It is not recommended to change this manually</b>
     <b>parent_id</b>                           ID of category this feed belongs to 
-                                               to change use: <b>parent_category</b> or <b>parent_id</b> (using 'category' will change other field)
+                                               
     
     <b>handler</b>                             protocol handler:
                                                <b>rss</b>, 
@@ -693,6 +701,7 @@ Below are field descriptions:
     
     <b>recom_weight</b>                        Aggregate of marked entries for this feed, used in recommendation
 
+    <b>location</b>                            Channel's location
 
 
 Every field can be changed with --edit-feed [ID] [FIELD] [VALUE] command, where [FIELD] is a name from above
@@ -717,7 +726,6 @@ Entries are stored in DB in <b>entries</b> table. Below, are field descriptions:
 
     <b>id</b>           unique identifier (integer)
     <b>feed_id</b>      ID of Feed or Category this Entry belongs to (feed and category IDs do not overlap)
-                        to change use: <b>parent_category</b>, <b>feed</b>, <b>parent_id</b> or <b>feed_id</b>
     
     <b>charset</b>      character encoding used in this entry ('utf-8' by default)
     <b>lang</b>         language used in this entry. If not provided in RSS/Atom, it will be heuristically detected
@@ -818,8 +826,7 @@ Rules are stored in DB in <b>rules</b> table. Below are field descriptions:
                                     regex, 2    - REGEX search
 
     <b>feed_id</b>              ID of a feed or category whose entries are exclusively matched against this rule
-                                to change use: <b>category</b>, <b>feed</b> or <b>feed_id</b>
-    <b>field_id</b>             ID of a field to be matched by a rule, also: <b>field</b>
+    <b>field</b>                Field to be matched by a rule.
                                 values: 'author','publisher','contributors','link','title','tags','category' 
 
     <b>string</b>               string to be matched according to rule type
@@ -860,30 +867,31 @@ Fields:
 FEEDEX_HELP_SCRIPTING=_("""
 <b>Feedex: Scripting</b>
 
-If Feed's handler is specified as <b>script</b> a user-specified command from <b>script_file</b> field (<b>feeds</b> table) is executed on fetching.
-Feedex then reads contents of <b>temp file</b> (expected to be in JSON format) and treats it as incomming feed data.
-Temp file path is passed as <b>%T</b> parameter to command or <b>FEEDEX_TEMP_FILE</b> env variable. 
-Script must populate it with a valid JSON structure (see below)
-It is also up to the script to prevent hanging, infinite loops and errors as Feedex will wait for the script to finish.
+If Feed's handler is specified as <b>script</b> a user-specified command from <b>script_file</b> field is executed on fetching.
+Script's output is then decoded as JSON (format specified below) into a dict and treated as fetching input.
+Unique ID must be provided as a field 'feedex_uid' (read by script from env or command line param.)
                         
-Feed data can be read from another temp file (<b>FEEDEX_TEMP_FILE_FEED</b> env variable or <b>%I</b> argument).
-It is encoded in JSON format. 
-
-Following arguments can be passed in the command and be replaced by variables:
-
-    <b>%T</b>   Transfer temp file path (raw feed data in JSON)
-    <b>%I</b>   Input temp file path (feed data in JSON)
-    <b>%A</b>   User Agent (feed-specific or global)
-    <b>%E</b>   Last saved ETag
-    <b>%M</b>   Last saved 'Modified' tag
-    <b>%U</b>   Feed's URL
-    <b>%F</b>   Feed's ID
-    <b>%%</b>   % character
-
+Following arguments can be passed in the command (corresponding env. variable name provided):
+            
+    %%      % sign
+    %I      Feedex identifier; FEEDEX_UID
+    %U      feed's fetching URL; FEEDEX_URL
+    %F      feed's id; FEEDEX_FEED_ID
+    %L      last read date in epoch format; FEEDEX_LAST_READ
+    %l      last checked date in epoch format; FEEDEX_LAST_CHECKED
+    %A      user agent; FEEDEX_AGENT
+    %E      etag; FEEDEX_ETAG
+    %M      'modified' tag; FEEDEX_MODIFIED
+    %H      feed's homepage; FEEDEX_HOME
+    %s      last HTTP status; FEEDEX_HTTP_STATUS
+    %i      feed's fetching interval; FEEDEX_INTERVAL
+    %n      feed's name; FEEDEX_NAME
                         
 <b>JSON structure in transfer file should have specific format:</b>
 
 {
+<i>feedex_uid</i>   THIS IS MANDATORY: ID provided by Feedex in env. variable FEEDEX_UID and with %I param
+                        
 <i>#HTTP return headers...</i>
 'status': <i>#HTTP return status, must be 200, 201, 202, 203, 204, 205 or 206 for Feedex to save results to DB</i>
 'etag': ...
@@ -915,6 +923,9 @@ Following arguments can be passed in the command and be replaced by variables:
 
 
 
+
+
+
 FEEDEX_HELP_JSON_QUERY = _("""
 <b>Feedex: JSON queries</b>
 
@@ -925,6 +936,7 @@ Fields are:
     
     <i>lang:</i> query language (for stemming)
     <i>handler:</i> filter by handler (rss, html, script, local)
+    <i>location:</i> filter by feed's location
 
     <i>field:</i> which field to search (title, desc, author etc.)
     <i>qtype:</i> query type (FTS, string matching)
@@ -932,8 +944,7 @@ Fields are:
     <i>date_from, date_to:</i> filter by published dates
     <i>date_add_from, date_add_to:</i> filter by added/modified date
 
-    <i>feed, category, parent_category, feed_id, parent_id </i>: filter by channel/category
-    <i>importance:</i> importance greater than FLOAT
+    <i>feed, category, feed_or_cat</i>: filter by channel/category
 
     <i>note:</i> is a note? (True/False)
     <i>news:</i> is a news item? (True/False)
@@ -983,13 +994,11 @@ Plugins allow user to run scripts/commands on various Feedex items:
     -   Query results  (useful for exporting results to other formats)
     -   Feedex entities (e.g. selected entry, feed, or category) 
 
-                        
-Data in JSON format is transferred using temp file whose path is transferred to script by:
+Data in JSON format is transferred using named pipe that can be read by script as a file:
 
-    <b>%T</b>                       parameter in command line argument
-    <b>FEEDEX_TMP_FILE</b>          environment variable
+    <b>%p</b>                       parameter in command line argument
+    <b>FEEDEX_PIPE</b>              environment variable
 
-                        
 If plugin processes text selection, data is transferred to script by:
 
     <b>%S</b>                       parameter in command line argument
@@ -1000,7 +1009,7 @@ When executing a plugin command substitutions will be made:
                         
     <b>%%</b>                       Percent (%) character
                         
-    <b>%t</b>                       Table type for result list               
+    <b>%t</b>                       Table type for result list        
 
     <b>%choose_file_save%</b>       File chooser dialog for a new file will be displayed 
                                     and chosen filename will be substituted for this string        
@@ -1009,13 +1018,11 @@ When executing a plugin command substitutions will be made:
     <b>%choose_dir_open%</b>        Folder chooser dialog will be displayed 
                                     and chosen folder will be substituted for this string        
 
-                        
 Following environment variables are available:
 
     <b>FEEDEX_TABLE</b>             Result table type (e.g. entries, feeds, rules, terms, time_series, keywords)
     <b>FEEDEX_FIELDS</b>            Semicolon-separated list of result fields
                                  
-
 Output from executed command will be send to status bar. 
 Pipes and redirecting are not allowed.
                         

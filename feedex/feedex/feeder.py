@@ -27,10 +27,18 @@ class FeedexDatabaseLockedError(FeedexDatabaseError):
     def __init__(self, *args, **kargs): 
         kargs['code'] = kargs.get('code', FX_ERROR_LOCK)
         super().__init__(*args, **kargs)
+        self.in_pipe = kargs.get('in_pipe')
+        self.session_id = kargs.get('session_id')
+        self.locks = ()
 
 class FeedexIndexError(FeedexError):
     def __init__(self, *args, **kargs): 
         kargs['code'] = kargs.get('code', FX_ERROR_INDEX)
+        super().__init__(*args, **kargs)
+
+class FeedexPipeError(FeedexError):
+    def __init__(self, *args, **kargs):
+        kargs['code'] = kargs.get('code', FX_ERROR_IO)
         super().__init__(*args, **kargs)
 
 
@@ -61,7 +69,6 @@ class FeedexDatabase:
         self.lastrowid = 0
         # Xapian stuff
         self.lastxapdocid = 0
-        self.lastxapcount = 0
 
         # Last inserted ids
         self.last_entry_id = 0
@@ -112,7 +119,6 @@ class FeedexDatabase:
                 self.load_all()
                 self.connect_LP()
                 self.connect_QP()
-
 
 
 
@@ -202,52 +208,59 @@ class FeedexDatabase:
                     raise FeedexDatabaseError('Error writing default feeds from %a: %b', os.path.join(sql_scripts_path,'feedex_db_default_feeds.sql'), e)
 
             # Insert verson to DB
-            try: #INSERT INTO "main"."params" ("name", "val") VALUES ('version', '1.0.0');
-                self.curs.execute(f"""INSERT INTO params (name, val) VALUES ('version', :version)""", {'version':FEEDEX_VERSION})
-                self.conn.commit()
-            except (sqlite3.Error, sqlite3.OperationalError, OSError) as e:
+            err = self.save_param('version', FEEDEX_VERSION)
+            if err != 0:
                 self.close(unlock=False)
                 raise FeedexDatabaseError('Error setting DB version: %a', e)
 
 
-        if self.main_conn and not create_sqlite:
+        if self.main_conn: 
+            if not create_sqlite:
             # Checking versions and aborting if needed
-            try: 
-                version = slist(self.curs.execute("select val from params where name = 'version'").fetchone(), 0, None)
-            except (sqlite3.Error, sqlite3.OperationalError, OSError) as e:
-                self.close(unlock=False)
-                raise FeedexDatabaseError('Error getting DB version: %a', e)
-
-            if version != FEEDEX_DB_VERSION_COMPAT and version != FEEDEX_VERSION:
-                self.close(unlock=False)
-                raise FeedexDatabaseError('App version (%a) incompatibile with DB version (%b)', FEEDEX_VERSION, version)
-
-            if kargs.get('unlock', False): 
-                err = self.unlock()
-                if err == 0:
-                    msg(_('Database unlocked'))
+                version = self.get_saved_param('version')
+                if self.status != 0:
                     self.close(unlock=False)
+                    raise FeedexDatabaseError('Error getting DB version: %a', e)
 
-            elif kargs.get('lock', False):
-                err = self.lock()
-                if err == 0:
-                    msg(_('Database locked'))
+                if version != FEEDEX_DB_VERSION_COMPAT and version != FEEDEX_VERSION:
                     self.close(unlock=False)
+                    raise FeedexDatabaseError('App version (%a) incompatibile with DB version (%b)', FEEDEX_VERSION, version)
 
-            else:
-                lock = self.locked() 
-                if lock is True:
-                    self.close(unlock=False)
-                    raise FeedexDatabaseLockedError('DB locked')
-                elif lock is None:
-                    self.close(unlock=False)
-                    raise FeedexDatabaseError('Unknown lock status!')
+                if kargs.get('unlock', False): 
+                    err = self.unlock()
+                    if err == 0:
+                        msg(_('Database unlocked'))
+                        self.close(unlock=False)
+                    return err
+
+                elif kargs.get('lock', False):
+                    err = self.lock()
+                    if err == 0:
+                        msg(_('Database locked'))
+                        self.close(unlock=False)
+                    return err
+
+                else:
+                    lock = self.locked() 
+                    if lock is True:
+                        in_pipe, session_id = self.get_saved_param('in_pipe'), self.get_saved_param('session_id')
+                        self.close(unlock=False)
+                        raise FeedexDatabaseLockedError('DB locked', in_pipe=in_pipe, session_id=session_id, locks=fdx.get_locks()) # Pass in pipe id for other processes
+                    elif lock is None:
+                        self.close(unlock=False)
+                        raise FeedexDatabaseError('Unknown lock status!')
+
+                self.lock()
+
+            if not fdx.single_run: self.lock()
+
+            debug(2, f'Connected to {self.sql_path} ({self.conn_id})')
 
 
         # Connecting XAPIAN index
         try:
             self.ix = xapian.Database(self.ix_path)
-            debug(2,f"Connected to index {self.ix_path}")        
+            debug(2,f"Connected to index {self.ix_path}  ({self.conn_id})")        
         except (xapian.DatabaseError,) as e:
             if self.allow_create:
                 try:
@@ -261,7 +274,7 @@ class FeedexDatabase:
                 # Final try ...
                 try:
                     self.ix = xapian.Database(self.ix_path)
-                    debug(2,f'Connected to index {self.ix_path}')
+                    debug(2,f'Connected to index {self.ix_path} ({self.conn_id})')
                 except (xapian.DatabaseError,) as e:
                     self.close()
                     raise FeedexIndexError('Error connecting to index at %a: %b', self.ix_path, e)           
@@ -330,7 +343,6 @@ class FeedexDatabase:
                 self.ixer_db.cancel_transaction()
             
             self.ixer_db.close()
-            msg(_('Done.'))
 
         self.ixer_db = None
         return 0
@@ -340,10 +352,118 @@ class FeedexDatabase:
 
 
     ########################################################################
-    #   Locks, Fetching Locks and Timeouts
+    #   
+    #       Local pipe management
+
+    def create_pipe(self, **kargs):
+        """ Defines pipe's filesystem name
+            type:
+                0 - in
+                1 - out
+        """
+        dir = kargs.get('type',0)
+
+        if dir == 0 and fdx.in_pipe is not None: return 0
+        elif dir == 1 and fdx.out_pipe is not None: return 0
+
+        debug(2, f'Creating communication pipe type {dir}...')
+
+        exists = True
+        while exists:
+            ts = datetime.now()
+            pipe = os.path.join(self.db_path, f"""{int(round(ts.timestamp()))}{random_str(length=25)}.tmp""")
+            if not os.path.exists(pipe):
+                exists = False
+                try:
+                    os.mkfifo(pipe, 0o660)
+                    if dir == 0: fdx.in_pipe = pipe 
+                    elif dir == 1: fdx.out_pipe = pipe
+                    debug(2, f'Pipe {pipe} created')
+                except (OSError, IOError) as e: 
+                    self.status = FX_ERROR_IO
+                    self.error = e
+                    raise FeedexPipeError('Could not create pipe type %a at %b: %c', dir, pipe, e)
+
+        err = 0
+        if dir == 0: err = self.save_param('in_pipe', fdx.in_pipe)
+        elif dir == 1: err = self.save_param('out_pipe', fdx.out_pipe)
+        return err
+
+
+
+
+    def destroy_pipe(self, **kargs):
+        """ Deletes named pipes
+            type:
+                0 - in
+                1 - out
+
+        """ 
+        dir = kargs.get('type',0)       
+
+        if dir == 0 and fdx.in_pipe is None: return 0
+        elif dir == 1 and fdx.out_pipe is None: return 0
+
+        try:
+            if dir == 0: os.remove(fdx.in_pipe)
+            elif dir == 1: os.remove(fdx.out_pipe)
+        except (OSError, IOError,) as e:
+            self.status = FX_ERROR_IO
+            self.error = e
+            raise FeedexPipeError('Could not destroy pipe type %a: %b', dir, e)
+
+        err = 0
+        if dir == 0: err = self.clear_param('in_pipe', 'session_id')
+        elif dir == 1: err = self.clear_param('out_pipe', 'session_id')
+        return err
+
+
+
+    def set_session_id(self, **kargs):
+        """ Set and save session ID 
+            type: 0 - GUI """
+        err = 0
+        tp = kargs.get('type',0)
+        session_id = fdx.get_session_id(type=tp)
+        if session_id is not None: err = self.save_param('session_id', session_id)
+        return err
+
+
+
+    ################################################3
+    #
+    #           Parameter interface
+
+    def get_saved_param(self, name, **kargs):
+        """ Get parameter from DB 
+            type - type to cast results to 
+            default - default value if nothing is retrieved """
+        tp = kargs.get('type',str)
+        default = kargs.get('default')
+        param = scast( slist(self.qr_sql(f"select val from params where name = :name", {'name':name}, one=True), 0, None), tp, default)
+        if param == '': param = None
+        return param
+
+    def save_param(self, name, val, **kargs):
+        err = self.run_sql_multi_lock(
+            ("delete from params where name = :name", {'name':name}),\
+            ("insert into params values(:name, :val)", {'name':name, 'val':val}),
+            )
+        return err
+
+    def clear_param(self, *names, **kargs):
+        qrs = []
+        for n in names: qrs.append( ('delete from params where name = :name', {'name':n}) )
+        return self.run_sql_multi_lock(*qrs)
+
+
+
+
+
+    ########################################################################
+    #   Locks, Fetching Locks, timeouts
     # 
-    
-    
+
     def lock(self, **kargs):
         """ Locks DB """
         self.status = 0
@@ -370,33 +490,34 @@ class FeedexDatabase:
 
 
 
-    # Fetching lock helps with large inserts/updates/indexing that take a long time
-    def lock_fetching(self, **kargs):
-        """ Locks DB for fetching """
-        fdx.db_fetch_lock = True
-        return 0
 
-
-    def unlock_fetching(self, **kargs):
-        """ Unlocks DB for fetching """
-        fdx.db_fetch_lock = False
-        return 0
-
-    
-    def locked_fetching(self, **kargs):
-        """ Checks if DB is locked for fetching """
-        if fdx.db_fetch_lock is True: return True
-        if fdx.db_fetch_lock is False: return False
-
-
-
-
-    def run_fetch_locked(self, func, *args, **kargs):
+    def run_locked(self, locks, func, *args, **kargs):
         """ Wrapper to run functions within fetching lock """
-        if self.locked_fetching(): return msg(FX_ERROR_LOCK, _('DB locked for fetching!'))
-        if self.lock_fetching() != 0: return FX_ERROR_DB
+        if type(locks) not in (list,tuple,): locks = (locks,) 
+        if FX_LOCK_FETCH in locks or FX_LOCK_ALL in locks:
+            if fdx.db_fetch_lock: return msg(FX_ERROR_LOCK, _('DB locked for fetching!'))
+            fdx.db_fetch_lock = True
+        if FX_LOCK_ENTRY in locks or FX_LOCK_ALL in locks:
+            if fdx.db_entry_lock: return msg(FX_ERROR_LOCK, _('Entry edit locked!'))
+            fdx.db_entry_lock = True
+        if FX_LOCK_FEED in locks or FX_LOCK_ALL in locks:
+            if fdx.db_feed_lock: return msg(FX_ERROR_LOCK, _('Feed edit locked!'))
+            fdx.db_feed_lock = True
+        if FX_LOCK_RULE in locks or FX_LOCK_ALL in locks:
+            if fdx.db_rule_lock: return msg(FX_ERROR_LOCK, _('Rule edit locked!'))
+            fdx.db_rule_lock = True
+        if FX_LOCK_FLAG in locks or FX_LOCK_ALL in locks:
+            if fdx.db_flag_lock: return msg(FX_ERROR_LOCK, _('Flag edit locked!'))
+            fdx.db_flag_lock = True
+
         ret = func(*args, **kargs)
-        self.unlock_fetching()
+
+        if FX_LOCK_FETCH in locks or FX_LOCK_ALL in locks: fdx.db_fetch_lock = False
+        if FX_LOCK_ENTRY in locks or FX_LOCK_ALL in locks: fdx.db_entry_lock = False
+        if FX_LOCK_FEED in locks or FX_LOCK_ALL in locks: fdx.db_feed_lock = False
+        if FX_LOCK_RULE in locks or FX_LOCK_ALL in locks: fdx.db_rule_lock = False
+        if FX_LOCK_FLAG in locks or FX_LOCK_ALL in locks: fdx.db_flag_lock = False
+
         return ret
 
 
@@ -432,7 +553,6 @@ class FeedexDatabase:
                 with self.conn: self.curs.execute(query, vals)
             else:
                 with self.conn: self.curs.execute(query)
-            
             self.rowcount = self.curs.rowcount
             self.lastrowid = self.curs.lastrowid
             return 0
@@ -502,6 +622,21 @@ class FeedexDatabase:
 
 
 
+    def qr_sql_iter(self, sql:str, *args, **kargs):
+        """ Query database - iterator """
+        if self.loc_locked(**kargs):
+            self.status = msg(FX_ERROR_LOCK, _('DB locked locally (%a) (sql: %b)'), self.conn_id, sql, log=True)
+            return self.status
+        try:
+            for i in self.conn.execute(sql, *args).fetchall(): yield i
+        except (sqlite3.Error, sqlite3.OperationalError) as e:            
+            self.error = f'{e}'
+            self.status = msg(FX_ERROR_DB, _('DB error (%a) - read: %b (%c)'), self.conn_id, e, sql,  log=True)
+            self.conn.rollback()
+            return self.status
+        finally: fdx.db_lock = False
+
+
 
 
     ##############################################################################
@@ -516,17 +651,18 @@ class FeedexDatabase:
         """ Lazily load query processor """
         if self.Q is None: self.Q = FeedexQuery(self, **kargs)
 
-
-
+    def connect_DN(self, **kargs):
+        """ Lazily connect desktop notifier to ain bus """
+        if fdx.DN is None:
+            from feedex_desktop_notifier import DesktopNotifier
+            self.cache_icons()
+            fdx.DN = DesktopNotifier(icons=fdx.icons_cache)
 
 
 
 
     def load_feeds(self, **kargs):
-        """ Load feed data from database into cache """
-        if not kargs.get('ignore_lock', False):
-            while self.locked_fetching(): time.sleep(1)
-        
+        """ Load feed data from database into cache """        
         debug(2, f'Loading feeds ({self.conn_id})...')
         fdx.feeds_cache = self.qr_sql('select * from feeds order by display_order asc', all=True)
         if self.status != 0: raise FeedexDataError('Error caching feeds: %a', self.error)
@@ -534,9 +670,6 @@ class FeedexDatabase:
 
     def load_rules(self, **kargs):
         """Load learned and saved rules from DB into cache"""
-        if not kargs.get('ignore_lock',False):
-            while self.locked_fetching(): time.sleep(1)
-        
         debug(2, f'Loading rules ({self.conn_id})...')
         fdx.rules_cache = self.qr_sql('select * from rules order by id desc', all=True)
         if self.status != 0: raise FeedexDataError('Error caching rules: %a', self.error)
@@ -553,9 +686,6 @@ class FeedexDatabase:
 
     def load_flags(self, **kargs):
         """ Build cached Flag dictionary """
-        if not kargs.get('ignore_lock',False):
-            while self.locked_fetching(): time.sleep(1)
-        
         debug(2, f'Loading flags ({self.conn_id})...')
         flag_list = self.qr_sql(f'select * from flags', all=True)
         if self.status != 0: raise FeedexDataError('Error caching flags: %a', self.error)
@@ -646,7 +776,7 @@ class FeedexDatabase:
                     if handler == 'rss': fdx.icons_cache[id] = os.path.join(FEEDEX_SYS_ICON_PATH, 'news-feed.svg')
                     elif handler == 'html': fdx.icons_cache[id] = os.path.join(FEEDEX_SYS_ICON_PATH, 'www.svg')
                     elif handler == 'script': fdx.icons_cache[id] = os.path.join(FEEDEX_SYS_ICON_PATH, 'script.svg')
-                    elif handler == 'local': fdx.icons_cache[id] = os.path.join(FEEDEX_SYS_ICON_PATH, 'mail.svg')
+                    elif handler == 'local': fdx.icons_cache[id] = os.path.join(FEEDEX_SYS_ICON_PATH, 'disk.svg')
                 
         return 0
 
@@ -676,7 +806,7 @@ class FeedexDatabase:
         self.load_flags()
         self.load_history()
         self.load_fetches()
-        debug(7, f'All data reloaded ({self.conn_id})...')
+        debug(2, f'All data reloaded ({self.conn_id})...')
         return 0
 
 
@@ -701,6 +831,8 @@ class FeedexDatabase:
 
 
 
+
+
     ##################################################################
     # Maintenance methods
     #
@@ -711,7 +843,7 @@ class FeedexDatabase:
         err = False
         now = int(datetime.now().timestamp())
 
-        debug(6, f'Housekeeping: {now}')
+        debug(2, f'Housekeeping: {now}')
         for root, dirs, files in os.walk(self.cache_path):
             for name in files:
                 filename = os.path.join(root, name)
@@ -720,7 +852,7 @@ class FeedexDatabase:
                     except OSError as e:
                         err = True
                         msg(FX_ERROR_IO, f'{_("Error removing %a:")} {e}', filename)
-                    debug(6, f'Removed : {filename}')
+                    debug(2, f'Removed : {filename}')
                 if err: break
             if err: break
 
@@ -730,7 +862,7 @@ class FeedexDatabase:
       
 
 
-    def maintenance(self, **kargs): return self.run_fetch_locked(self._maintenance, **kargs)
+    def maintenance(self, **kargs): return self.run_locked(FX_LOCK_ALL, self._maintenance, **kargs)
     def _maintenance(self, **kargs):
         """ Performs database maintenance to increase performance at large sizes """
         msg(_('Starting DB miantenance'), log=True)
@@ -755,7 +887,6 @@ class FeedexDatabase:
                 feed_weight_list = self.qr_sql(FEED_FREQ_MAINT_SQL, all=True)
                 for w in feed_weight_list: stats_delta[w[0]] = w[1]
                 err = self.update_stats(stats_delta, ignore_lock=True)
-
 
         if err == 0: err = self.run_sql_lock("""insert into actions values('maintenance',:doc_count)""", {'doc_count':doc_count})
         if err == 0:
@@ -786,17 +917,13 @@ class FeedexDatabase:
     def update_stats(self, idict:dict, **kargs):
         """ Get DB statistics and save them to params table for quick retrieval"""
 
-        msg(_("Updating DB statistics..."))
+        debug(2, "Updating DB statistics...")
 
         err = 0
         dc_delta = scast(idict.get('dc'), int, 0)
         if dc_delta != 0:
             doc_count = self.get_doc_count() + dc_delta
-            err = self.run_sql_multi_lock(
-                    ("delete from params where name = 'doc_count'",),\
-                    ("insert into params values('doc_count', :doc_count)", {'doc_count':doc_count})
-                    )
-            
+            err = self.save_param('doc_count', doc_count)            
         if err != 0: return err
 
         do_reload = False
@@ -825,10 +952,7 @@ class FeedexDatabase:
         msg(_('Calculating document count...'))
         doc_count = scast( slist(self.qr_sql(DOC_COUNT_MAINT_SQL, one=True),0, 0), int, 0)
         if self.status != 0: return FX_ERROR
-        err = self.run_sql_multi_lock(
-                    ("delete from params where name = 'doc_count'",),\
-                    ("insert into params values('doc_count', :doc_count)", {'doc_count':doc_count})
-                    )
+        err = self.save_param('doc_count', doc_count)
         return err
         
 
@@ -837,10 +961,10 @@ class FeedexDatabase:
         """ Retrieve entry count from params"""
         if fdx.doc_count is not None: return fdx.doc_count
         
-        doc_count = scast( slist(self.qr_sql("select val from params where name = 'doc_count'", one=True), 0, None), int, None)
+        doc_count = self.get_saved_param('doc_count', type=int)
         if doc_count is None:
             err = self._update_doc_count()
-            if err == 0: doc_count = scast( slist(self.qr_sql("select val from params where name = 'doc_count'", one=True), 0, None), int, 1)
+            if err == 0: doc_count = self.get_saved_param('doc_count', type=int)
             else: return 1
         return doc_count
 
@@ -865,45 +989,49 @@ class FeedexDatabase:
         return {'date_str': '<N/A>', 'from':None, 'to':None}
 
 
+
+
+
     def stats(self, **kargs):
         """ Displays database statistics """
-        stat_dict = {}
 
-        stat_dict['db_path'] = self.db_path
+        stat_cont = FeedexDBStats()
+        stat_cont['db_path'] = self.db_path
 
-        stat_dict['version'] = slist(self.qr_sql("select val from params where name='version'", one=True), 0, '<???>')
+        stat_cont['version'] = self.get_saved_param('version', default='<???>')
         
-        stat_dict['db_size'] = os.path.getsize(os.path.join(self.db_path,'main.db'))
-        stat_dict['ix_size'] = get_dir_size(self.ix_path)
-        stat_dict['cache_size'] = get_dir_size(self.cache_path)
-        stat_dict['total_size'] = sanitize_file_size(stat_dict['db_size'] + stat_dict['ix_size'] + stat_dict['cache_size'])
+        stat_cont['db_size_raw'] = os.path.getsize(os.path.join(self.db_path,'main.db'))
+        stat_cont['ix_size_raw'] = get_dir_size(self.ix_path)
+        stat_cont['cache_size_raw'] = get_dir_size(self.cache_path)
+        stat_cont['total_size_raw'] = stat_cont['db_size_raw'] + stat_cont['ix_size_raw'] + stat_cont['cache_size_raw']
 
-        stat_dict['db_size'] = sanitize_file_size(stat_dict['db_size'])
-        stat_dict['ix_size'] = sanitize_file_size(stat_dict['ix_size'])
-        stat_dict['cache_size'] = sanitize_file_size(stat_dict['cache_size'])
+        stat_cont['db_size'] = sanitize_file_size(stat_cont['db_size_raw'])
+        stat_cont['ix_size'] = sanitize_file_size(stat_cont['ix_size_raw'])
+        stat_cont['cache_size'] = sanitize_file_size(stat_cont['cache_size_raw'])
+        stat_cont['total_size'] = sanitize_file_size(stat_cont['total_size_raw'])
 
-        stat_dict['doc_count'] = self.get_doc_count()
-        stat_dict['last_doc_id'] = self.get_last_docid()
-        stat_dict['last_update'] = slist(self.qr_sql("select max(time) from actions where name = 'fetch'", one=True, ignore_errors=False), 0, '<???>')
-        stat_dict['first_update'] = slist(self.qr_sql("select min(time) from actions where name = 'fetch'", one=True, ignore_errors=False), 0, '<???>')
-        stat_dict['rule_count'] = slist(self.qr_sql("select count(id) from rules", one=True, ignore_errors=False), 0, 0)
-        stat_dict['learned_kw_count'] = slist(self.qr_sql("select count(id) from terms", one=True, ignore_errors=False), 0, 0)
+        stat_cont['doc_count'] = self.get_doc_count()
+        stat_cont['last_doc_id'] = self.get_last_docid()
+        stat_cont['last_update'] = slist(self.qr_sql("select max(time) from actions where name = 'fetch'", one=True, ignore_errors=False), 0, '<???>')
+        stat_cont['first_update'] = slist(self.qr_sql("select min(time) from actions where name = 'fetch'", one=True, ignore_errors=False), 0, '<???>')
+        stat_cont['rule_count'] = slist(self.qr_sql("select count(id) from rules", one=True, ignore_errors=False), 0, 0)
+        stat_cont['learned_kw_count'] = slist(self.qr_sql("select count(id) from terms", one=True, ignore_errors=False), 0, 0)
 
-        stat_dict['feed_count'] = slist(self.qr_sql("select count(id) from feeds where coalesce(is_category,0) = 0 and coalesce(deleted,0) = 0", one=True, ignore_errors=False), 0, 0)
-        stat_dict['cat_count'] = slist(self.qr_sql("select count(id) from feeds  where coalesce(is_category,0) = 1 and coalesce(deleted,0) = 0", one=True, ignore_errors=False), 0, 0)
+        stat_cont['feed_count'] = slist(self.qr_sql("select count(id) from feeds where coalesce(is_category,0) = 0 and coalesce(deleted,0) = 0", one=True, ignore_errors=False), 0, 0)
+        stat_cont['cat_count'] = slist(self.qr_sql("select count(id) from feeds  where coalesce(is_category,0) = 1 and coalesce(deleted,0) = 0", one=True, ignore_errors=False), 0, 0)
 
-        stat_dict['fetch_lock'] = self.locked_fetching()
+        stat_cont['fetch_lock'] = fdx.db_fetch_lock
 
-        stat_dict['last_update'] = scast(stat_dict['last_update'], int, None)
-        if stat_dict['last_update'] is not None: stat_dict['last_update'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat_dict['last_update']))
+        stat_cont['last_update'] = scast(stat_cont['last_update'], int, None)
+        if stat_cont['last_update'] is not None: stat_cont['last_update'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat_cont['last_update']))
 
-        stat_dict['first_update'] = scast(stat_dict['first_update'], int, None)
-        if stat_dict['first_update'] is not None: stat_dict['first_update'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat_dict['first_update']))
+        stat_cont['first_update'] = scast(stat_cont['first_update'], int, None)
+        if stat_cont['first_update'] is not None: stat_cont['first_update'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat_cont['first_update']))
 
-        if self.check_due_maintenance(): stat_dict['due_maintenance'] = True
-        else: stat_dict['due_maintenance'] = False
+        if self.check_due_maintenance(): stat_cont['due_maintenance'] = True
+        else: stat_cont['due_maintenance'] = False
             
-        return stat_dict
+        return stat_cont
 
 
 
@@ -919,14 +1047,7 @@ class FeedexDatabase:
 
 
 
-
-    def import_entries(self, **kargs): 
-        self.cache_feeds()
-        self.cache_flags()
-        self.cache_terms()
-        self.cache_rules()
-        return self.run_fetch_locked(self._import_entries, **kargs)
-    def _import_entries(self, **kargs):
+    def import_entries(self, **kargs):
         """ Wraper for inserting entries from list of dicts or a file """
         pipe = kargs.get('pipe',False)
         efile = kargs.get('efile')
@@ -945,241 +1066,65 @@ class FeedexDatabase:
             except (json.JSONDecodeError) as e: return msg(FX_ERROR_IO, _('Error parsing JSON: %a'), e)
 
         # Validate data received from json
-        if not isinstance(elist, (list, tuple)):  return msg(FX_ERROR_IO, _('Invalid input: must be a list of dicts!'))
+        if not isinstance(elist, (list, tuple)):  return msg(FX_ERROR_IO, _('Invalid input: must be a list of dicts...'))
         
-        entry = FeedexEntry(self)
-        term = FeedexKwTerm()
-        elist_len = len(elist)
-        now = datetime.now()
-        num_added = 0
-
-
-        entries_sql_q = [] # SQL statemets to be executed, adding entries
-        terms_sql_d = {} # Extracted keywords
-        stats_delta = {} # Marked entry frequencies
-
         if pipe: msg(_('Importing entries ...'))
         else: msg(_('Importing entries from %a...'), efile)
 
-        # Queue processing
-        for i,e in enumerate(elist):
-
-            if not isinstance(e, dict):
-                msg(FX_ERROR_VAL, _('Input entry no. %a is not a dictionary!'), i)
-                continue
-            
-            entry.clear()
-            entry.strict_merge(e)
-
-            entry['id'] = None
-            entry['adddate_str'] = coalesce(entry.get('adddate_str'), now)
-            entry['pubdate_str'] = coalesce(entry.get('pubdate_str'), now)
-
-            err = entry.validate()
-            if err != 0:
-                msg(FX_ERROR_VAL, _('Item %a:'), i)
-                msg(*err)
-                continue
-
-            learn = False
-            read = scast(entry['read'], int, 0)
-            if read > 0: 
-                learn = True
-                stats_delta[entry['feed_id']] = scast(stats_delta.get(entry['feed_id']), int, 0) + read
-
-            err = entry.ling(index=True, rank=True, learn=learn, save_terms=False, counter=i)
-            if err != 0: 
-                self.close_ixer(rollback=True)
-                return msg(FX_ERROR_LP, _('Indexing or LP error in item %a precludes further actions! Aborting!'), i)
-
-            if learn:
-                terms_sql_d[entry['ix_id']] = []
-                for r in entry.terms:
-                    term.strict_merge(r)
-                    terms_sql_d[entry['ix_id']].append(term.tuplify())
-                terms_sql_d[entry['ix_id']] = tuple(terms_sql_d[entry['ix_id']])
-
-            num_added += 1
-            entries_sql_q.append(entry.vals.copy())
-
-
-        if num_added > 0:
-            err = self.run_sql_lock(entry.insert_sql(all=True), entries_sql_q)
-            if err == 0:
-                err = self.close_ixer()
-                if err != 0: # Revert changes to SQL if indexing failed
-                    msg(_('Reverting changes...'))
-                    ix_ids = []
-                    for k in terms_sql_d.keys(): ix_ids.append({'ix_id':k})
-                    err = self.run_sql_lock('delete from entries where ix_id = :ix_id', ix_ids)
-                    if err != 0: return msg(FX_ERROR, _('Error reverting changes! Import failed miserably'))
-                    return FX_ERROR_INDEX
-
-                # Assign context_ids to keywordss and insert them
-                if len(terms_sql_d.keys()) > 0:
-                    
-                    terms_sql_q = []
-
-                    ixs_list = ''
-                    for ix in terms_sql_d.keys(): ixs_list = f"""{ixs_list}{ix},"""
-                    if ixs_list.endswith(','): ixs_list = ixs_list[:-1]
-                    ix_to_ids = self.qr_sql(f'select ix_id, id from entries where ix_id in ({ixs_list})', all=True)
-
-                    for it in ix_to_ids:
-                       ix_id = it[0]
-                       id = it[1]
-                       for r in terms_sql_d[ix_id]:
-                           term.populate(r)
-                           term['context_id'] = id
-                           terms_sql_q.append(term.vals.copy())
-
-                    if len(terms_sql_q) > 0: self.run_sql_lock(term.insert_sql(all=True), terms_sql_q, many=True)
-
-        # stat
-        if num_added > 0:
-            stats_delta['dc'] = num_added
-            #for k,v in stats_delta.items(): print(f"{k}: {v}")
-            self.update_stats(stats_delta, ignore_lock=True)
-            if not fdx.single_run: self.load_terms()
-            msg(_('Added %a new entries from %b items'), num_added, elist_len, log=True)
-        
-        return 0
+        entry = FeedexEntry(self)
+        err = entry.add_many(elist)
+        return err
 
 
 
 
 
 
-    def import_feeds(self, ifile, **kargs): 
-        self.cache_feeds()
-        return self.run_fetch_locked(self._import_feeds, ifile, **kargs)
-    def _import_feeds(self, ifile, **kargs):
+    def import_feeds(self, ifile, **kargs):
         """ Import feeds from JSON file """
+
         feed_data = load_json(ifile, -1)
         if feed_data == -1: return -1
 
         self.cache_feeds()
-        if len(fdx.feeds_cache) == 0: max_id = 0
-        else: max_id = max(map(lambda x: x[0], fdx.feeds_cache))
 
-        if type(feed_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
+        if type(feed_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries'))
 
         feed = FeedexFeed(self)
-        insert_sql = []
-        for i,f in enumerate(feed_data):
-            if type(f) is not dict:
-                msg(FX_ERROR_VAL, _('Invalid input format for item %a. Should be list of dictionaries!'), i)
-                continue
-            feed.clear()
-            feed.strict_merge(f)
-            feed_id = feed['id'] + max_id
-            if scast(feed['parent_id'], int, 0) > 0: parent_id = scast(feed['parent_id'], int, 0) + max_id
-            else: parent_id = None
-            feed['id'] = None
-            feed['parent_id'] = None
-            
-            err = feed.validate()
-            if err != 0:
-                msg(FX_ERROR_VAL, _('Item %a:'), i)
-                msg(*err)
-                continue
-
-            feed['id'] = feed_id
-            feed['parent_id'] = parent_id
-            
-            insert_sql.append(feed.vals.copy())
-
-        if len(insert_sql) > 0:
-            msg(_('Saving feeds to database...'))
-            err = self.run_sql_lock(feed.insert_sql(all=True), insert_sql)
-            if err == 0:
-                if not fdx.single_run: err = self.load_feeds(ignore_lock=True)
-            if err == 0: 
-                return msg(_('Feeds imported successfully!'))
-
-        return 0
+        msg(_('Importing feeds/categories from %a...'), ifile)
+        err = feed.add_many(feed_data)
+        return err
+    
 
 
 
-    def import_rules(self, ifile, **kargs): 
-        self.cache_rules()
-        self.cache_feeds()
-        self.cache_flags()
-        return self.run_fetch_locked(self._import_rules, ifile, **kargs)
-    def _import_rules(self, ifile, **kargs):
+
+    def import_rules(self, ifile, **kargs):
         """ Import rules from JSON """
         rule_data = load_json(ifile, -1)
         if rule_data == -1: return -1
 
-        if type(rule_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
+        if type(rule_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries...'))
 
         rule = FeedexRule(self)
-        insert_sql = []
-        for i,r in enumerate(rule_data):
-            if type(r) is not dict: 
-                msg(FX_ERROR_VAL, _('Invalid input format for item %a. Should be list of dictionaries!'), i)
-                continue
-            rule.clear()
-            rule.strict_merge(r)
-            rule['id'] = None
-            
-            err = rule.validate()
-            if err != 0: 
-                msg(FX_ERROR_VAL, _('Item %a:'), i)
-                msg(*err)
-                continue
-            
-            insert_sql.append(rule.vals.copy())
-
-        if len(insert_sql) > 0:
-            msg(_('Saving rules to database...'))
-            err = self.run_sql_lock(rule.insert_sql(all=True), insert_sql)
-            if err == 0:
-                if not fdx.single_run: err = self.load_rules(ignore_lock=True)
-            if err == 0: 
-                return msg(_('Rules imported successfully!'))
-
-        return 0
+        msg(_('Importing rules from %a...'), ifile)
+        err = rule.add_many(rule_data)
+        return err
 
 
 
-
-    def import_flags(self, ifile, **kargs): 
-        self.cache_flags()
-        return self.run_fetch_locked(self._import_flags, ifile, **kargs)
-    def _import_flags(self, ifile, **kargs):
+    def import_flags(self, ifile, **kargs):
         """ Import flags from JSON """
         
         flag_data = load_json(ifile, -1)
         if flag_data == -1: return FX_ERROR_IO
 
-        if type(flag_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries!'))
+        if type(flag_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries...'))
 
         flag = FeedexFlag(self)
-        insert_sql = []
-        for i,f in enumerate(flag_data):
-            if type(f) is not dict: 
-                msg(FX_ERROR_VAL, _('Invalid input format for item %a. Should be list of dictionaries!'), i)
-                continue
-            flag.clear()
-            flag.strict_merge(f)
-
-            err = flag.validate()
-            if err != 0: 
-                msg(FX_ERROR_VAL, _('Item %a:'), i)
-                msg(*err)
-                continue
-
-            insert_sql.append(flag.vals.copy())
-
-        if len(insert_sql) > 0:
-            msg(_('Saving flags to database...'))
-            err = self.run_sql_lock(flag.insert_sql(all=True), insert_sql)
-            if err == 0:
-                if not fdx.single_run: err = self.load_flags(ignore_lock=True)
-            if err == 0: return msg(_('Flags imported successfully!'))
-
-        return 0
+        msg(_('Importing flags from %a...'), ifile)
+        err = flag.add_many(flag_data)
+        return err
 
 
 
@@ -1192,13 +1137,12 @@ class FeedexDatabase:
 
 
 
-    def fetch(self, **kargs): 
+    def fetch(self, **kargs): return self.run_locked(FX_LOCK_FETCH, self._fetch, **kargs) 
+    def _fetch(self, **kargs):
+        """ Check for news taking into account specified intervals and defaults as well as ETags and Modified tags"""
         self.cache_feeds()
         self.cache_rules()
         self.cache_flags()
-        return self.run_fetch_locked(self._fetch, **kargs) 
-    def _fetch(self, **kargs):
-        """ Check for news taking into account specified intervals and defaults as well as ETags and Modified tags"""
 
         feed_ids = scast(kargs.get('ids'), tuple, None)
         feed_id = scast(kargs.get('id'), int, 0)
@@ -1206,7 +1150,6 @@ class FeedexDatabase:
         force = kargs.get('force', False)
         ignore_interval = kargs.get('ignore_interval', True)
 
-        skip_ling = kargs.get('skip_ling',False)
         update_only = kargs.get('update_only', False)
 
         started_raw = datetime.now()
@@ -1223,201 +1166,113 @@ class FeedexDatabase:
         html_handler = None
         script_handler = None
         
-        entries_sql = []
-        feeds_sql = []
-
-        self.feed = SQLContainer('feeds', FEEDS_SQL_TABLE)
-        self.entry = SQLContainer('entries', ENTRIES_SQL_TABLE)
+        feed = FeedexFeed(self, exists=True)
+        entry = FeedexEntry(self, exists=True)
 
         self.cache_feeds()
 
-        for feed in fdx.feeds_cache:
+        for f in fdx.feeds_cache.copy():
 
-            self.feed.clear()
-            self.feed.populate(feed)
+            feed.populate(f)
 
             # Check for processing conditions...
-            if self.feed['deleted'] == 1 and not update_only and feed_id == 0: continue
-            if self.feed['fetch'] in (None,0) and feed_id == 0 and feed_ids is None: continue
-            if feed_id != 0 and feed_id != self.feed['id']: continue
-            if feed_ids is not None and self.feed['id'] not in feed_ids: continue
-            if self.feed['is_category'] not in (0,None) or self.feed['handler'] in ('local',): continue
+            if feed['deleted'] == 1 and not update_only and feed_id == 0: continue
+            if feed['fetch'] in (None,0) and feed_id == 0 and feed_ids is None: continue
+            if feed_id != 0 and feed_id != feed['id']: continue
+            if feed_ids is not None and feed['id'] not in feed_ids: continue
+            if feed['is_category'] not in (0,None) or feed['handler'] in ('local',): continue
 
             # Ignore unhealthy feeds...
-            if scast(self.feed['error'],int,0) >= self.config.get('error_threshold',5) and not kargs.get('ignore_errors',False):
-                msg(_('Feed %a ignored due to previous errors'), self.feed.name(id=True))
+            if scast(feed['error'],int,0) >= self.config.get('error_threshold',5) and not kargs.get('ignore_errors',False):
+                msg(_('Feed %a ignored due to previous errors'), feed.name(id=True))
                 continue
 
             #Check if time difference exceeds the interval
-            last_checked = scast(self.feed['lastchecked'], int, 0)
+            last_checked = scast(feed['lastchecked'], int, 0)
             if not ignore_interval:
                 diff = (started - last_checked)/60
-                if diff < scast(self.feed['interval'], int, self.config.get('default_interval',45)):
-                    debug(f'Feed {self.feed["id"]} ignored (interval: {self.feed["interval"]}, diff: {diff})')
+                if diff < scast(feed['interval'], int, self.config.get('default_interval',45)):
+                    debug(2, f'Feed {feed["id"]} ignored (interval: {feed["interval"]}, diff: {diff})')
                     continue
 
-            msg(_('Processing %a ...'), self.feed.name())
+            msg(_('Processing %a ...'), feed.name())
 
             now = datetime.now()
             now_raw = int(now.timestamp())
-            last_read = scast(self.feed['lastread'], int, 0)
+            last_read = scast(feed['lastread'], int, 0)
             
             
             # Choose/lazy-load appropriate handler           
-            if self.feed['handler'] == 'rss':
+            if feed['handler'] == 'rss':
                 if rss_handler is None: rss_handler = FeedexRSSHandler(self)
                 handler = rss_handler
-            
-            elif self.feed['handler'] == 'html':
+            elif feed['handler'] == 'html':
                 if html_handler is None: html_handler = FeedexHTMLHandler(self)
                 handler = html_handler
-            
-            elif self.feed['handler'] == 'script':
+            elif feed['handler'] == 'script':
                 if script_handler is None: script_handler = FeedexScriptHandler(self)
                 handler = script_handler
-
-            elif self.feed['handler'] == 'local':
+            elif feed['handler'] == 'local':
                 msg(_('Channel handled locally... Ignoring...'))
                 continue
-            
             else:
-                msg(FX_ERROR_HANDLER, _('Handler %a not recognized!'), self.feed['handler'])
+                msg(FX_ERROR_HANDLER, _('Handler %a not recognized!'), feed['handler'])
                 continue     
 
             # Set up feed-specific user agent
-            if self.feed['user_agent'] not in (None, ''):
-                msg(_('Using custom User Agent: %a'), self.feed['user_agent'])
-                handler.set_agent(self.feed['user_agent'])
+            agent = scast(feed['user_agent'], str, '').strip() 
+            if agent != '':
+                msg(_('Using custom User Agent: %a'), feed['user_agent'])
+                handler.set_agent(agent)
             else: handler.set_agent(None)
 
             # Start fetching ...
             if not update_only:
 
-                pguids = self.qr_sql("""select distinct guid from entries e where e.feed_id = :feed_id""", {'feed_id':self.feed['id']} , all=True)
-                if handler.compare_links: plinks = self.qr_sql("""select distinct link from entries e where e.feed_id = :feed_id""", {'feed_id':self.feed['id']} , all=True, ignore_errors=False)
+                pguids = self.qr_sql("""select distinct guid from entries e where e.feed_id = :feed_id""", {'feed_id':feed['id']} , all=True)
+                if handler.compare_links: plinks = self.qr_sql("""select distinct link from entries e where e.feed_id = :feed_id""", {'feed_id':feed['id']} , all=True, ignore_errors=False)
                 else: plinks = ()
                 
                 if self.status != 0:
-                    msg(FX_ERROR_DB, _('Feed %a ignored due to DB error: %b'), self.feed.name(), self.error, log=True)
+                    msg(FX_ERROR_DB, _('Feed %a ignored due to DB error: %b'), feed.name(), self.error, log=True)
                     continue
 
 
-                handler.set_feed(self.feed)
-                for item in handler.fetch(self.feed, force=force, pguids=pguids, plinks=plinks, last_read=last_read, last_checked=last_checked):
+                handler.set_feed(feed)
+                for item in handler.fetch(force=force, pguids=pguids, plinks=plinks, last_read=last_read, last_checked=last_checked):
                     
-                    if isinstance(item, FeedexEntry):
-                        self.new_items += 1
-                        err = item.validate_types()
-                        if err != 0: 
-                            msg(FX_ERROR_VAL, _('Entry %a (feed: %b) invalid data type: %b'), self.new_items, self.feed.get('url'), err)
-                            continue
-                        
-                        if not skip_ling:
-                            item.set_feed(feed=feed)
-                            err = item.ling(index=True, stats=True, rank=True, learn=False, counter=tech_counter)
-                            if err != 0:
-                                self.DB.close_ixer(rollback=True)
-                                return msg(FX_ERROR_LP, _('Item %a (feed: %b): LP error precludes further actions!'), self.new_items, self.feed.get('url'))
-                            
-                            vals = item.vals.copy()
-                            entries_sql.append(vals)
-                        else:
-                            entries_sql.append(item.vals.copy())
-
-                        # Track new entries and take care of massive insets by dividing them into parts
+                    if isinstance(item, dict):
                         tech_counter += 1
-                        if tech_counter >= self.config.get('max_items_per_transaction', 2000):                            
-                            msg(_('Saving new items ...'))
-                            err = self.run_sql_lock(self.entry.insert_sql(all=True), entries_sql)
-                            if err == 0: 
-                                err = self.close_ixer()                 
-                                if err != 0:
-                                    msg(_('Reverting changes...'))
-                                    ix_ids = []
-                                    for v in entries_sql.values(): ix_ids.append({'ix_id':v.get('ix_id')})
-                                    err = self.run_sql_lock('delete from entries where ix_id = :ix_id', ix_ids)
-                                    if err != 0: return msg(FX_ERROR_DB, _('Error reverting changes! Fetching failed miserably'))
-                                    return FX_ERROR_INDEX
+                        item['note'], item['read'], item['deleted'], item['importance'], item['flag'] = 0, 0, 0, None, None
+                        err = entry.add(item, counter=tech_counter, no_commit=True)
+                        if err == 0: self.new_items += 1
+                        else: return msg(err, _('Fetching aborted due to errors...'))
 
-                            err = self.run_sql_lock("""update feeds set lastread = :now, lastchecked = :now, etag = :etag, modified = :modified, http_status = :status, error = 0  where id = :id""", feeds_sql)
-                            if err == 0:
-                                feeds_sql = []
-                                entries_sql = []
-                            else:
-                                self.close_ixer(rollback=True)
-                                return msg(FX_ERROR_DB, _('Fetching aborted! DB error: %a'), err)
+                        # Commit if batch size is reached
+                        if tech_counter >= self.config.get('max_items_per_transaction', 2000):                      
+                            err = entry.commit()
+                            if err == 0: err = feed.commit()
+                            if err != 0: return msg(err, _('Fetching aborted due to errors...'))
+                            tech_counter = 0
 
-                            tech_counter = 0  
-
-
-             
-
+                    else: 
+                        msg(FX_ERROR_VAL, _('Invalid entry format (%a)!'), type(item))
+                        continue
 
             else:
                 # This bit is if no fetching is done (just meta update)
-                handler.set_feed(self.feed)
+                handler.set_feed(feed)
                 handler.download(force=force)
 
 
-
-            if handler.error:
-                # Save info about errors if they occurred
-                if update_only: err = self.run_sql_lock("""update feeds set http_status = :status, error = coalesce(error,0)+1 where id = :id""", {'status': handler.status, 'id': self.feed['id']} )
-                else: err = self.run_sql_lock("""update feeds set lastchecked = :now, http_status = :status, error = coalesce(error,0)+1 where id = :id""", {'now':now_raw, 'status':handler.status, 'id': self.feed['id']} )
-                if err != 0: return err
-                continue
-
-            else:				
-                #Update feed last checked date and other data
-                if update_only: 
-                    err = self.run_sql_lock("""update feeds set http_status = :status, error = 0  where id = :id""", {'status':handler.status, 'id': self.feed['id']} )
-                    if err != 0: return err
-                else:
-                    feeds_sql.append({'now':now_raw, 'etag':handler.etag, 'modified':handler.modified, 'status':handler.status, 'id':self.feed['id']})
-                
-
-
-            # Inform about redirect
-            if handler.redirected: msg(_('Channel redirected: %a'), self.feed['url'], log=True)
-
-            # Save permanent redirects to DB
-            if handler.feed_raw.get('href',None) != self.feed['url'] and handler.status == 301:
-                self.feed['url'] = rss_handler.feed_raw.get('href',None)
-                if not update_only and kargs.get('save_perm_redirects', self.config.get('save_perm_redirects', False) ):
-                    err = self.run_sql_lock('update feeds set url = :url where id = :id', {'url':self.feed['url'], 'id':self.feed['id']} )    
-                    if err != 0: return err
-
-            # Mark deleted as unhealthy to avoid unnecessary fetching
-            if handler.status == 410 and self.config.get('mark_deleted',False):
-                err = self.run_sql_lock('update feeds set error = :err where id = :id', {'err':self.config.get('error_threshold',5), 'id':self.feed['id']})
-                if err != 0: return err
-
-
+            feed.update_meta_headers(handler.feed_delta, no_commit=True)     
 
             # Autoupdate metadata if needed or specified by 'forced' or 'update_only'
-            if (scast(self.feed['autoupdate'], int, 0) == 1 or update_only) and not handler.no_updates:
+            if (scast(feed['autoupdate'], int, 0) == 1 or update_only) and not handler.no_updates and not handler.error:
+                msg(_('Updating metadata for %a'), feed.name())
+                handler.update_meta()
+                feed.update_meta(handler.feed_meta_delta, no_commit=True)
 
-                msg(_('Updating metadata for %a'), self.feed.name())
-
-                handler.update(self.feed)
-                if not handler.error:
-
-                    updated_feed = handler.feed
-
-                    if updated_feed == -1:
-                        msg(FX_ERROR_HANDLER, _('Error updating metadata for feed %a'), self.feed.name(id=True))
-                        continue
-                    elif updated_feed == 0:
-                        continue
-                    
-                    err = updated_feed.validate_types()
-                    if err != 0: msg(FX_ERROR_VAL, _('Invalid data type: %a'), err)
-                    else:
-                        err = self.run_sql_lock(updated_feed.update_sql(wheres=f'id = :id'), updated_feed.vals)
-                        if err != 0: return err
-        
-                    meta_updated = True
-                    msg(_('Metadata updated for feed %a'), self.feed.name())
 
 
             # Stop if this was the specified feed (i.e. there was a feed specified and a loop was executed)...
@@ -1426,25 +1281,12 @@ class FeedexDatabase:
 
         # Push final entries to DB (the same as when tech_counter hit before)           
         if not update_only:
-            if len(entries_sql) > 0:
-                msg(_('Saving new items ...'))
-                err = self.run_sql_lock(self.entry.insert_sql(all=True), entries_sql)
-                if err == 0: 
-                    err = self.close_ixer()
-                    if err != 0:
-                        msg(_('Reverting changes...'))
-                        ix_ids = []
-                        for v in entries_sql.values(): ix_ids.append({'ix_id':v.get('ix_id')})
-                        err = self.run_sql_lock('delete from entries where ix_id = :ix_id', ix_ids)
-                        if err != 0: return msg(FX_ERROR_DB, _('Error reverting changes! Fetching failed miserably'))
-                        return FX_ERROR_INDEX
-                    
-                    err =  self.run_sql_lock("""update feeds set lastread = :now, lastchecked = :now, etag = :etag, modified = :modified, http_status = :status, error = 0  where id = :id""", feeds_sql)
-                
-                else:
-                    self.close_ixer(rollback=True)
-                    return msg(FX_ERROR_DB,_('Fetching aborted!'))
-
+            err = entry.commit()
+            if err == 0: err = feed.commit()
+            if err != 0: return msg(err, _('Fetching aborted due to errors...'))
+        else:
+            err = feed.commit()
+            if err != 0: return msg(err, _('Operation aborted due to errors...'))
 
 
         # ... finally, do maintenance ....
@@ -1455,7 +1297,6 @@ class FeedexDatabase:
             if err != 0: return err
             elif not fdx.single_run: self.load_fetches()
 
-            if kargs.get('update_stats',True): self.update_stats({'dc':self.new_items})
 
         finished_raw = datetime.now()
         finished = int(finished_raw.timestamp())
@@ -1467,9 +1308,6 @@ class FeedexDatabase:
 
         if not update_only: msg(_('Finished fetching (%a new articles), duration: %b'), self.new_items, duration)
         else: msg(_('Finished updating metadata, duration: %a'), duration)
-
-        del self.__dict__['feed']
-        del self.__dict__['entry']
         
         return 0
 
@@ -1478,139 +1316,78 @@ class FeedexDatabase:
 
 
 
-    def recalculate(self, **kargs): 
+
+
+
+
+
+    def recalculate(self, ids, **kargs): 
         self.cache_feeds()
         self.cache_rules()
         self.cache_flags()        
-        return self.run_fetch_locked(self._recalculate, **kargs)
-    def _recalculate(self, **kargs):
+        return self.run_locked(FX_LOCK_ALL, self._recalculate, ids, **kargs)
+    def _recalculate(self, ids, **kargs):
         """ Utility to recalculate, retokenize, relearn, etc. 
             Useful for mass operations """
-
-        entry_id = scast(kargs.get('id'), int, 0)
-
-        if entry_id == 0:
-            start_id = kargs.get('start_id', 0)
-            if start_id is None: start_id = 0
-            end_id = kargs.get('end_id', None)
-            if end_id is None:
-                end_id = self.get_last_docid()
-                if end_id == -1: return -2
-
-            batch_size = kargs.get('batch_size', None)
-            if batch_size is None: batch_size = self.config.get('max_items_per_transaction', 1000)
-
         learn = kargs.get('learn',False)
         rank = kargs.get('rank',False)
         index = kargs.get('index',False)
 
-        entry = FeedexEntry(self)
-        term = FeedexKwTerm()
-
-        entry_q = []
-        terms_q = []
-        terms_ids_q = []
-
-        vals = {}
-        vs = {}
-
-        if entry_id in (0, None):
+        if type(ids) is str and '..' in ids: 
+            start_id = scast(slist(ids.split('..'), 0, None), int, 0)
+            end_id = scast(slist(ids.split('..'), 1, None), int, self.get_last_docid())
             many = True
-            msg(_("Mass recalculation started..."), log=True)
-            if rank: msg(_("Ranking according to rules..."), log=True)
-            if learn: msg(_("Learning keywords ..."), log=True)
-            if index: msg(_("Indexing ..."), log=True)
-
-            SQL = RECALC_MULTI_SQL
-
-            debug(4, f"Batch size: {batch_size}\nRange: {start_id}..{end_id}")
-        
         else:
+            ids = scast(ids, int, None)
+            if ids is None: return msg(FX_ERROR_VAL, _('Invalid id/ids given! Should be ID or START_ID..END_ID'))
             many = False
-            msg(_("Recalculating entry %a ..."), entry_id)
-            SQL = "select * from entries where id=:id"
-
-            vs = {'id':entry_id}
 
 
+        entry = FeedexEntry(self, exists=True)
 
-        page = 0
-        t_start_id = 0
-        t_end_id = 0
-        stop = False
-        while not stop:
+        if many:
+            batch_size = scast(kargs.get('batch_size'), int, self.config.get('max_items_per_transaction', 1000))
 
-            if many:
+            if rank: msg(_("Reranking entries..."), log=True)
+            if learn: msg(_("Relearning keywords for Entries..."), log=True)
+            if index: msg(_("Reindexing entries..."), log=True)
+        
+            err = 0
+            page = 0
+            t_start_id = 0
+            t_end_id = 0
+            stop = False
+
+            if rank: self.connect_QP() # Needed to bypass lock
+
+            while not stop:
                 t_start_id = start_id + (page * batch_size)
                 page += 1
                 t_end_id = start_id + (page * batch_size)
                 vs = {'start_id':t_start_id, 'end_id':t_end_id}
-                if t_end_id > end_id: stop = True
-            else: stop = True
+                if t_end_id >= end_id:
+                    t_end_id = end_id
+                    stop = True
 
-
-            if many: msg(_('Getting entries...'))
-            entries = self.qr_sql(SQL, vs, all=True)
-            if self.status != 0: return self.status
+                for e in self.qr_sql_iter(RECALC_MULTI_SQL, vs):
+                    entry.populate(e)
+                    if learn: err = entry.relearn(no_commit=True)
+                    elif rank: err = entry.rerank(no_commit=True)
+                    elif index: err = entry.reindex(no_commit=True)
+                if self.status != 0: return self.status
+                err = entry.commit()
+                if err != 0: return msg(err, _('Recalculation aborted due to errors'))
             
-            for i,e in enumerate(entries):
-
-                entry.populate(e)
-    
-                if many and learn and coalesce(entry['read'],0) == 0: continue
-                msg(_(f"Processing entry %a ({entry['read']})..."), entry['id'])
-
-                err = entry.ling(learn=learn, index=index, rank=rank, save_terms=False, multi=True, counter=i, rebuilding=True)
-                if err != 0: 
-                    self.DB.close_ixer(rollback=True) 
-                    return msg(FX_ERROR_LP, _('Error while linguistic processing %a!'), e['id'])
-
-                vals = {'id': entry['id']}
-                if index:
-                    for f in ENTRIES_TECH_LIST: vals[f] = entry[f] 
-                if rank:
-                    vals['importance'] = entry['importance']
-                    vals['flag'] = entry['flag']
-
-                if learn:
-                    for r in entry.terms: terms_q.append(r)
-                    terms_ids_q.append({'id': entry['id']})
-
-                entry_q.append(vals.copy())
-
-
-
-            if len(entry_q) > 0:
-                msg(_('Committing batch ...'))
-                err = self.run_sql_lock(entry.update_sql(filter=vals.keys(), wheres='id = :id'), entry_q)
-                if err != 0: 
-                    self.DB.close_ixer(rollback=True) 
-                    return err
-
-            if learn:
-                msg(_('Learning keywords from batch ...'))
-                if len(terms_ids_q) > 0:
-                    err = self.run_sql_lock('delete from terms where context_id = :id', terms_ids_q)
-                if len(terms_q) > 0:
-                    if err == 0: err = self.run_sql_lock(term.insert_sql(all=True), terms_q)
-                    if err != 0: return err
-
-            if index: self.close_ixer()                   
-
-            entry_q.clear()
-            terms_q.clear()
-            terms_ids_q.clear()
-
-            msg(_('Batch committed'), log=True)
-
-
-        msg(_('Recalculation finished!'), log=True)
-
-        if learn: 
-            if not fdx.single_run: self.load_terms()
-
-        return 0
-
+            msg(_('Recalculation finished!'), log=True)
+            return 0
+        
+        else:
+            err = 0 
+            entry.get_by_id(ids)
+            if learn: err = entry.relearn()
+            elif rank: err = entry.rerank()
+            elif index: err = entry.reindex()
+            return err
 
 
 
@@ -1642,35 +1419,45 @@ class FeedexDatabase:
 
 
 
-    def empty_trash(self, **kargs):
+    def empty_trash(self, **kargs): return self.run_locked((FX_LOCK_FETCH, FX_LOCK_FEED, FX_LOCK_ENTRY,), self._empty_trash, **kargs)
+    def _empty_trash(self, **kargs):
         """ Removes all deleted items permanently """
         # Delete permanently with all data
         terms_deleted = 0
         entries_deleted = 0
         feeds_deleted = 0
         err = self.run_sql_lock(EMPTY_TRASH_TERMS_SQL)
-        terms_deleted = self.rowcount
-        if err == 0:
-            err = self.run_sql_lock(EMPTY_TRASH_ENTRIES_SQL)
-            entries_deleted = self.rowcount
-        if err == 0: err = self.run_sql_lock(EMPTY_TRASH_FEEDS_SQL1)
-        if err == 0:
-            feeds_to_remove = self.qr_sql('select id from feeds where deleted = 1', all=True)
-            if self.status != 0: return self.status
-            for f in feeds_to_remove:
-                self.cache_icons()
-                icon = fdx.icons_cache.get(f)
-                if icon is not None and icon.startswith( os.path.join(self.icon_path, 'feed_') ) and os.path.isfile(icon): os.remove(icon)
-        else: return err
-
-        err = self.run_sql_lock(EMPTY_TRASH_FEEDS_SQL2)
-        feeds_deleted = self.rowcount
         if err != 0: return err
- 
-        if not fdx.single_run: self.load_feeds(ignore_lock=True)
+        terms_deleted = self.rowcount
+
+        entry = FeedexEntry(self, exists=True)
+        for e in self.qr_sql_iter('select * from entries where coalesce(deleted,0) > 0'):
+            entry.populate(e)
+            err = entry._oper(FX_ENT_ACT_DEL_PERM, no_commit=True)
+            if err != 0: return err
+            entries_deleted += 1
+        if self.status != 0: return self.status
+        err = entry.commit()
+        if err != 0: return err
+        
+        feed = FeedexFeed(self, exists=True)
+        for f in fdx.feeds_cache:
+            if scast(f[FEEDS_SQL_TABLE.index('deleted')], int, 0) == 0: continue
+            feed.populate(f)
+            entries_deleted += feed.get_doc_count()
+            err = feed._oper(FX_ENT_ACT_DEL_PERM, no_commit=True)
+            if err != 0: return err
+            feeds_deleted += 1
+        if self.status != 0: return self.status
+        err = feed.commit()
+        if err != 0: return err
 
         return msg(_('Trash emptied: %a channels/categories, %b entries, %c learned keywords removed'), feeds_deleted, entries_deleted, terms_deleted, log=True)
                      
+
+
+
+
 
 
 

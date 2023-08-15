@@ -12,19 +12,13 @@ class FeedexEntry(SQLContainerEditable):
     """ Container for Entries """
 
     def __init__(self, db, **kargs):
-
-        SQLContainerEditable.__init__(self, 'entries', ENTRIES_SQL_TABLE, types=ENTRIES_SQL_TYPES, col_names=ENTRIES_SQL_TABLE_PRINT, **kargs)
-        self.set_interface(db)
-        self.DB.cache_feeds()
-        self.DB.cache_flags()
-
-        self.reindex = False # These flags mark the need to reindex and relearn keywords
-        self.relearn = False
+        SQLContainerEditable.__init__(self, db, FX_ENT_ENTRY, **kargs)
+        self.index = False # These flags mark the need to reindex and relearn keywords
+        self.learn = False
+        self.rank = False
 
         self.feed = ResultFeed()
         self.term = FeedexKwTerm()
-
-        self.immutable = ENTRIES_TECH_LIST
 
         if kargs.get('id') is not None: self.get_by_id(kargs.get('id'))
         elif kargs.get('url') is not None: self.get_by_url(kargs.get('url'))
@@ -41,23 +35,13 @@ class FeedexEntry(SQLContainerEditable):
 
         self.terms = [] # Keywords extracted by LP
 
+        # Queues for mass inserts
+        self.terms_oper_q = []
+        self.reindex_oper_q = []
+        self.context_ids = [] # This are index ids for operating on learned terms
 
 
 
-
-
-
-
-    def get_by_id(self, id:int):
-        id = scast(id, int, -1) 
-        content = self.DB.qr_sql("select * from entries e where e.id = :id", {'id':id}, one=True )
-        if content in (None, (None,), ()):
-            self.exists = False
-            return msg(FX_ERROR_NOT_FOUND, f"""{_('Entry')} %a {_('not found!')}""", id)
-        else:
-            self.exists = True
-            self.populate(content)
-            return 0
 
     def get_by_url(self, url:str):
         url = scast(url, str, -1)
@@ -91,8 +75,20 @@ class FeedexEntry(SQLContainerEditable):
             if feed[self.feed.get_index('id')] != self.feed['id']: self.feed.populate(feed)
         else:
             if self.feed['id'] != self.vals['feed_id']:
-                feed = fdx.find_f_o_c(self.vals['feed_id'], load=True)
+                feed = fdx.load_parent(self.vals['feed_id'])
                 if feed != -1: self.feed.populate(feed)
+
+
+
+    def clear_q(self, **kargs):
+        """ Clear all queues """
+        SQLContainerEditable.clear_q(self, **kargs)
+        self.terms_oper_q.clear()
+        self.reindex_oper_q.clear()
+        self.context_ids.clear()
+
+
+
 
 
 
@@ -103,115 +99,307 @@ class FeedexEntry(SQLContainerEditable):
         if not self.exists: return FX_ERROR_NOT_FOUND
 
         read = coalesce(self.vals['read'],0)
+        link = scast(self.vals.get('link'), str, '').strip()
 
-
-        if self.vals.get('link') is not None:
-
-            now = datetime.now()
-            now_raw = int(now.timestamp())
-            now = now.strftime('%Y-%m-%d %H:%M:%S')
-
-            if read >= 0: err = self.DB.run_sql_lock('update entries set read = coalesce(read,0) + 1, adddate = :now_raw, adddate_str = :now where id = :id', 
-                                                    {'id':self.vals['id'], 'now':now, 'now_raw':now_raw})
-            else: err = self.DB.run_sql_lock('update entries set read = 1, adddate = :now_raw, adddate_str = :now  where id = :id', 
-                                            {'id':self.vals['id'], 'now':now, 'now_raw':now_raw})
-            if err != 0: return FX_ERROR_DB
-
-            self.vals['read'] = read + 1
-            self.vals['adddate'] = now_raw
-            self.vals['adddate_str'] = now
-
+        if link != '':
             err = fdx.ext_open('browser', self.vals.get('link'), background=kargs.get('background',True))
             if err != 0: return err
             else: msg(_('Opening in browser (%a) ...'), self.vals.get('link', '<UNKNOWN>'))
 
-
         else: return msg(FX_ERROR_NOT_FOUND, _('No link found. Aborting...'))
 
+        #now = datetime.now()
+        #now_raw = int(now.timestamp())
+        #now = now.strftime('%Y-%m-%d %H:%M:%S')
+        if coalesce(self.vals['deleted'],0) == 0: err = self.update({'read':read+1}, no_commit=False)
+        return err
 
 
-        if self.config.get('use_keyword_learning', True) and read == 0: learn = True
-        else: learn = False
 
-        # Reindex and learn
-        if learn: msg(_('Reindexing and learning keywords...'))
-        else: msg(_('Reindexing ...'))
+
+
+
+
+
+    def _hook(self, stage, **kargs):
+
+
+        if stage == FX_ENT_STAGE_PRE_VAL:
+
+            if self.action == FX_ENT_ACT_ADD: 
+                self.vals['id'] = None
+                self.vals['read'] = coalesce(self.vals.get('read'), self.config.get('default_entry_weight',2))
+
+            if self.vals.get('feed_id') is not None: pass
+            elif self.vals.get('feed') is not None: self.vals['feed_id'] = scast(self.vals['feed'], int, -1)
+            elif self.vals.get('cat') is not None: self.vals['feed_id'] = fdx.res_cat_name(self.vals['cat'])
+            elif self.vals.get('cat_id') is not None: self.vals['feed_id'] = scast(self.vals['cat_id'], int, -1)
+            elif self.vals.get('parent_id') is not None: self.vals['feed_id'] = scast(self.vals['parent_id'], int, -1)
+
+            if self.vals.get('flag_id') is not None: self.vals['flag'] = scast(self.vals['flag_id'], int, -1)
+            elif self.vals.get('flag') is not None:
+                if type(self.vals['flag']) is str: self.vals['flag'] = fdx.res_flag_name(self.vals['flag'])
+
+            return 0
+
+
+
+        elif stage == FX_ENT_STAGE_POST_VAL:
+            
+            feed = fdx.load_parent(self.vals.get('feed_id'))
+            if feed == -1: return FX_ERROR_VAL, _('Channel/Category %a not found!'), self.vals['feed_id']
+            else: 
+                self.feed.populate(feed)
+                self.vals['feed_id'] = self.feed['id']            
+            
+            if self.vals['flag'] not in (0, None):
+                if not fdx.is_flag(self.vals['flag']): return FX_ERROR_VAL, _('Flag not found!')
+
+            if self.vals.get('link') is not None and not check_url(self.vals.get('link')):
+                return FX_ERROR_VAL, _('Not a valid url! (%a)'), self.vals.get('link', '<???>')
+
+            if self.vals['deleted'] not in (None, 0, 1): return FX_ERROR_VAL, _('Deleted flag must be 0 or 1!')
+            if self.vals['note'] not in (None, 0,1): return FX_ERROR_VAL, _('Note marker must be 0 or 1!')
+            if coalesce(self.vals['read'],0) < 0: return FX_ERROR_VAL, _('Read marker must be >= 0!')
+
+            self.vals['importance'] = coalesce(self.vals.get('importance'),0)
+
+            if self.vals['pubdate'] is None:
+                date = convert_timestamp(self.vals['pubdate_str'])
+                if date is None: return FX_ERROR_VAL, _('Invalid published date string (pubdate_str)!')
+                else: self.vals['pubdate'] = date
+
+            if self.vals['adddate_str'] is not None:
+                date = convert_timestamp(self.vals['adddate_str'])
+                if date is None: return FX_ERROR_VAL, _('Invalid adding date string (%a)!'), self.vals['adddate_str']
+                else: self.vals['adddate'] = date
+            return 0
         
-        err = self.ling(learn=learn, index=True, rank=False, save_terms=learn)
-        if err != 0:
-            self.DB.close_ixer(rollback=True)
-            return err
-        else:
-            self.DB.close_ixer()
-            msg(_('Keywords learned'))
-            err = self.DB.update_stats( {self.vals['feed_id']:1} )
 
-        return err                        
+
+        #####################################################
+        #       Adding
+        if self.action == FX_ENT_ACT_ADD:
 
 
 
+            if stage == FX_ENT_STAGE_INIT_OPER:
+
+                now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                self.vals['id'] = None
+                self.vals['adddate_str'] = now
+                self.vals['pubdate_str'] = coalesce(self.vals.get('pubdate_str', None), now)
+                self.vals['read'] = coalesce(self.vals.get('read'), self.vals['weight'], self.config.get('default_entry_weight',2))
+                self.vals['weight'] = None
+                self.vals['note'] = coalesce(self.vals['note'],1)
+                return 0
 
 
 
 
-    def validate(self, **kargs):
-        """ Field validation """
-        if self.vals['flag'] not in (0,None): self.vals['flag'] = fdx.find_flag(self.vals['flag'])
-        if self.vals['flag'] == -1: return FX_ERROR_VAL, _('Flag not found!')
+            elif stage == FX_ENT_STAGE_PRE_OPER:
+                
+                self.index, self.learn = True, False
 
-        err_fld = self.validate_types()
-        if err_fld != 0: return FX_ERROR_VAL, _('Invalid type for field %a'), err_fld
+                read = scast(self.vals['read'], int, 0)
 
-        if self.vals.get('feed_or_cat') is not None:
-            feed = fdx.find_f_o_c(self.vals.get('feed_or_cat'), load=True)
-            if feed == -1: return FX_ERROR_VAL, _('Channel or Category %a not found!'), self.vals.get('feed_or_cat', '<???>')
-            self.feed.populate(feed)
-            self.vals['feed_id'] = self.feed['id']
+                if self.config.get('use_keyword_learning', True): 
+                    if read > 0: self.learn = True
 
-        elif self.vals.get('feed_id') is not None:
-            feed = fdx.find_f_o_c(self.vals.get('feed_id'), load=True)
-            if feed == -1: return FX_ERROR_VAL, _('Channel or Category %a not found!'), self.vals.get('feed_id', '<???>')
-            self.feed.populate(feed)
-            self.vals['feed_id'] = self.feed['id']
+                if self.vals.get('flag') not in (None, 0) or self.vals.get('importance') not in (None,0): self.rank = False
+                else: self.rank = True
 
-        elif self.vals.get('parent_id') is not None:
-            feed = fdx.find_f_o_c(self.vals.get('parent_id'), load=True)
-            if feed == -1: return FX_ERROR_VAL, _('Channel or Category %a not found!'), self.vals.get('parent_id', '<???>')
-            self.feed.populate(feed)
-            self.vals['feed_id'] = self.feed['id']
+                err = self.ling(index=True, rank=self.rank, learn=self.learn, counter=kargs.get('counter',0))
+                if err != 0:
+                    self.DB.close_ixer(rollback=True)
+                    return err
 
-        elif self.vals.get('parent_category') is not None:
-            feed = fdx.find_category(self.vals.get('parent_category'), load=True)
-            if feed == -1: return FX_ERROR_VAL, _('Category %a not found!'), self.vals.get('parent_category', '<???>')
-            self.feed.populate(feed)
-            self.vals['feed_id'] = self.feed['id']
-
-        else:
-            if self.vals.get('feed') is not None: self.vals['feed_id'] = self.vals.get('feed')
-            feed = fdx.find_feed(self.vals.get('feed_id'), load=True)
-            if feed is None: return FX_ERROR_VAL, _('Every entry needs to be assigned to a Channel or a Category!')
-            if feed == -1: return FX_ERROR_VAL, _('Channel %a not found!'), self.vals['feed_id']
-            self.feed.populate(feed)
-            self.vals['feed_id'] = self.feed['id']
+                self.sd_add('dc', 1)
+                if read > 0: self.sd_add(self.vals['feed_id'], read)
+                return 0
 
 
-        if self.vals.get('link') is not None and not check_url(self.vals.get('link')):
-            return FX_ERROR_VAL, _('Not a valid url! (%a)'), self.vals.get('link', '<???>')
 
-        if self.vals['deleted'] not in (None, 0, 1): return FX_ERROR_VAL, _('Deleted flag must be 0 or 1!')
+            elif stage == FX_ENT_STAGE_POST_OPER:
+
+                if self.learn:
+                    for t in self.terms: self.terms_oper_q.append(t.copy())
+                return 0
+
+
+
+        ####################################################
+        # Updating
+        elif self.action == FX_ENT_ACT_UPD:
+
+
+
+
+            if stage == FX_ENT_STAGE_PRE_OPER:
+                
+                self.learn, self.index = False, False
         
-        if self.vals['note'] not in (None, 0,1): return FX_ERROR_VAL, _('Note marker must be 0 or 1!')
+                for f in self.to_update:
+                    if f in REINDEX_LIST:
+                        self.index = True
+                        break
 
-        if coalesce(self.vals['read'],0) < 0: return FX_ERROR_VAL, _('Read marker must be >= 0!')
+                read = coalesce(self.vals['read'],0)
+                old_read = coalesce(self.backup_vals['read'],0)
+                if read != old_read: self.sd_add(self.vals['feed_id'], read - old_read)
 
-        date = convert_timestamp(self.vals['pubdate_str'])
-        if date is None: return FX_ERROR_VAL, _('Invalid published date string (pubdate_str)!')
-        else: self.vals['pubdate'] = date
+                if self.config.get('use_keyword_learning', True):
+                    if read > 0:
+                        for f in self.to_update:
+                            if f in LING_TEXT_LIST:
+                                self.learn = True
+                                break
+                        if old_read <= 0: self.learn = True
 
-        if self.vals['adddate_str'] is not None:
-            date = convert_timestamp(self.vals['adddate_str'])
-            if date is None: return FX_ERROR_VAL, _('Invalid adding date string (%a)!'), self.vals['adddate_str']
-            else: self.vals['adddate'] = date
+
+                if self.learn or self.index:
+                    err = self.ling(index=self.index, rank=False, learn=self.learn)
+                    if err != 0:
+                        self.restore()
+                        self.DB.close_ixer(rollback=True)
+                        return err
+                return 0
+
+
+
+
+
+
+            elif stage == FX_ENT_STAGE_POST_OPER:
+
+                if self.learn:
+                    for t in self.terms: self.terms_oper_q.append(t.copy())
+                return 0
+
+
+
+        #######################################################
+        # Deleteing
+        elif self.action == FX_ENT_ACT_DEL:
+
+            if stage == FX_ENT_STAGE_POST_OPER:
+                self.DB.connect_ixer()
+                try: ix_doc = self.DB.ixer_db.get_document(self.vals['ix_id'])
+                except (xapian.DocNotFoundError,): ix_doc = None
+                if isinstance(ix_doc, xapian.Document):
+                    uuid = ix_doc.get_data()
+                    try: self.DB.ixer_db.delete_document(f"""UUID {uuid}""")
+                    except xapian.DatabaseError as e:
+                        self.DB.close_ixer(rollback=True)
+                        return msg(FX_ERROR_INDEX, _('Index error: %a'), e)
+
+                self.sd_add('dc', -1)
+                self.sd_add(self.vals['feed_id'], -scast(self.vals.get('read'),int, 0))
+
+                return 0
+
+
+
+        elif self.action == FX_ENT_ACT_RES:
+
+            if stage == FX_ENT_STAGE_POST_OPER:
+                err = self.ling(index=True, rank=False, learn=False)
+                if err != 0:
+                    self.restore()
+                    self.DB.close_ixer(rollback=True)
+                    return err
+
+            self.sd_add('dc', 1)
+            self.sd_add(self.vals['feed_id'], scast(self.vals.get('read'),int, 0))
+
+            return 0
+
+
+
+        elif self.action == FX_ENT_ACT_DEL_PERM:
+            
+            if stage == FX_ENT_STAGE_POST_OPER:
+
+                self.context_ids.append({'context_id':self.vals['id']})
+
+                im_file = os.path.join(self.DB.img_path, f"""{self.vals['id']}.img""")
+                tn_file = os.path.join(self.DB.cache_path, f"""{self.vals['id']}.img""")
+                if os.path.isfile(im_file):
+                    try: os.remove(im_file)
+                    except (OSError, IOError,) as e: msg(FX_ERROR_IO, _('Error removing image %a: %b'), im_file, e)
+                if os.path.isfile(tn_file):
+                    try: os.remove(tn_file)
+                    except (OSError, IOError,) as e: msg(FX_ERROR_IO, _('Error removing thumbnail %a: %b'), tn_file, e)
+
+                return 0
+
+
+        ##################################################
+        #   COMMIT
+        if stage == FX_ENT_STAGE_POST_COMMIT:
+
+            err = self.DB.close_ixer()
+            if err != 0:
+                self.DB.close_ixer(rollback=True)
+                return FX_ERROR_INDEX
+            else:
+                if len(self.reindex_oper_q) > 0:
+                    msg(_('Updating indexed stats...'))
+                    err = self.DB.run_sql_lock(self.update_sql(filter=REINDEX_LIST_RECALC + ('id',), wheres='id = :id'), self.reindex_oper_q)
+                    if err != 0: return err
+
+
+            if err == 0:
+
+                cid_len = len(self.context_ids)
+                if cid_len > 0:
+                    
+                    if self.action == FX_ENT_ACT_ADD:
+
+                        if cid_len == 1 and self.act_singleton and self.last_id not in (0,None,): # For singleton operation we simply update cached terms with last inserted id
+                            cid = self.context_ids[0]
+                            for t in self.terms_oper_q:
+                                if t == cid: t['context_id'] = self.last_id
+
+                        else: # Here starts a switcharoo by getting newly addded entries by ix_ids and then swapping terms context ids for proper ids
+                            id_ixs = self.DB.qr_sql(f'select ix_id, id from entries where e.ix_id in ({ids_cs_string(self.context_ids)})', all=True)
+                            for ii in id_ixs:
+                                ix_id, id = ii[0], ii[1]
+                                for t in self.terms_oper_q:
+                                    if t['context_id'] == ix_id: t['context_id'] = id
+
+                    else:
+
+                        msg(_('Removing old keywords...'))
+                        err = self.DB.run_sql_lock("delete from terms where context_id = :context_id", self.context_ids)
+                        if err != 0: return err
+                        debug(8, 'Keywords removed')
+
+
+
+                    # ... and save new keyword set to database
+                    if len(self.terms_oper_q) > 0:
+                        msg(_('Saving learned keywords...'))
+                        if fdx.debug_level in (1,4): 
+                            for r in self.terms: print(r)
+            
+                        err = self.DB.run_sql_lock(self.term.insert_sql(all=True), self.terms_oper_q)
+                        if err != 0:
+                            self.DB.last_term_id = self.DB.lastrowid
+                            return err
+
+                        debug(8, 'Keyword terms saved')
+            return 0
+
+
+
+
+        if stage == FX_ENT_STAGE_RECACHE:
+            
+            err = 0
+            if self.learn: err = self.DB.load_terms()
+            if err  != 0: return err
+            return 0
 
         return 0
 
@@ -220,275 +408,41 @@ class FeedexEntry(SQLContainerEditable):
 
 
 
-    def do_update(self, **kargs):
-        """ Apply edit changes to DB """
-        if not self.updating: return 0
-        if not self.exists: return FX_ERROR_NOT_FOUND
-
-        stats_delta = {}
-
-        self.vals['adddate_str'] = datetime.now()
-
-        if kargs.get('validate', True): 
-            err = self.validate()
-            if err != 0: 
-                self.restore()
-                return msg(*err)
-
-        if coalesce(self.vals['deleted'],0) == 0 and coalesce(self.backup_vals['deleted'],0) >= 1: 
-            stats_delta['dc'] = 1
-            restoring = True
-        else: 
-            restoring = False
-
-        self.relearn = False
-        self.reindex = False
-        if restoring: self.reindex = True
-
-        err = self.constr_update()
-        if err != 0:
-            self.restore()
-            return err
-
-
-        for f in self.to_update:
-            if f in REINDEX_LIST: self.reindex = True
-            
-        read = coalesce(self.vals['read'],0)
-        old_read = coalesce(self.backup_vals['read'],0)
-
-        if self.config.get('use_keyword_learning', True):
-            if self.reindex and read > 0: self.relearn = True
-            if read > 0 and old_read <= 0: self.relearn = True
-
-        if restoring and read > 0: stats_delta[self.vals['feed_id']] = read
-        elif read != old_read: stats_delta[self.vals['feed_id']] = read - old_read
-
-        if self.relearn or self.reindex:
-            if self.reindex:  msg(_('Reindexing statistics ...'))
-            if self.relearn: msg(_('Extracting and learning keywords ...'))
-
-            err = self.ling(index=self.reindex, rank=False, learn=self.relearn, save_terms=self.relearn)
-            if err != 0:
-                self.restore()
-                self.DB.close_ixer(rollback=True)
-                return err
-
-
-        # Construct second time, to include recalculated fields
-        err = self.constr_update()
-        if err != 0:
-            self.restore()
-            self.DB.close_ixer(rollback=True)
-            return err
-
-        err = self.DB.run_sql_lock(self.to_update_sql, self.filter(self.to_update))
-        if err != 0:
-            self.restore()
-            self.DB.close_ixer(rollback=True)
-            return err
-        else:
-            err = self.DB.close_ixer()
-            if err != 0:
-                self.restore()
-                err = self.DB.run_sql_lock(self.to_update_sql, self.filter(self.to_update))
-                if err != 0: return msg(FX_ERROR_DB, _('Error restoring entry! Update failed miserably'))
-                else: return FX_ERROR_INDEX
-
-
-        if self.DB.rowcount > 0:
-
-            for i,u in enumerate(self.to_update):
-                if u in self.immutable or u == 'id': del self.to_update[i]
-
-            if stats_delta != {}:
-                err = self.DB.update_stats(stats_delta)
-                if err != 0: return err
-
-            if len(self.to_update) > 1: msg(_('Entry %a updated successfuly!'), self.vals['id'], log=True)
-            else:
-                for f in self.to_update:
-                    if f == 'read' and self.vals.get(f,0) > 0: 
-                        msg(_('Entry %a marked as read'), self.vals['id'], log=True)
-                    elif f == 'read' and self.vals.get(f,0) < 0: 
-                        msg(_('Entry %a marked as read'), self.vals['id'], log=True)
-                    elif f == 'read' and self.vals.get(f) in (0, None): 
-                        msg(_('Entry %a marked as unread'), self.vals['id'], log=True)
-                    elif f == 'flag' and self.vals.get(f) in (0,None): 
-                        msg(_('Entry %a unflagged'), self.vals['id'], log=True)
-                    elif f == 'flag' and self.vals.get(f) not in (0, None): 
-                        msg(_('Entry %a flagged'), self.vals['id'], log=True)
-                    elif f == 'deleted' and self.vals.get(f) in (0, None): 
-                        msg(_('Entry %a restored'), self.vals['id'], log=True)
-                    elif f == 'note' and self.vals.get(f) in (0, None): 
-                        msg(_('Entry %a marked as news item'), self.vals['id'], log=True)
-                    elif f == 'note' and self.vals.get(f) == 1: 
-                        msg(_("""Entry %a marked as a user's Note"""), self.vals['id'], log=True)
-                    elif f == 'feed_id': 
-                        msg(_("Entry %a assigned to %b"), self.vals['id'], self.feed.name(with_id=True), log=True)
-                    elif f == 'node_id' and self.vals.get(f) in (0, None): 
-                        msg(_('Entry %a unassigned from node'), log=True)
-                    elif f == 'node_id' and self.vals.get(f) not in (0, None): 
-                        msg(_('Entry %a assigned to entry %b'),self.vals["id"], self.vals['node_id'], log=True)
-                    else:
-                        msg(_("Entry %a updated: %b -> %c"), self.vals['id'], f, self.vals.get(f,_("<NULL>")), log=True)
-            return 0
-
-        else: return msg(_('Nothing done'))
 
 
 
 
-
-    def update(self, idict, **kargs):
-        """ Quick update with a value dictionary"""
-        if not self.exists: return FX_ERROR_NOT_FOUND
-        err = self.add_to_update(idict)
-        if err == 0: err = self.do_update(validate=True)
-        return err
-
-
-
-
-    def delete(self, **kargs):
-        """ Delete from DB with terms if necessary """   
-        if not self.exists: return FX_ERROR_NOT_FOUND
-        id = kargs.get('id', None)
-        if id is not None and self.vals['id'] is None: self.get_by_id(id)
-        id = self.vals.get('id')
-        if id is None: return FX_ERROR_NOT_FOUND
-
-        stats_delta = {}
-
-        if self.vals.get('deleted',0) == 1:
-            err = self.DB.run_sql_multi_lock(
-                ("delete from terms where context_id = :id", {'id':id}),\
-                ("delete from entries where id = :id", {'id':id}) )
-        else:
-            now = datetime.now()
-            now_raw = convert_timestamp(now)
-            self.vals['deleted'] = 1
-            err = self.DB.run_sql_lock("update entries set deleted = 1, adddate = :now_raw, adddate_str = :now where id = :id", {'id':id, 'now':now, 'now_raw':now_raw} )
-            if err == 0:
-                # Remove from index ...
-                self.DB.connect_ixer()
-                try: ix_doc = self.DB.ixer_db.get_document(self.vals['ix_id'])
-                except (xapian.DocNotFoundError,): ix_doc = None
-                if isinstance(ix_doc, xapian.Document):
-                    uuid = ix_doc.get_data()
-                    try: self.DB.ixer_db.delete_document(f"""UUID {uuid}""")
-                    except xapian.DatabaseError as e: 
-                        msg(FX_ERROR_INDEX, _('Index error: %a'), e)
-                        self.DB.close_ixer(rollback=True)
-                        err = self.DB.run_sql_lock("update entries set deleted = 0 where id = :id", {'id':id})
-                        if err != 0: return msg(FX_ERROR_DB, _('Error reverting changes! Delete failed miserably'))
-                
-                err = self.DB.close_ixer()
-                if err != 0:
-                    err = self.DB.run_sql_lock("update entries set deleted = 0 where id = :id", {'id':id})
-                    if err != 0: return msg(FX_ERROR_DB, _('Error reverting changes! Delete failed miserably'))
-            
-            stats_delta['dc'] = -1
-            stats_delta[self.vals['feed_id']] = -coalesce(self.vals['read'],0)
-
-        if err != 0: return err
+    # Messages 
+    def _upd_msg(self, field, **kargs):
+        if field == 'read' and self.vals.get(field, 0) > 0: 
+            return _('Entry %a marked as read'), self.vals['id']
+        elif field == 'read' and self.vals.get(field, 0) < 0: 
+            return _('Entry %a marked as read'), self.vals['id']
+        elif field == 'read' and self.vals.get(field) in (0, None): 
+            return _('Entry %a marked as unread'), self.vals['id']
+        elif field == 'flag' and self.vals.get(field) in (0,None): 
+            return _('Entry %a unflagged'), self.vals['id']
+        elif field == 'flag' and self.vals.get(field) not in (0, None):
+            return _('Entry %a flagged as %b'), self.vals['id'], fdx.get_flag_name(self.vals.get(field))       
+        elif field == 'note' and self.vals.get(field) in (0, None): 
+            return _('Entry %a marked as news item'), self.vals['id']
+        elif field == 'note' and self.vals.get(field) == 1: 
+            return _("""Entry %a marked as a user's note"""), self.vals['id']
+        elif field == 'feed_id':
+            return _("Entry %a assigned to %b"), self.vals['id'], self.feed.name(with_id=True)
+        elif field == 'images':
+            return _("Updated image(s) for entry %a"), self.vals['id']
+        elif field == 'node_id' and self.vals.get(field) in (0, None): 
+            return _('Entry %a unassigned from node')
+        elif field == 'node_id' and self.vals.get(field) not in (0, None): 
+            return _('Entry %a assigned to entry %b'),self.vals["id"], self.vals['node_id']
+        else: return f"""{self.ent_name} %a {_('updated: %b changed to %c')}""", self.vals['id'], self.get_col_name(field), self.vals.get(field,_("<NONE>"))
 
 
-
-        if self.DB.rowcount > 0:
-
-            im_file = os.path.join(self.DB.img_path, f"""{id}.img""")
-            if os.path.isfile(im_file):
-                try: os.remove(im_file)
-                except (OSError, IOError,) as e: msg(FX_ERROR_IO, f"""{_('Error removing image %a')}: {e}""", im_file)
-
-            err = self.DB.update_stats(stats_delta)
-            if err != 0: return err
-
-            if self.vals.get('deleted',0) == 1:
-                self.vals['deleted'] = 2
-                self.exists = False 
-                return msg(_('Entry %a deleted permanently with learned terms'), id, log=True)
-            else:
-                self.vals['deleted'] = 1
-                return msg(_('Entry %a deleted'), id, log=True)
-        else:                
-            return msg(_('Nothing done'))
-
-
-
-
-
-
-
-    def add(self, **kargs):
-        """ Add this entry to database """
-        counter = kargs.get('counter',0)
-
-        idict = kargs.get('new')
-        if idict is not None:
-            self.clear()
-            self.merge(idict)
-
-        now = datetime.now()
-        
-        self.vals['id'] = None
-        self.vals['adddate_str'] = now
-        self.vals['pubdate_str'] = coalesce(self.vals.get('pubdate_str', None), now)
-        self.vals['read'] = coalesce(self.vals.get('read'), self.config.get('default_entry_weight',2))
-        self.vals['note'] = coalesce(self.vals['note'],1)
-
-        if kargs.get('validate',True):
-            err = self.validate()
-            if err != 0: return msg(*err)
-
-        if not self.config.get('use_keyword_learning', True): learn = False
-        elif coalesce(self.vals['read'], 0) > 0: learn = True
-        else: learn = False
-
-        if kargs.get('ling',True):
-            err = self.ling(index=True, rank=True, learn=learn, save_terms=False, counter=counter)
-            if err != 0:
-                self.DB.close_ixer(rollback=True)
-                return err
-
-        else: learn = False
-
-        self.clean()
-        err = self.DB.run_sql_lock(self.insert_sql(all=True), self.vals)
-        if err != 0: 
-            self.DB.close_ixer(rollback=True)
-            return err
-
-        self.vals['id'] = self.DB.lastrowid
-        self.DB.last_entry_id = self.vals['id']
-    
-        err = self.DB.close_ixer()
-        if err != 0:
-            err = self.DB.run_sql_lock('delete from entries where id = :id', {'id':self.vals['id']})
-            if err != 0: return msg(FX_ERROR_DB, _('Could not revert changes! Add failed miserably'))
-            else: return FX_ERROR_INDEX
-
-        if learn:
-            msg(_('Extracting and learning keywords ...'))
-            err = self.save_terms()
-            if err != 0: return msg(FX_ERROR_DB,_('Error saving learned keywords!'))
-            else: msg(_('Keywords learned for entry %a'), self.vals['id'])
-
-        if kargs.get('update_stats',True):
-            stats_delta = { 'dc':1, self.vals['feed_id']:coalesce(self.vals['read'],0) }
-            err = self.DB.update_stats(stats_delta)
-            if err != 0: return err
-
-            if not fdx.single_run: 
-                err = self.DB.load_terms()
-                if err != 0: return msg(FX_ERROR_DB, _('Error reloading learned terms after successfull add!'))
-
-
-        if self.vals['note'] in (0,None): return msg(_('Entry %a added as News item'), self.vals['id'])
-        else: return msg(_('Entry %a added as a Note'), self.vals['id'])
-
-
+    def _upd_msg_generic(self, **kargs): return f"""{self.ent_name} %a {_('updated successfully')}""", self.vals['id']
+    def _add_msg(self, **kargs): return f"""{self.ent_name} %a {_('added successfully')}""", self.vals['id']
+    def _del_msg(self, **kargs): return f"""{self.ent_name} %a {_('deleted successfully')}""", self.vals['id']
+    def _del_perm_msg(self, **kargs): return f"""{self.ent_name} %a {_('deleted permanently')}""", self.vals['id']
 
 
 
@@ -499,7 +453,7 @@ class FeedexEntry(SQLContainerEditable):
 
 
     ###############################################
-    #  Linguistic processing methods
+    #  Linguistic and indexing processing methods
 
     def ling(self, **kargs):
         """ Linguistic processing coordinator """
@@ -507,7 +461,6 @@ class FeedexEntry(SQLContainerEditable):
         learn = kargs.get('learn',False)
         stats = kargs.get('stats',True)
         rank = kargs.get('rank',True)
-        save_terms = kargs.get('save_terms', learn)
         index = kargs.get('index', stats)
         to_disp = kargs.get('to_disp',False)
         counter = kargs.get('counter',0) # Counter for generating UUIDs
@@ -519,7 +472,7 @@ class FeedexEntry(SQLContainerEditable):
         if learn: self.DB.cache_terms()
 
         # Setup language and remember if detection was tried
-        self.vals['lang'] = self.DB.LP.set_model(self.vals['lang'], sample=f"""{self.vals['title']} {self.vals['desc']}"""[:1000])
+        self.vals['lang'] = self.DB.LP.set_model(self.vals['lang'], sample=f"""{self.vals['title']} {self.vals['desc']}  {self.vals['text']} """[:2000])
 
         self.set_feed()
 
@@ -577,11 +530,9 @@ class FeedexEntry(SQLContainerEditable):
             ix_doc.add_boolean_term(f"""UUID {uuid}""")
             # Add feed tag for easier deletes later on
             ix_doc.add_boolean_term(f'FEED_ID {self.vals["feed_id"]}')
-            # ... and other filters
-            ix_doc.add_boolean_term(f"""HANDLER {self.feed.get("handler",'')}""")
-            if coalesce(self.vals["note"],0) >= 1: ix_doc.add_boolean_term(f"""NOTE 1""")
+            if scast(self.vals["note"], int, 0) >= 1: ix_doc.add_boolean_term(f"""NOTE 1""")
             else: ix_doc.add_boolean_term(f"""NOTE 0""")
-            if coalesce(self.vals["read"],0) >= 1: ix_doc.add_boolean_term(f"""READ 1""")
+            if scast(self.vals["read"], int, 0) >= 1: ix_doc.add_boolean_term(f"""READ 1""")
             else: ix_doc.add_boolean_term(f"""READ 0""")
 
             ix_doc.add_value(0, xapian.sortable_serialise(scast(self.vals['pubdate'], int, 0)) )
@@ -619,12 +570,17 @@ class FeedexEntry(SQLContainerEditable):
                 try: self.vals['ix_id'] = self.DB.ixer_db.replace_document(f'UUID {uuid}', ix_doc)
                 except (xapian.DatabaseError, xapian.DocNotFoundError,) as e: 
                     return msg(FX_ERROR_INDEX, _('Index error: %a'), e)
-                debug(2, f'Replaced Xapian doc: {self.vals["ix_id"]}')
+                debug(2, f'Replaced Xapian doc {uuid}: {self.vals["ix_id"]}')
             else:            
                 try: self.vals['ix_id'] = self.DB.ixer_db.add_document(ix_doc)
                 except (xapian.DatabaseError,) as e: 
                     return msg(FX_ERROR_INDEX, _('Index error: %a'), e)
-                debug(2, f"""Added Xapian doc: {self.vals['ix_id']}""")
+                debug(2, f"""Added Xapian doc {uuid}: {self.vals['ix_id']}""")
+
+            self.DB.lastxapdocid = self.vals['ix_id']
+
+            if self.action in (FX_ENT_ACT_UPD, FX_ENT_ACT_RES, FX_ENT_ACT_REINDEX,):
+                self.reindex_oper_q.append(self.filter_cast(self.vals, REINDEX_LIST_RECALC + ('id',)))
 
 
 
@@ -640,20 +596,22 @@ class FeedexEntry(SQLContainerEditable):
             model = self.DB.LP.get_model()
 
             self.terms.clear()
+            if self.action in (FX_ENT_ACT_ADD,):
+                context_id = self.vals['ix_id']
+                self.context_ids.append(context_id)
+            else:
+                context_id = self.vals['id']
+                self.context_ids.append({'context_id':context_id})
+
             for r in terms_tmp:
                 self.term.clear()
                 self.term['term'] = scast(r[2], str, '')
                 self.term['weight'] = scast(r[1], float, 0) #* self.vals['weight']
                 self.term['model'] = model
                 self.term['form'] = scast(r[0], str, '')
-                self.term['context_id'] = self.vals['id']
+                self.term['context_id'] = context_id
 
                 self.terms.append(self.term.vals.copy())
-
-            # Sometimes we need to temporarily skip saving terms to DB
-            if save_terms:
-                err = self.save_terms()
-                if err != 0: return err
         
         return 0
 
@@ -661,23 +619,67 @@ class FeedexEntry(SQLContainerEditable):
 
 
 
-    def save_terms(self, **kargs):
-        """ Save pending learned terms """
-        if fdx.debug_level in (1,4): 
-            for r in self.terms: print(r)
 
-        # ... delete existing keywords for this entry ...
-        err = self.DB.run_sql_lock("delete from terms where context_id = :id", {'id': self.vals['id']} )
-        if err != 0: return err
 
-        # ... and save new keyword set to database
-        err = self.DB.run_sql_lock(self.term.insert_sql(all=True), self.terms)
+
+    def reindex(self, **kargs):
+        """ Reindex this entry """
+        if not self.exists: return FX_ERROR_NOT_FOUND
+        self.action = FX_ENT_ACT_REINDEX
+        no_commit = kargs.get('no_commit', False)
+
+        msg(_('Reindexing %a...'), self.vals['id'])
+        self.index = True
+        err = self.ling(index=self.index, rank=False, learn=False)
         if err != 0: 
-            self.DB.last_term_id = self.DB.lastrowid
+            self.DB.close_ixer(rollback=True)
             return err
 
-        debug(4, 'Keyword terms learned')
-        return 0
+        if no_commit: return 0
+        err = self.commit()
+        if err != 0: return err
+        return msg(_('Entry %a reindexed'), self.vals['id'])
+
+
+    def rerank(self, **kargs):
+        """ Rerank this entry against rules """
+        if not self.exists: return FX_ERROR_NOT_FOUND
+        self.action = FX_ENT_ACT_RERANK
+        no_commit = kargs.get('no_commit', False)
+
+        msg(_('Ranking %a...'), self.vals['id'])
+        self.rank = True
+        err = self.ling(index=False, rank=True, learn=False)
+        if err != 0: return err
+        if self.sql_str is None: self.sql_str = 'update entries set importance = :importance, flag = :flag where id = :id'
+        self.oper_q.append({'importance':self.vals['importance'], 'flag':self.vals['flag'], 'id':self.vals['id']})
+
+        if no_commit: return 0
+        err = self.commit()
+        if err != 0: return err
+        return msg(_('Entry %a reranked'), self.vals['id'])
+
+
+    def relearn(self, **kargs):
+        """ Relearn keywords for this entry """
+        if not self.exists: return FX_ERROR_NOT_FOUND
+        if coalesce(self.vals['read'], 0) == 0: return 0
+        self.action = FX_ENT_ACT_RELEARN
+        no_commit = kargs.get('no_commit', False)
+
+        msg(_('Relearning %a...'), self.vals['id'])
+        self.learn = True
+        err = self.ling(index=False, rank=False, learn=self.learn)
+        if err != 0: return err
+        for t in self.terms: self.terms_oper_q.append(t.copy())
+
+        if no_commit: return 0
+        err = self.commit()
+        if err != 0: return err
+        return msg(_('Keywords relearned for entry %a'), self.vals['id'])
+
+
+
 
 
 

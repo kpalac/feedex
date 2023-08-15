@@ -84,6 +84,6 @@ DROP TABLE rules_tmp;
 delete from terms where term like 'URL:%';
 update terms set term = trim(term), form = trim(form);
 
-update params set val = '1.2.0' where name = 'version';
+update params set val = '1.2.1' where name = 'version';
 
 commit;

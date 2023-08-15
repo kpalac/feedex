@@ -26,9 +26,24 @@ if PLATFORM == 'linux':
     FEEDEX_SYS_SHARED_PATH = '/usr/share/feedex'
     FEEDEX_SHARED_PATH = os.environ['HOME'] + '/.local/share/feedex'
 
-    # Paths
     APP_PATH = '/usr/bin'
     FEEDEX_DEFAULT_BROWSER = 'xdg-open %u'
+    FEEDEX_DEFAULT_IM_VIEWER = 'xdg-open %u'
+
+
+elif PLATFORM == 'win32':
+
+    FEEDEX_SHARED_PATH = os.path.join(os.getenv('LOCALAPPDATA'), 'feedex')
+    FEEDEX_CONFIG = os.path.join(FEEDEX_SHARED_PATH, 'feedex.conf')
+
+    APP_PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
+    FEEDEX_SYS_SHARED_PATH = APP_PATH
+    FEEDEX_SYS_CONFIG = os.path.join(FEEDEX_SHARED_PATH, 'data', 'examples', 'config_win32')
+
+    FEEDEX_DEFAULT_BROWSER = 'START %u'
+    FEEDEX_DEFAULT_IM_VIEWER = 'START %u'
+
+
 
 FEEDEX_SYS_ICON_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','pixmaps')
 FEEDEX_MODELS_PATH = os.path.join(FEEDEX_SYS_SHARED_PATH,'data','models')
@@ -181,7 +196,11 @@ order by weight desc
 
 LOAD_TERMS_LONG_SQL="""
 select
-t.*
+t.term,
+t.weight,
+t.model,
+t.form,
+e.id as context_id
 from terms t
 join entries e on e.id = t.context_id
 join feeds f on f.id = e.feed_id
@@ -196,7 +215,8 @@ RESULTS_COLUMNS_SQL="""e.*,
 coalesce(nullif(e.deleted,0), f.deleted, 0) as is_deleted, f.name || ' (' || f.id || ')' as feed_name_id, 
 f.name as feed_name, datetime(e.pubdate,'unixepoch', 'localtime') as pubdate_r, strftime('%Y.%m.%d', date(e.pubdate,'unixepoch', 'localtime')) as pudbate_short, 
 coalesce( nullif(fl.name,''), fl.id) as flag_name, f.user_agent as user_agent,
-coalesce(c.id, f.id) as parent_id, coalesce(c.name, c.title, c.id) as parent_name
+coalesce(c.id, f.id) as parent_id, coalesce(c.name, c.title, c.id) as parent_name,
+f.location as location
 from entries e 
 left join feeds f on f.id = e.feed_id
 left join feeds c on c.id = f.parent_id
@@ -204,13 +224,9 @@ left join flags fl on fl.id = e.flag"""
 
 
 EMPTY_TRASH_TERMS_SQL = """delete from terms where context_id in
-( select e.id from entries e where e.deleted = 1 or e.feed_id in 
-( select f.id from feeds f where f.deleted = 1)  )"""
+( select e.ix_id from entries e where coalesce(e.deleted,0) > 0 or e.feed_id in 
+( select f.id from feeds f where coalesce(f.deleted,0) > 0)  )"""
 
-EMPTY_TRASH_ENTRIES_SQL = """delete from entries where deleted = 1 or feed_id in ( select f.id from feeds f where f.deleted = 1)"""
-
-EMPTY_TRASH_FEEDS_SQL1 = """update feeds set parent_id = NULL where parent_id in ( select f1.id from feeds f1 where f1.deleted = 1)"""
-EMPTY_TRASH_FEEDS_SQL2 = """delete from feeds where deleted = 1"""
 
 SEARCH_HISTORY_SQL = """
 select string,
@@ -237,6 +253,77 @@ and e.id <= :end_id
 order by e.id ASC
 """
 
+# Main entities
+FX_ENT_ENTRY = 1
+FX_ENT_FEED = 2
+FX_ENT_RULE = 3
+FX_ENT_FLAG = 4
+FX_ENT_QUERY = 5
+FX_ENT_QUERY_RES = 6
+FX_ENT_CAT_ITEM = 7
+
+# Additional ents.
+FX_ENT_CONTEXT = 8
+FX_ENT_TERM = 9
+FX_ENT_KW_TERM = 10
+FX_ENT_TS = 11
+FX_ENT_FETCH = 12
+FX_ENT_HISTORY = 13
+FX_ENT_DB_STATS = 14
+
+FX_ENTITIES = (FX_ENT_ENTRY, FX_ENT_FEED, FX_ENT_FLAG, FX_ENT_RULE, FX_ENT_QUERY, FX_ENT_CAT_ITEM,
+               FX_ENT_CONTEXT, FX_ENT_TERM, FX_ENT_KW_TERM, FX_ENT_TS, FX_ENT_FETCH, FX_ENT_HISTORY, 
+               FX_ENT_DB_STATS,)
+
+
+# Action codes
+FX_ENT_ACT_ADD = 1
+FX_ENT_ACT_DEL = 2
+FX_ENT_ACT_DEL_PERM = 3
+FX_ENT_ACT_UPD = 4
+FX_ENT_ACT_RES = 5
+FX_ENT_ACT_REINDEX = 6
+FX_ENT_ACT_RELEARN = 7
+FX_ENT_ACT_RERANK = 8
+FX_ACTIONS = (FX_ENT_ACT_ADD, FX_ENT_ACT_UPD, FX_ENT_ACT_DEL, FX_ENT_ACT_DEL_PERM, FX_ENT_ACT_RES,)
+# Query codes
+FX_ENT_QR_BASE = 1
+FX_ENT_QR_RECOM = 2
+FX_ENT_QR_TRENDING = 3
+FX_ENT_QR_TS = 4
+FX_ENT_QR_SIMILAR = 5
+FX_ENT_QR_RIT = 6
+FX_ENT_QR_TERM_NET = 7
+FX_ENT_QR_TRENDS = 8
+FX_ENT_QR_CONTEXT = 9
+FX_ENT_QR_META_FEEDS = 10
+FX_ENT_QR_META_FED_TREE = 11
+FX_ENT_QR_META_RULES = 12
+FX_ENT_QR_META_FLAGS = 14
+FX_ENT_QR_META_KW_TERMS = 15
+FX_ENT_QR_META_FETCHES = 16
+FX_ENT_QR_META_HISTORY = 17
+
+# Action stages codes (for hooks)
+FX_ENT_STAGE_PRE_VAL = 1
+FX_ENT_STAGE_POST_VAL = 2
+FX_ENT_STAGE_PRE_OPER = 3
+FX_ENT_STAGE_POST_OPER = 4
+FX_ENT_STAGE_PRE_COMMIT = 5
+FX_ENT_STAGE_POST_COMMIT = 6
+FX_ENT_STAGE_RECACHE = 7
+FX_ENT_STAGE_INIT_OPER = 8
+
+# Lock codes
+FX_LOCK_FETCH = 1
+FX_LOCK_ENTRY = 2
+FX_LOCK_FEED = 3
+FX_LOCK_RULE = 4
+FX_LOCK_FLAG = 5
+FX_LOCK_ALL = 6
+
+# Main bus action codes (must not conflict with other actions)
+FX_ACTION_HANDLE_REQUEST = 100
 
 
 def n_(arg): return arg # ... to facilitate localization
@@ -255,16 +342,16 @@ ENTRIES_SQL_TABLE_PRINT = (n_("ID"), n_("Source/Category"), n_("Character encodi
                                   n_("Parent Node ID"), n_("Order within a Node"), n_("Index ID"))
 
 
-RESULTS_SQL_TABLE                = ENTRIES_SQL_TABLE + ("is_deleted", "feed_name_id", "feed_name", "pubdate_r", "pubdate_short", "flag_name", "user_agent", "parent_id", "parent_name", 
+RESULTS_SQL_TABLE                = ENTRIES_SQL_TABLE + ("is_deleted", "feed_name_id", "feed_name", "pubdate_r", "pubdate_short", "flag_name", "user_agent", "parent_id", "parent_name", "location",
                                                         "sdeleted", "snote", "sread", "snippets", "rank", "count", "is_node", "children_no")
-RESULTS_SQL_TYPES                = ENTRIES_SQL_TYPES + (int, str, str,   str, str,   str,   str,   int, str,  str,str,str,   tuple, float, int, int, int)
-RESULTS_SQL_TABLE_PRINT          = ENTRIES_SQL_TABLE_PRINT + (n_("Is Deleted?"), n_("Source (ID)"), n_("Source"), n_("Published - Timestamp"), n_("Date"), n_("Flag name"), n_("User Agent"), n_("Parent Category ID"), n_("Parent Category"), 
+RESULTS_SQL_TYPES                = ENTRIES_SQL_TYPES + (int, str, str,   str, str,   str,   str,   int, str, str,  str,str,str,   tuple, float, int, int, int)
+RESULTS_SQL_TABLE_PRINT          = ENTRIES_SQL_TABLE_PRINT + (n_("Is Deleted?"), n_("Source (ID)"), n_("Source"), n_("Published - Timestamp"), n_("Date"), n_("Flag name"), n_("User Agent"), n_("Parent Category ID"), n_("Parent Category"), n_('Location'),
                                                               n_("Deleted?"), n_("Note?"), n_("Read/Marked?"),n_("Snippets"), n_("Rank"), n_("Count"), n_("Node?"), n_("Number of Children"))
 
 LING_TEXT_LIST = ('title','desc','tags','category','text', 'author', 'publisher', 'contributors')
 REINDEX_LIST = LING_TEXT_LIST + ('adddate','pubdate','feed_id','flag','read','note','deleted','handler')
 ENTRIES_TECH_LIST = ('sent_count','word_count','char_count','polysyl_count','com_word_count','numerals_count','caps_count','readability','weight', 'adddate','adddate_str','ix_id')
-
+REINDEX_LIST_RECALC = ('sent_count','word_count','char_count','polysyl_count','com_word_count','numerals_count','caps_count','readability', 'weight', 'ix_id',)
 
 
 RESULTS_SHORT_PRINT             = ("id", "feed_name_id", "pubdate_short", "title", "desc", "text", "author", "link", "pubdate_r", "sread", "flag_name", 
@@ -288,11 +375,11 @@ FEEDS_SQL_TABLE       =  ('id','charset','lang','generator','url','login','domai
                                 'autoupdate','http_status','etag','modified','version','is_category','parent_id', 'handler','deleted', 'user_agent', 'fetch',
                                 'rx_entries','rx_title', 'rx_link', 'rx_desc', 'rx_author', 'rx_category', 'rx_text', 'rx_images', 'rx_pubdate', 
                                 'rx_pubdate_feed', 'rx_image_feed', 'rx_title_feed', 'rx_charset_feed', 'rx_lang_feed',
-                                'script_file', 'icon_name', 'display_order', 'recom_weight')
+                                'script_file', 'icon_name', 'display_order', 'recom_weight', 'location')
 FEEDS_SQL_TYPES = (int,  str, str, str, str, str,str, str, str, str, str,str, str, str, str, str,str, str, str, str, str, str, str,
                   int, int, int,   str, str, str, str,   int, int,    str, int,     str, int,
                   str, str, str, str, str, str, str, str, str, str, str, str, str, str,
-                  str, str, int, int)
+                  str, str, int, int, str)
 FEEDS_SQL_TABLE_PRINT = (n_("ID"), n_("Character encoding"), n_("Language"), n_("Feed generator"), n_("URL"), n_("Login"), n_("Domain"), n_("Password"), n_("Authentication method"), n_("Author"), n_("Author - contact"),
                                 n_("Publisher"), n_("Publisher - contact"), n_("Contributors"), n_("Copyright"), n_("Home link"), n_("Title"), n_("Subtitle"), n_("Category"), n_("Tags"), n_("Name"), n_("Last read date (Epoch)"),
                                 n_("Last check date (Epoch)"), n_("Update interval"), n_("Errors"), n_("Autoupdate?"), n_("Last connection HTTP status"), n_("ETag"), n_("Modified tag"), n_("Protocol version"), n_("Is category?"), 
@@ -300,30 +387,34 @@ FEEDS_SQL_TABLE_PRINT = (n_("ID"), n_("Character encoding"), n_("Language"), n_(
                                 n_("Entries REGEX (HTML)"), n_("Title REGEX (HTML)"), n_("Link REGEX (HTML)"), n_("Description REGEX (HTML)"), n_("Author REGEX (HTML)"), n_("Category REGEX (HTML)"), 
                                 n_("Additional Text REGEX (HTML)"), n_("Image extraction REGEX (HTML)"), n_("Published date REGEX (HTML)"),
                                 n_("Published date - Feed REGEX (HTML)"), n_("Image/Icon - Feed REGEX (HTML)"), n_("Title REGEX - Feed (HTML)"), n_("Charset REGEX - Feed (HTML)"), 
-                                n_("Lang REGEX - Feed (HTML)"), n_("Script file"), n_("Icon name"), n_("Display Order"), n_('Recomm. Weight'))
+                                n_("Lang REGEX - Feed (HTML)"), n_("Script file"), n_("Icon name"), n_("Display Order"), n_('Recomm. Weight'), n_('Location'))
 
-FEEDS_SQL_TABLE_RES = FEEDS_SQL_TABLE + ('parent_category_name','sdeleted', 'sautoupdate', 'is_node','children_no')
-FEEDS_SQL_TYPES_RES = FEEDS_SQL_TYPES + (str,   str,str,   int, int)
-FEEDS_SQL_TABLE_RES_PRINT = FEEDS_SQL_TABLE_PRINT + (n_('Parent Category Name'), n_('Deleted?'), n_('Autoupdate?'), n_('Node?'), n_('Number of Children'))
+FEEDS_HEADERS = ('http_status', 'error', 'etag', 'modified', 'lastread', 'lastchecked',)
+FEEDS_INFO = ('charset', 'lang', 'generator', 'author', 'author_contact', 'publisher', 'publisher_contact', 'contributors', 'category', 'copyright', 'tags')
+FEEDS_META = ('link', 'charset', 'lang', 'generator', 'author', 'author_contact', 'publisher', 'publisher_contact', 'contributors', 'title', 'subtitle', 'category', 'copyright', 'tags', 'name', 'version')
+
+FEEDS_SQL_TABLE_RES = FEEDS_SQL_TABLE + ('parent_category_name','sdeleted', 'sautoupdate', 'sfetch', 'is_node','children_no')
+FEEDS_SQL_TYPES_RES = FEEDS_SQL_TYPES + (str,   str,str,str,   int, int)
+FEEDS_SQL_TABLE_RES_PRINT = FEEDS_SQL_TABLE_PRINT + (n_('Parent Category Name'), n_('Deleted?'), n_('Autoupdate?'), n_('Fetch?'), n_('Node?'), n_('Number of Children'))
 
 
 FEEDS_REGEX_HTML_PARSERS = ('rx_entries','rx_title', 'rx_link', 'rx_desc', 'rx_author', 'rx_category', 'rx_text', 'rx_images', 'rx_pubdate', 'rx_pubdate_feed', 'rx_image_feed','rx_title_feed', 'rx_charset_feed', 'rx_lang_feed')
 
 
-FEEDS_SHORT_PRINT      = ("id", "name", "title", "subtitle", "category", "tags", "publisher", "author", "link", "url", "parent_category_name", "sdeleted", "sautoupdate", "user_agent", "fetch", "display_order")
+FEEDS_SHORT_PRINT      = ("id", "name", "title", "subtitle", "category", "tags", "publisher", "author", "link", "url", "location", "parent_category_name", "sdeleted", "sautoupdate", "user_agent", "sfetch")
 CATEGORIES_PRINT       = ("id", "name", "subtitle","sdeleted", "children_no", "icon_name")
 
 
 
 
 
-RULES_SQL_TABLE =        ('id','name','type','feed_id','field_id','string','case_insensitive','lang','weight','additive','flag')
+RULES_SQL_TABLE =        ('id','name','type','feed_id','field','string','case_insensitive','lang','weight','additive','flag')
 RULES_SQL_TYPES = (int, str, int, int, str,   str, int, str,    float, int, int)
-RULES_SQL_TABLE_PRINT =  (n_('ID'), n_('Name'), n_('Type'),n_('Feed ID'), n_('Field ID'), n_('Search string'), n_('Case insensitive?'), n_('Language'), n_('Weight'), n_('Additive?'), n_('Flag') )
+RULES_SQL_TABLE_PRINT =  (n_('ID'), n_('Name'), n_('Type'),n_('Feed ID'), n_('Search field'), n_('Search string'), n_('Case insensitive?'), n_('Language'), n_('Weight'), n_('Additive?'), n_('Flag') )
 
 RULES_SQL_TABLE_RES = RULES_SQL_TABLE + ('flag_name', 'feed_name', 'field_name', 'query_type', 'matched', 'scase_insensitive', 'sadditive')
 RULES_SQL_TYPES_RES = RULES_SQL_TYPES + (str, str, str, str, int,   str,str)
-RULES_SQL_TABLE_RES_PRINT = RULES_SQL_TABLE_PRINT + (n_('Flag name'), n_('Feed/Category name'), n_('Field name'), n_('Query Type'), n_('No. of matches'), n_('Case Insensitive?'), n_('Additive?'),)
+RULES_SQL_TABLE_RES_PRINT = RULES_SQL_TABLE_PRINT + (n_('Flag name'), n_('Feed/Category name'), n_('Search field name'), n_('Query Type'), n_('No. of matches'), n_('Case Insensitive?'), n_('Additive?'),)
 
 PRINT_RULES_SHORT = ("id", "name", "string", "weight", "scase_insensitive", "query_type", "flag_name", "flag", "field_name", "feed_name",)
 PRINT_RULES_FOR_ENTRY = ("name", "string", "matched", "weight", "scase_insensitive", "query_type", "flag_name", "flag", "field_name", "feed_name",)
@@ -371,6 +462,17 @@ FEEDEX_CATALOG_TABLE_NAMES = (n_('ID'), _('Name'), _('Description'), _('Link'), 
 FEEDEX_CATALOG_TABLE_TYPES = (int,  str, str,str, str, str, str, str, str, str,      int, dict, int, str,      int, int,)
 FEEDEX_CATALOG_TABLE_SHORT = ('id', 'name', 'desc', 'link_home', 'link_res', 'location', 'freq', 'rank',)
 
+# DB Stats
+FEEDEX_DB_STATS = ('db_path','version', 'db_size', 'ix_size', 'cache_size', 'total_size', 
+                   'doc_count', 'last_doc_id', 'rule_count', 'learned_kw_count', 'feed_count', 'cat_count',
+                   'last_update', 'first_update', 'fetch_lock', 'due_maint',
+                   'db_size_raw', 'ix_size_raw', 'cache_size_raw', 'total_size_raw',)
+FEEDEX_DB_STATS_TYPES = (str, str,  str, str, str, str,  int, int, int, int, int, int,   str, str,  bool, bool,
+                         int, int, int, int)
+FEEDEX_DB_STATS_PRINT = (_('Database location'), _('FEEDEX version'), _('Main database size'), _('Index size'),_('Cache size'), _('Total size'), 
+                         _('Entry count'), _('Last entry ID'), _('Rule count'),_('Learned terms count'), _('Feed count'), _('Category count'),
+                        _('Last news update'), _('First news update'), _('Fetch locked?'), _('Due Maintenance?'),
+                        _('Main database size (bytes)'), _('Index size (bytes)'),_('Cache size (bytes)'), _('Total size (bytes)'))
 
 
 
@@ -446,156 +548,115 @@ if PLATFORM == 'linux':
     'LIGHT_RED_BOLD' : '\033[1;91m'
     }
 
+elif PLATFORM == 'win32':
+
+    TCOLS = {
+    'DEFAULT'    : '\033[0m',
+    'WHITE'      : '\033[0;37m',
+    'WHITE_BOLD' : '\033[1;37m',
+    'YELLOW'     : '\033[0;33m',
+    'YELLOW_BOLD': '\033[1;33m',
+    'CYAN'       : '\033[0;36m',
+    'CYAN_BOLD'  : '\033[1;36m',
+    'BLUE'       : '\033[0;34m',
+    'BLUE_BOLD'  : '\033[1;34m',
+    'RED'        : '\033[0;31m',
+    'RED_BOLD'   : '\033[1;31m',
+    'GREEN'      : '\033[0;32m',
+    'GREEN_BOLD' : '\033[1;32m',
+    'PURPLE'     : '\033[0;35m',
+    'PURPLE_BOLD': '\033[1;35m',
+    'LIGHT_RED'  : '\033[0;91m',
+    'LIGHT_RED_BOLD' : '\033[1;91m'
+    }
+
+
 
 
 TERM_NORMAL = TCOLS['DEFAULT']
 TERM_BOLD   = TCOLS['WHITE_BOLD']
+TERM_EMPH   = TCOLS['YELLOW_BOLD']
 TERM_ERR = TCOLS['LIGHT_RED']
 TERM_ERR_BOLD = TCOLS['LIGHT_RED_BOLD']
 
-TERM_FLAG = TCOLS['YELLOW_BOLD']
-TERM_READ = TCOLS['WHITE_BOLD']
-TERM_DELETED = TCOLS['RED']
-TERM_SNIPPET_HIGHLIGHT = TCOLS['CYAN_BOLD']
 
-BOLD_MARKUP_BEG = '<b>'
-BOLD_MARKUP_END = '</b>'
+FEEDEX_CONFIG_LIST = (
+('profile_name',        _('Profile Name'),          str, '',    None),
+('log',                 _('Log File'),              str, os.path.join(FEEDEX_SHARED_PATH, 'feedex.log'),  None),
+('db_path',             _('Path to DB'),            str, os.path.join(FEEDEX_SHARED_PATH, 'feedex.db'),    ('nn',)),
+('lang',                _('Language'),              str, 'en',   None),
+('browser',             _('WWW Browser'),           str, FEEDEX_DEFAULT_BROWSER,    None),
+('user_agent',          _('Def. User Agent'),       str, FEEDEX_USER_AGENT,   None),
+('fallback_user_agent', _('Fallback User Agent'),   str, None,   None),
+('timeout',             _('DB Timeout'),            int, 240,   (('gt',0),) ),
+('fetch_timeout',       _('Fetching Oper. Timeout'),      int, 20,   (('gt',0),) ),
+('default_interval',    _('Default News Check Interval'), int, 45,   (('gt',0),) ),
+('error_threshold',     _('Feed Error Limit'),            int, 5,   (('ge',0),) ),
+('max_items_per_transaction', _('Max Items per Transaction'), int, 2000,   (('gt',0),) ),
 
+('use_keyword_learning',_('Use Keyword Learning'),   bool, True,  None ),
+('recom_algo',          _('Recomm. Algorithm'),      int, 1,   (('in', (1,2,3)),) ),
+('recom_limit',         _('Recomm. Term Limit'),     int, 200,   (('gt',0),) ),
+('no_history',          _('No Search History'),      bool, False,  None ),
 
-DEFAULT_CONFIG = {
-            'profile_name' : '',
-            'log' : os.path.join(FEEDEX_SHARED_PATH, 'feedex.log'), 
-            'db_path' : os.path.join(FEEDEX_SHARED_PATH, 'feedex.db'),
-            'browser' : FEEDEX_DEFAULT_BROWSER,
-            'lang' : 'en',
-            'user_agent' : FEEDEX_USER_AGENT,
-            'fallback_user_agent' : None, 
-            'timeout' : 120,
-            'fetching_timeout' : 20,
-            'default_interval': 45,
-            'error_threshold': 5,
-            'max_items_per_transaction': 300,
-            'use_keyword_learning' : True,
-            'recom_algo' : 1,
-            'recom_limit' : 200,
-            'no_history': False,
-            'default_entry_weight' : 2,
-            'default_rule_weight' : 2,
-            'query_rule_weight' : 10,
-            'default_similarity_limit' : 20,
-            'default_depth' : 5,
-            'do_redirects' : True,
-            'save_perm_redirects': False,
-            'mark_deleted' : False,
-            'ignore_modified': True,
-            
-            'gui_desktop_notify' : True, 
-            'gui_fetch_periodically' : False,
-            'gui_notify_group': 'feed',
-            'gui_notify_depth': 5,
-
-            'gui_new_color' : '#0FDACA',
-            'gui_deleted_color': 'grey',
-            'gui_hilight_color' : 'blue',
-            'gui_default_flag_color' : 'blue',
-
-            'gui_layout' : 0,
-            'gui_orientation' : 0,
-
-            'window_name_exclude' : 'Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird',
-
-            'imave_viewer': '',
-            'search_engine': 'https://duckduckgo.com/?t=ffab&q=%Q&ia=web',
-            'gui_clear_cache' : 30,
-
-            'gui_key_new_entry': 'n',
-            'gui_key_new_rule': 'r',
-            'gui_key_add': 'a',
-            'gui_key_edit': 'e',
-            'gui_key_search' : 's',
-
-            'normal_color' : 'DEFAULT',
-            'bold_color': 'WHITE_BOLD',
-            'bold_markup_beg': '<b>',
-            'bold_markup_end': '</b>'
+('default_entry_weight',_('Default New Note Weight'),int, 2,   (('ge',0),) ),
+('default_rule_weight', _('Default New Rule Weight'),int, 2,   (('ge',0),) ),
+('default_similar_weight',_('Weight to add during Simil. Query'),int, 0,   (('ge',0),) ),
+('default_similarity_limit',_('Default Limit for Simil. Query'),int, 20,   (('ge',0),) ),
+('default_depth',       _('Default Query Depth'),    int, 10,   (('gt',0),) ),
+('default_page_len',    _('Default Page Length'),    int, 3000,   (('gt',0),) ),
+('max_context_length',  _('Max Context Length'),     int, 70,   (('gt',0),) ),
 
 
-}
+('do_redirects',        _('Follow Link Redirects?'),  bool, True,  None ),
+('save_perm_redirects', _('Save Perm. Link Redirects?'),   bool, False,  None ),
+('mark_deleted',        _('Mark unhealthy Feeds as deleted?'),   bool, False,  None ),
+('ignore_modified',     _('Ignore MODIFIED and ETag?'),    bool, True,  None ),
 
-CONFIG_NAMES = {
-            'profile_name' : _('Profile name'),
-            'log' : _('Log file'),
-            'db_path' : _('Feedex database'),
-            'browser' : _('Browser command'),
-            'lang' : _('Language'),
-            'user_agent': _('User Agent String'),
-            'fallback_user_agent': _('Fallback User Agt.'),
-            'timeout' : _('Database timeout'),
-            'fetching timeout' : _('Fetching timeout'),
-            'default_interval': _('Default Channel check interval'),
-            'error_threshold': _('Channel error threshold'),
-            'max_items_per_transaction': _('Max items for a single transaction'),
-            'recom_limit' : _('Limit for recommendation queries'),
-            'use_keyword_learning' : _('Use keyword learning'),
-            'recom_algo' : _('Recommendation algorithm'),
-            'no_history' : _('Do not save queries in History'),
-            'default_entry_weight' : _('Default Entry weight'),
-            'default_rule_weight' : _('Default Rule weight'),
-            'query_rule_weight' : _('Default Rule wieght (query)'),
-            'default_similarity_limit' : _('Max similar items'),
-            'default_depth' : _('Default grouping depth'),
-            'do_redirects' : _('Do HTTP redirects'),
-            'save_perm_redirects' : _('Save permanent HTTP redirects'),
-            'mark_deleted' : _('Mark deleted RSS channels as unhealthy'),
-            'do_redirects' : _('Do HTTP redirects'),
+('gui_desktop_notify',  _('Notify on Fetched News?'), bool, True,  None ),
+('gui_fetch_periodically',_('Fetch periodicallly in bckgr.?'),   bool, True,  None ),
+('gui_notify_group',    _('Grouping for Notif.'),       str, 'feed',  (('in',('category', 'feed' ,'flag','number')),) ),
 
-            'ignore_modified': _('Ignore MODIFIED and ETag tags'),
-            
-            'gui_desktop_notify' : _('Push desktop notifications for new items'), 
-            'gui_fetch_periodically' : _('Fetch news periodically'),
-            'gui_notify_group': _('Notification grouping'),
-            'gui_notify_depth': _('Notification depth'),
+('gui_notify_depth',    _('Depth for Notif.'),          int, 10,   (('gt',0),) ),
 
-            'gui_new_color' : _('New item color'),
-            'gui_deleted_color': _('Deleted item color'),
-            'gui_hilight_color' : _('Search hilight color'),
-            'gui_default_flag_color' : _('Default Color for Flags'),
+('gui_new_color',       _('New Item Color'),           str, '#0FDACA',   None),
+('gui_deleted_color',   _('Deleted Item Color'),       str, 'grey',   None),
+('gui_hilight_color',   _('Hilight Color'),            str, 'blue',   None),
+('gui_default_flag_color', _('Default Flag Color'),    str, 'blue',   None),
 
-            'gui_layout' : _('GUI pane layout'),
-            'gui_orientation' : _('GUI pane orientation'),
+('gui_layout',          _('Window Layout'),            int, 0,   (('in', (0,1,2,)),) ),
+('gui_orientation',     _('Tab Orientation'),          int, 0,   (('in', (0,1,)),) ),
 
-            'window_name_exclude' : _('Phrases to exclude from window name'),
+('window_name_exclude', _('Excluded Window Name Strings'),  str, 'Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird',   None),
 
-            'imave_viewer': _('Image viewer command'),
-            'search_engine': _('Search Engine to use in GUI'),
-            'gui_clear_cache' : _('Clear image cache after n days'),
+('image_viewer',        _('Image Viewer'),              str, FEEDEX_DEFAULT_IM_VIEWER,   None),
+('search_engine',       _('Search Engine'),             str, 'https://duckduckgo.com/?t=ffab&q=%Q&ia=web',   None),
 
-            'gui_key_new_entry': _('New Entry shortcut key'),
-            'gui_key_new_rule': _('New Rule shortcut key'),
-            'gui_key_add': _('Add item from tab shortcut key'),
-            'gui_key_edit': _('Edit item from tab shortcut key'),
-            'gui_key_search' : _('Search shortcut key'),
+('gui_clear_cache',     _('Clear Cache Interval'),      int, 30,   (('ge',0),) ),
 
-            'normal_color' : _('CLI normal color'),
-            'bold_color': _('CLI bold style'),
-            'bold_markup_beg': _('Bold section beginning markup'),
-            'bold_markup_end': _('Bold section end markup')
-}
+('gui_key_new_entry',   _('Add Entry Hotkey'),          'hotkey', 'n',   None),
+('gui_key_new_rule',    _('Add Rule Hotkey'),           'hotkey', 'r',   None),
+('gui_key_add',         _('Add Item Hotkey'),           'hotkey', 'a',   None),
+('gui_key_edit',        _('Edit Item Hotkey'),          'hotkey', 'e',   None),
+('gui_key_search',      _('Search Hotkey'),             'hotkey', 's',   None),
+
+('normal_color',        _('CLI Normal Color'),          'term_col', 'DEFAULT', None),
+('bold_color',          _('CLI Bold Color'),            'term_col', 'WHITE_BOLD', None),
+('emph_color',          _('CLI Emphasis Color'),        'term_col', 'YELLOW_BOLD', None),
+('deleted_color',       _('CLI Deleted Color'),         'term_col', 'LIGHT_RED', None),
+('snipp_hilight_color', _('CLI Snippet Color'),         'term_col', 'CYAN_BOLD', None),
+
+('bold_markup_beg',     _('Begin Bold Markup'),         str, '<b>',   None),
+('bold_markup_end',     _('End Bold Markup'),           str, '<b>',   None),
+
+('read_marker',         _('CLI Read Marker'),           str, '=>  ',   None),
+('note_marker',         _('CLI Note Marker'),           str, '(*)  ',   None),
+
+('allow_pipe',          _('Allow Desktop Inter-Process Comm.?'),  bool, True,  None ),
 
 
-CONFIG_INTS_NZ=('timeout','notify_level','default_interval','error_threshold','max_items_per_transaction', 'default_similarity_limit','recom_limit',)
-CONFIG_INTS_Z=('gui_clear_cache','default_depth','gui_layout','gui_orientation','gui_notify_depth','fetch_timeout', 'recom_algo')
+)
 
-CONFIG_FLOATS=('default_entry_weight', 'default_rule_weight', 'query_rule_weight' )
-
-CONFIG_STRINGS=('profile_name', 'log','db_path','browser','lang','user_agent', 'fallback_user_agent', 'gui_notify_group', 'window_name_exclude',\
-    'gui_new_color','gui_deleted_color', 'gui_hilight_color', 'gui_default_flag_color' ,'imave_viewer', 'search_engine','bold_markup_beg','bold_markup_end')
-CONFIG_KEYS=('gui_key_new_entry', 'gui_key_new_rule', 'gui_key_add', 'gui_key_edit', 'gui_key_search',)
-
-CONFIG_BOOLS=('notify', 'use_keyword_learning', 'do_redirects','ignore_modified','gui_desktop_notify',
-'gui_fetch_periodically', 'save_perm_redirects', 'mark_deleted', 'no_history')
-
-CONFIG_COLS=('normal_color','bold_color')
 
 
  # Error return codes
@@ -611,6 +672,7 @@ FX_ERROR_CL = -9
 FX_ERROR_LP = -10
 FX_ERROR_INDEX = -11
 FX_ERROR_CONFIG = -12
+FX_ERROR_REQ = -14
 
 
 

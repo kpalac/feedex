@@ -6,6 +6,275 @@ from feedex_headers import *
 
 
 
+###############################################################33
+#
+#           Utilities
+
+def slist(lst, idx, default):
+    """ Safely extract list element or give default """
+    try: 
+        return lst[idx]
+    except (IndexError, TypeError, ValueError, KeyError) as e: 
+        return default
+
+
+def scast(value, target_type, default_value):
+    """ Safely cast into a given type or give default value """
+    try:
+        if value is None:
+            return default_value
+        return target_type(value)
+    except (ValueError, TypeError):
+        return default_value
+
+def sround(value, rnd, default):
+    """ Safely round a variable """
+    try: return round(value, rnd)
+    except (ValueError, TypeError): return default
+
+def nullif(val, nullifier):
+    """ SQL's nullif counterpart for Python, returning None if val is in nullifier (list of str/int/float)"""
+    if isinstance(nullifier, (list, tuple)):
+        if val in nullifier: return None
+    elif isinstance(nullifier, (str, int, float)):
+        if val == nullifier: return None
+    return val
+
+def coalesce(*args, **kargs):
+    nulls = kargs.get('nulls',(None,))
+    for a in args:
+        if a not in nulls: return a
+
+
+def dezeroe(num, default):
+    """ Overwrite zero with default """
+    if num == 0: return default
+    else: return num
+
+
+def ellipsize(string, length):
+    """ Ellipsize a string for display """
+    if len(string) > length: return f"{string[:length]}..."
+    else: return string
+
+
+
+
+
+
+
+
+def convert_timestamp(datestring:str, **kargs):
+    """ This is needed to handle timestamps from updates, as it can be tricky at times and will derail the whole thing"""
+    if isinstance(datestring, str):
+        
+        if datestring.isdigit():
+            if len(datestring) >= 10:
+                datestring = datestring[:10]
+                return int(datestring)
+            else: 
+                msg(FX_ERROR_VAL, _('Timestamp convertion: %a'), _('Invalid epoch'))
+                return None
+
+        try:
+            date_obj = dateutil.parser.parse(datestring, fuzzy_with_tokens=True)
+            return int(date_obj[0].timestamp())
+        except (dateutil.parser.ParserError, ValueError) as e:
+            msg(FX_ERROR_VAL, _('Timestamp convertion: %a'), e )
+            return None
+
+    elif isinstance(datestring, int): return datestring
+    else: return None
+
+
+def humanize_date(string, today, yesterday, year):
+    """ Format date to be more human readable and context dependent """
+    date_short = string
+    date_short = date_short.replace(today, _("Today") )
+    date_short = date_short.replace(yesterday, _("Yesterday") )
+    date_short = date_short.replace(year,'')
+    return date_short
+
+
+
+def sanitize_file_size(size:int, **kargs):
+    """ Convert bytes to a nice string """
+    str_dict = {1: 'KB', 2:' MB', 3:'GB', 4:'TB', 5:'PB', 6:'EB' } # This is clearly an overkill :)
+    unit = ''
+
+    r = scast(size, float, None)
+    rs = float(0)
+    if r is None: return _('<???>')
+    for i in range(1,6):
+        r = r / 1024
+        if r < 1: break
+        rs = r
+        unit = str_dict[i]
+
+    return f"""{rs:.4f} {unit}"""
+
+
+
+def get_dir_size(start_path = '.'):
+    """ Calculates size recursively for everything under "start_path" directory """
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            # skip if it is symbolic link
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
+
+
+
+
+def random_str(**kargs):
+    """ Generates a random string with length=length for string=string 
+        Assures that random sequence is not in original text
+        Useful for escape sequences """
+    l = kargs.get('length',15)
+    string = kargs.get('string','')
+    rand_str = ''
+ 
+    while rand_str in string:
+        for _ in range(l):
+            rand_int = randint(97, 97 + 26 - 1)
+            flip = randint(0, 1)
+            rand_int = rand_int - 32 if flip == 1 else rand_int
+            rand_str += (chr(rand_int))
+    
+    return rand_str
+
+
+
+
+def cli_mu(string:str, **kargs):
+    string = string.replace('<b>',f'{TERM_BOLD}')
+    string = string.replace('</b>',f'{TERM_NORMAL}')
+    string = string.replace('<i>',f'{TERM_EMPH}')
+    string = string.replace('</i>',f'{TERM_NORMAL}')
+    string = string.replace('&lt;','<')
+    string = string.replace('&gt;','>')
+    return string
+
+def clr_mu(string:str, **kargs):
+    string = string.replace('<b>','')
+    string = string.replace('</b>','')
+    string = string.replace('<i>','')
+    string = string.replace('</i>','')
+    string = string.replace('&lt;','<')
+    string = string.replace('&gt;','>')
+    return string
+
+
+def mu_print(string:str, **kargs):
+    """ Nice print for marked up messages - with bold etc. """
+    print(cli_mu(string))
+
+
+
+def check_paths(paths:list):
+    """ Check if paths in a list exist and create them if not """
+    for p in paths:
+        if not os.path.isdir(p): os.makedirs(p)
+
+
+def check_if_regex(string:str):
+    """ Check if string is a valid REGEX """
+    try:
+        re.compile(string)
+        is_valid = True
+    except re.error:
+        is_valid = False
+    return is_valid
+
+
+
+
+def ids_cs_string(ids:list, **kargs):
+    id_str = ''
+    for id in ids: id_str = f'{id_str}{id},'
+    if id_str.endswith(','): id_str = id_str[:-1]
+    return id_str
+
+
+
+def check_url(string:str):
+    """ Check if a string is a valid URL or IP """
+    if type(string) is not str:
+        return False
+    matches = re.findall(URL_VALIDATE_RE, string)
+    if matches not in (None, (), []): return True
+    matches = re.findall(URL_VALIDATE_RE, f'http://{string}')
+    if matches not in (None, (), []):
+        return True
+    matches = re.findall(URL_VALIDATE_RE, f'https://{string}')
+    if matches not in (None, (), []):
+        return True
+    matches = re.findall(IP4_VALIDATE_RE, string)
+    if matches not in (None, (), []):
+        return True
+    matches = re.findall(IP6_VALIDATE_RE, string)
+    if matches not in (None, (), []):
+        return True
+
+    return False
+
+
+def denull(par:str, none_str:str):
+    """ Replaces special strings with Nones """
+    if par == none_str: return None
+    else: return par
+
+
+def load_json(infile, default, **kargs):
+    """ Loads JSON file and returns default if failed  """
+    if not os.path.isfile(infile):
+        msg(FX_ERROR_IO, _('JSON file %a does not exist!'), infile)
+        if kargs.get('create_file',False) and not os.path.exists(infile): save_json(infile, default)         
+        return default
+    out = default
+    try:
+        with open(infile, 'r') as f:
+            out = json.load(f)
+    except (OSError, TypeError, json.JSONDecodeError) as e:
+        msg(FX_ERROR_IO, _('Error reading from %a: %b'), infile, e )
+        return default
+    return out
+
+
+def save_json(ofile:str, data, **kargs):
+    """ Saves GUI attrs into text file """
+    if kargs.get('check',False):
+        if os.path.exists(ofile):
+            msg(FX_ERROR_IO, _('File %a already exists!'), ofile)
+            return -1
+    try:
+        with open(ofile, 'w') as f:
+            json.dump(data, f)
+        msg(_('Data saved to %a'), ofile)
+    except (OSError, TypeError, json.JSONDecodeError) as e:
+        msg(FX_ERROR_IO, _('Error writing to %a: %b'), ofile, e)
+        return -1
+    return 0
+
+
+
+def print_json(data):
+    """ Prints data in JSON format """
+    try:
+        json_string = json.dumps(data)
+    except (OSError, json.JSONDecodeError, TypeError) as e:
+        msg(FX_ERROR_IO, _('Error converting to JSON: %a'), e)
+        return -1
+    print(json_string)
+    return 0
+
+
+
+
+
 class FeedexError(Exception):
     """ Generic Feedex exception"""
     def __init__(self, *args, **kargs):
@@ -49,7 +318,7 @@ class FeedexMainBus:
         self.__dict__['lock'] = threading.Lock()
 
         # Global configuration
-        self.__dict__['config'] = kargs.get('config', DEFAULT_CONFIG)
+        self.__dict__['config'] = None
         self.__dict__['debug_level'] = None
 
         # Language models
@@ -85,7 +354,11 @@ class FeedexMainBus:
 
         # Message queue
         self.__dict__['bus_q'] = []
+        self.__dict__['handle_bus'] = False
 
+        # Request queue
+        self.__dict__['req_q'] = []
+        self.__dict__['handle_req'] = False
 
         # Download errors ( not to retry failed downloads)
         self.__dict__['download_errors'] = []
@@ -97,6 +370,27 @@ class FeedexMainBus:
         # Local DB locks
         self.__dict__['db_lock'] = False
         self.__dict__['db_fetch_lock'] = False
+        self.__dict__['db_entry_lock'] = False
+        self.__dict__['db_feed_lock'] = False
+        self.__dict__['db_rule_lock'] = False
+        self.__dict__['db_flag_lock'] = False
+
+        # Helper classes
+        self.__dict__['CLP'] = None # CLI processor
+        self.__dict__['DN'] = None #Desktop notifier
+        self.__dict__['CLPR'] = None # Clipboard helper
+
+        # Named pipe for IPC
+        self.__dict__['in_pipe'] = None
+        self.__dict__['out_pipe'] = None
+
+        # Sessions
+        self.__dict__['session_id'] = None
+        self.__dict__['IPC'] = None
+        self.__dict__['listen'] = False # Listening flag to control listening threads
+        
+        self.set_uid()
+
 
 
     def __setattr__(self, __name: str, __value) -> None:
@@ -105,11 +399,77 @@ class FeedexMainBus:
         self.__dict__[__name] = __value
         self.lock.release()
 
+    # Connectors
+    def connect_CLP(self, **kargs):
+        if self.CLP is None: self.reconnect_CLP(**kargs)
+    def reconnect_CLP(self, **kargs):
+        from feedex_cli import FeedexCLI
+        self.CLP = FeedexCLI(**kargs)
+
+    def connect_CLPR(self, **kargs):
+        if self.CLPR is None: self.reconnect_CLPR(**kargs)
+    def reconnect_CLPR(self, **kargs):
+        from feedex_clipper import FeedexClipper
+        self.CLPR = FeedexClipper(config=self.config)
+
+    def connect_IPC(self, **kargs):
+        if self.IPC is None: self.reconnect_IPC(**kargs)
+    def reconnect_IPC(self, **kargs):
+        from feedex_piper import FeedexRequest, FeedexPiper
+        self.IPC = FeedexPiper(config=self.config)
+    
+
+    # Send notification to desktop
+    def dnotify(self, icon, *args): self.DN.notify(icon, slist(args, 0, None), slist(args, 1, None))
+
+    # Locking
+    def get_locks(self, **kargs):
+        """ Gathers lock information into a tuple """
+        locks = []
+        if self.db_fetch_lock: locks.append(FX_LOCK_FETCH)
+        if self.db_entry_lock: locks.append(FX_LOCK_ENTRY)
+        if self.db_rule_lock: locks.append(FX_LOCK_RULE)
+        if self.db_feed_lock: locks.append(FX_LOCK_FEED)
+        if self.db_flag_lock: locks.append(FX_LOCK_FLAG)
+        return tuple(locks)
+        
+
+    # Session data
+    def get_session_id(self, **kargs):
+        """ Get session ID from ENV 
+            type: 0 - GUI """
+        tp = kargs.get('type',0)
+
+        session_id = None
+        if tp == 0:
+            if PLATFORM == 'linux': session_id = f"""{os.getlogin().replace(' ','-')}-{os.getenv('XDG_CURRENT_DESKTOP','')}"""
+        self.session_id = session_id
+        return session_id
+
+    def set_uid(self, **kargs):
+        """ Sets up unique identifier for this Feedex instance """
+        self.uid = f'{random_str(length=8)}-{random_str(length=8)}-{random_str(length=8)}-{random_str(length=8)}-{random_str(length=8)}'
+
+
+    # Main bus routines
     def bus_append(self, item):
         """ Append to bus queue with locking """
         self.lock.acquire()
         self.bus_q.append(item)
+        self.__dict__['handle_bus'] = True
         self.lock.release()
+
+    def bus_pop(self):
+        """ Pop from bus """
+        if len(self.bus_q) > 0:
+            self.lock.acquire()
+            item = self.bus_q.pop(0)
+            if len(self.bus_q) == 0: self.__dict__['handle_bus'] = False
+            else: self.__dict__['handle_bus'] = True
+            self.lock.release()
+            return item
+        else: return None
+
 
     def bus_del(self, index):
         """ Delete from bus queue with locking """
@@ -126,6 +486,25 @@ class FeedexMainBus:
         self.lock.acquire()
         self.download_errors.append(err)
         self.lock.release()
+
+    # Requests
+    def req_append(self, item):
+        """ Append to bus queue with locking """
+        self.lock.acquire()
+        self.req_q.append(item)
+        self.lock.release()
+
+    def req_pop(self):
+        """ Pop from bus """
+        if len(self.req_q) > 0:
+            self.lock.acquire()
+            item = self.req_q.pop(0)
+            self.lock.release()
+            return item
+        else: return None
+
+
+
 
 
 
@@ -239,177 +618,11 @@ class FeedexMainBus:
 
 
 
-
-    # Configuration methods
-    def parse_config(self, cfile:str, **kargs):
-        """ Parse configuration from a given file and put it to a general storage """
-
-        self.config = {}
-
-        try: 
-            with open(cfile, 'r') as f: lines = f.readlines()
-        except OSError as e:
-            raise FeedexConfigError(_('Error reading config from %a: %b'), cfile, e)
-
-
-        for l in lines:
-
-            l = l.strip()
-            if l == '': continue
-            if l.startswith('#'): continue
-            if '=' not in l: continue
-        
-            fields = l.split('=',1)
-
-            option = scast(slist(fields, 0, None), str, '').strip()
-            if option == '': continue
-            value = scast(slist(fields, 1, None), str, '').strip()
-            if value == '': continue
-
-            vfloat = scast(value, float, None)
-
-            if value.isdigit(): value = scast(value, int, 0)
-            elif not (vfloat is None): value = vfloat
-            elif value in ('True','true','Yes','yes','YES'): value = True
-            elif value in ('False','false','No','no','NO'): value = False
-            else:
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:]
-                    value = value[:-1]
-                    value = value.replace('\"','"')
-                if value.startswith("'") and value.endswith("'"):
-                    value = value[1:]
-                    value = value[:-1]
-                    value = value.replace("'","")
-            
-                if "/" in value and "~" in value: value = value.replace('~',os.getenv('HOME'))
-            
-            self.config[option] = value
-
-        self.config_file = cfile
-
-        debug(7, self.config)
-        return 0
-
-
-
-
-
-
-    def save_config(self, **kargs):
-        """ Saves config dict to a file """
-        contents = ''
-        for k,v in self.config.items():
-            if v in (None,''): v = ''
-            elif v is True: v = 'True'
-            elif v is False: v = 'False'
-            else: v = scast(v, str, '')
-            contents = f"{contents}\n{k} = {v}"
-
-        try:        
-            with open(self.config_file, 'w') as f: f.write(contents)
-            self.msg(_('Configuration saved to %a'), self.config_file)  
-            return 0
-        except OSError as e:
-            return self.msg(FX_ERROR_IO, f'{_("Error saving configuration to %a:")} {e}', self.config_file )
-
-
-
-
-
-
-    def validate_config(self, **kargs):
-        """ Validates config dictionary """
-        config = kargs.get('config', self.config)
-        strict = kargs.get('strict', False)
-        load = kargs.get('load', True)
-
-        new_config = {}
-
-        for k,v in config.items():
-
-            if v is None: continue
-
-            if k in CONFIG_INTS_NZ:
-                v = scast(v, int, None)
-                if v is None or v <= 0:
-                    if strict: return FX_ERROR_VAL, _('%a must be integer > 0'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
-                    new_config[k] = DEFAULT_CONFIG[k]
-                else: new_config[k] = v
-            
-            elif k in CONFIG_INTS_Z:
-                v = scast(v, int, None)
-                if v is None or v < 0:
-                    if strict: return FX_ERROR_VAL, _('%a must be integer >= 0'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
-                    new_config[k] = DEFAULT_CONFIG[k]
-                else: new_config[k] = v
-
-            elif k in CONFIG_BOOLS:
-                v = scast(v, bool, None)
-                if v is None:
-                    if strict: return FX_ERROR_VAL, _('%a must be True or False'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
-                    new_config[k] = DEFAULT_CONFIG[k]
-                else: new_config[k] = v
-
-            elif k in CONFIG_FLOATS:
-                v = scast(v, float, None)
-                if v is None:
-                    if strict: return FX_ERROR_VAL, _('%a must be a valid number'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
-                    new_config[k] = DEFAULT_CONFIG[k]
-                else: new_config[k] = v
-
-            elif k in CONFIG_STRINGS:
-                v = scast(v, str, None)
-                if v is None:
-                    if strict: return FX_ERROR_VAL, _('%a must be a valid string'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
-                    new_config[k] = DEFAULT_CONFIG[k]
-                else: new_config[k] = v
-
-            elif k in CONFIG_KEYS:
-                v = scast(v, str, None)
-                if v is None or len(v) > 1:
-                    if strict: return FX_ERROR_VAL, _('%a must be a single character ([a-zA-Z0-9])'), CONFIG_NAMES.get(k)
-                    else: self.msg(FX_ERROR_VAL, _("Invalid config option: %a; Defaulting to %b"), k, DEFAULT_CONFIG[k])
-                    new_config[k] = DEFAULT_CONFIG[k]
-                else: new_config[k] = v
-
-        # ... CLI display and markup options ...
-        if config.get('normal_color') is not None and config.get('normal_color') in TCOLS.keys():
-            new_config['TERM_NORMAL'] = TCOLS[config.get('normal_color')]
-        if config.get('flag_color') is not None and config.get('flag_color') in TCOLS.keys():
-            new_config['TERM_FLAG'] = TCOLS[config.get('flag_color')]
-        if config.get('read_color') is not None and config.get('read_color') in TCOLS.keys():
-            new_config['TERM_READ'] = TCOLS[config.get('read_color')]
-        if config.get('deleted_color') is not None and config.get('deleted_color') in TCOLS.keys():
-            new_config['TERM_DELETED'] = TCOLS[config.get('deleted_color')]
-        if config.get('bold_color') is not None and config.get('bold_color') in TCOLS.keys():
-            new_config['TERM_SNIPPET_HIGHLIGHT'] = TCOLS[config.get('bold_color')]
-
-        if config.get('bold_markup_beg') is not None and type(config.get('bold_markup_beg')) is str:
-            BOLD_MARKUP_BEG = config.get('bold_markup_beg')
-        if config.get('bold_markup_end') is not None and type(config.get('bold_markup_end')) is str:
-            BOLD_MARKUP_END = config.get('bold_markup_end')
-
-        if load: self.config = new_config.copy()
-        
-        return 0
-    
-
-
-
     def get_par(self, arg, **kargs):
         """ Sanitizes 'x=y' parameter """
         rarg = slist(scast(arg, str, '').split('='), 1, None)
         if rarg is None: self.cli_param_error = True
         return rarg
-
-        
-
     
 
     def ext_open(self, command_id, main_arg, **kargs):
@@ -441,7 +654,7 @@ class FeedexMainBus:
             command[i] = arg
 
         debug(' '.join(command))
-        if background: debug('Running in background...')
+        if background: debug(6, 'Running in background...')
 
         try:
             if background: subprocess.Popen(command)
@@ -449,6 +662,7 @@ class FeedexMainBus:
         except OSError as e: return self.msg(FX_ERROR_IO, f'{_("Error opening %a:")} {e}', main_arg)
 
         return 0
+        
 
 
 
@@ -496,58 +710,9 @@ class FeedexMainBus:
 
     def get_flag_color_cli(self, id:int, **kargs):
         if id not in self.flags_cache.keys(): return ''
-        color = self.flags_cache.get(id, (None,None,None,self.config.get('TERM_FLAG', TERM_FLAG)))[3]
-        if color in (None, ''): return self.config.get('TERM_FLAG', TERM_FLAG)
+        color = self.flags_cache.get(id, (None,None,None,self.config.get('emph_color', TERM_EMPH)))[3]
+        if color in (None, ''): return self.config.get('emph_color', TERM_EMPH)
         else: return color
-        
-
-
-
-    def find_category(self, val:str, **kargs):
-        """ Resolve entry type depending on whether ID or name was given"""
-        if val is None: return None
-        load = kargs.get('load', False)
-        if scast(val, str, '').isdigit():
-            val = int(val)
-            for f in self.feeds_cache:
-                if f[FEEDS_SQL_TABLE.index('id')] == val and f[FEEDS_SQL_TABLE.index('is_category')] == 1: 
-                    if load: return f
-                    else: return val
-        else:
-            val = str(val)
-            for f in self.feeds_cache:
-                if f[FEEDS_SQL_TABLE.index('name')] == val and f[FEEDS_SQL_TABLE.index('is_category')] == 1: 
-                    if load: return f
-                    else: return f[FEEDS_SQL_TABLE.index('id')]
-        return -1
-
-
-    def find_feed(self, val:int, **kargs):
-        """ check if feed with given ID is present """
-        if val is None: return None
-        val = scast(val, int, -1)
-        if val < 0: return -1
-        load = kargs.get('load', False)
-        for f in self.feeds_cache:
-            if val == f[FEEDS_SQL_TABLE.index('id')] and f[FEEDS_SQL_TABLE.index('is_category')] != 1: 
-                if load: return f
-                else: return val
-        return -1
-
-
-    def find_f_o_c(self, val, **kargs):
-        """ Resolve feed or category """
-        if val is None: return None
-        val = scast(val, int, -1)
-        if val < 0: return -1
-        load = kargs.get('load', False)
-        for f in self.feeds_cache:
-            if f[FEEDS_SQL_TABLE.index('id')] == val:
-                if load: return f
-                if f[FEEDS_SQL_TABLE.index('is_category')] == 1: return -1, val
-                return val, -1
-        return -1
-
 
     def get_feed_name(self, id:int, **kargs):
         """ Return name of a IDd feed/category """
@@ -569,24 +734,89 @@ class FeedexMainBus:
         return '<???>'
 
 
-    def resolve_field(self, val:str):
+    def load_feed(self, id):
+        """ Loads feed to tuple """
+        id = scast(id, int, -1)
+        if id == -1: return -1
+        for f in self.feeds_cache:
+            if f[FEEDS_SQL_TABLE.index('id')] == id and f[FEEDS_SQL_TABLE.index('is_category')] != 1: return f
+        return -1
+
+    def load_cat(self, id):
+        """ Loads feed to tuple """
+        id = scast(id, int, -1)
+        if id == -1: return -1
+        for f in self.feeds_cache:
+            if f[FEEDS_SQL_TABLE.index('id')] == id and f[FEEDS_SQL_TABLE.index('is_category')] == 1: return f
+        return -1
+    
+    def load_parent(self, id):
+        id = scast(id, int, -1)
+        if id == -1: return -1
+        for f in self.feeds_cache:
+            if f[FEEDS_SQL_TABLE.index('id')] == id: return f
+        return -1
+
+
+
+
+    ###################################################################
+    #   Resolve methods
+    #
+
+    def res_flag_name(self, name):
+        """ Resolved flag name to id """
+        name = scast(name, str, None)
+        if id is None: return None
+        for k,v in self.flags_cache.items():
+            if name == v[0]: return k
+        return -1
+
+    def res_cat_name(self, name):
+        """ resolves if name is a category """
+        name = scast(name, str, None)
+        if name is None: return None
+        for f in self.feeds_cache:
+            if f[FEEDS_SQL_TABLE.index('is_category')] == 1:
+                if f[FEEDS_SQL_TABLE.index('name')] == name: return f[FEEDS_SQL_TABLE.index('id')]
+        return -1
+
+    def is_cat_feed(self, id):
+        """ Checks if given id belongs to a category """
+        id = scast(id, int, -1)
+        for f in self.feeds_cache:
+            if f[FEEDS_SQL_TABLE.index('id')] == id: 
+                if f[FEEDS_SQL_TABLE.index('is_category')] == 1: return 1
+                else: return 2
+        return -1
+
+    def is_flag(self, id):
+        """ Check if given id belings to a flag """
+        id = scast(id, int, -1)
+        if id in self.flags_cache.keys(): return True
+        else: return False 
+
+
+    def res_field(self, val:str):
         """ Resolve field ID depending on provided field name. Returns -1 if field is not in prefixes """
         if val is None: return None
         if val in PREFIXES.keys(): return val
         return -1
 
 
-    def resolve_qtype(self, qtype, **kargs):
+    def res_qtype(self, qtype, **kargs):
         """ Resolve query type from string to int """
-        if qtype is None: 
-            if kargs.get('no_null', False): return -1
-            return 1
-        if type(qtype) is int and qtype in (0,1,2): return qtype
-        if type(qtype) is str:
-            if qtype.lower() in ('string','str','string_matching','sm'): return 0
-            elif qtype.lower() in ('full', 'fts', 'full-text','fulltext',): return 1
-            else: return 1
-
+        rule = kargs.get('rule', False)
+        if qtype is None and not rule: return 1
+        
+        if type(qtype) is int:
+            if rule and qtype in (0,1,2,): return qtype
+            elif qtype in (0,1,): return qtype
+        
+        qtype = scast(qtype, str, '').strip().lower()
+        if qtype in ('string','str','string_matching','sm'): return 0
+        elif qtype in ('full', 'fts', 'full-text','fulltext',): return 1
+        elif rule and qtype in ('regex',): return 2 
         return -1
 
 
@@ -792,6 +1022,11 @@ class FeedexMainBus:
 
 
 
+        
+
+
+
+
 
     ######################################################################3
     #
@@ -828,261 +1063,224 @@ def debug(*args): return fdx.debug(*args)
 
 
 
+###############################################################33
+#
+#           Configuration
 
 
 
+class FeedexConfig:
+    """ Class for storing and validating configuration """
+    def __init__(self, file, **kargs) -> None:
+        self.file = file
+        self.vals = {}
+        self.vals['cli_cols'] = {}
+        self.import_list(kargs.get('list', FEEDEX_CONFIG_LIST))
+
+
+    # Utils to preseve interface compatibility with dict
+    def get(self, key, *args): return self.vals.get(key, *args)
+    def __getitem__(self, key:str): return self.vals[key]
+    def __setitem__(self, key:str, value): self.vals[key] = value
+    def __delitem__(self, key:str): del self.vals[key]
+    def copy(self): return self.vals.copy()
+    def clear(self): return self.vals.clear()
+
+
+    def clone(self):
+        n = FeedexConfig(self.file)
+        n.vals = self.vals.copy()
+        n.fields, n.names, n.types, n.defaults, n.conds = self.fields, self.names, self.types, self.defaults, self.conds
+        return n
+
+
+    def import_list(self, list):
+        """ Import meta list """
+        self.fields, self.names, self.types, self.defaults, self.conds = [], [], [], [], []
+        for l in list:
+            field, name, type, default, conds = l[0], l[1], l[2], l[3], coalesce(l[4], ())
+            self.vals[field] = default
+            self.fields.append(field)
+            self.names.append(name)
+            self.types.append(type)
+            self.defaults.append(default)
+            self.conds.append(conds)
+        self.fields, self.names, self.types, self.defaults, self.conds = \
+            tuple(self.fields), tuple(self.names), tuple(self.types), tuple(self.defaults), tuple(self.conds)
 
 
 
-def slist(lst, idx, default):
-    """ Safely extract list element or give default """
-    try: 
-        return lst[idx]
-    except (IndexError, TypeError, ValueError, KeyError) as e: 
-        return default
-
-
-def scast(value, target_type, default_value):
-    """ Safely cast into a given type or give default value """
-    try:
-        if value is None:
-            return default_value
-        return target_type(value)
-    except (ValueError, TypeError):
-        return default_value
-
-def sround(value, rnd, default):
-    """ Safely round a variable """
-    try: return round(value, rnd)
-    except (ValueError, TypeError): return default
-
-def nullif(val, nullifier):
-    """ SQL's nullif counterpart for Python, returning None if val is in nullifier (list of str/int/float)"""
-    if isinstance(nullifier, (list, tuple)):
-        if val in nullifier: return None
-    elif isinstance(nullifier, (str, int, float)):
-        if val == nullifier: return None
-    return val
-
-def coalesce(*args, **kargs):
-    nulls = kargs.get('nulls',(None,))
-    for a in args:
-        if a not in nulls: return a
-
-
-def dezeroe(num, default):
-    """ Overwrite zero with default """
-    if num == 0: return default
-    else: return num
-
-
-def ellipsize(string, length):
-    """ Ellipsize a string for display """
-    if len(string) > length: return f"{string[:length]}..."
-    else: return string
-
-
-
-
-
-
-
-
-def convert_timestamp(datestring:str, **kargs):
-    """ This is needed to handle timestamps from updates, as it can be tricky at times and will derail the whole thing"""
-    if isinstance(datestring, str):
+    def validate_field(self, field, val, **kargs):
+        """ Validate a single field """
         
-        if datestring.isdigit():
-            if len(datestring) >= 10:
-                datestring = datestring[:10]
-                return int(datestring)
-            else: 
-                msg(FX_ERROR_VAL, _('Timestamp convertion: %a'), _('Invalid epoch'))
-                return None
+        ix = self.fields.index(field)
+        tp, conds, name = self.types[ix], self.conds[ix], self.names[ix]
+        #debug(7, f'{field}; {val};  {name};   {conds}')
+        
+        if tp == 'hotkey':
+            if type(val) is str and len(val) == 1: 
+                self.val_vals[field] = val
+                return 0
+            else: return FX_ERROR_CONFIG, _('Config item %a (%b) most be a hotkey - one character'), name, field
 
-        try:
-            date_obj = dateutil.parser.parse(datestring, fuzzy_with_tokens=True)
-            return int(date_obj[0].timestamp())
-        except (dateutil.parser.ParserError, ValueError) as e:
-            msg(FX_ERROR_VAL, _('Timestamp convertion: %a'), e )
-            return None
+        elif tp == 'term_col':
+            cval = TCOLS.get(val)
+            if cval is None: return FX_ERROR_CONFIG, _('Config item %a (%b) most be in %c'), name, field, TCOLS.keys()
+            else:
+                self.val_vals['cli_cols'][field] = cval
+                return 0
 
-    elif isinstance(datestring, int): return datestring
-    else: return None
+        if val is None and 'nn' not in conds: 
+            self.val_vals[field] = None
+            return 0
+        
+        cval = scast(val, tp, None)
+        if cval is None: return FX_ERROR_CONFIG, _('Invalid type for config item %a, should be %b'), self.name, tp
 
+        for c in conds:
+            if c == 'nn': continue
+            op,v = c[0], c[1]
+            if op == 'ne' and not cval == v: return FX_ERROR_CONFIG, _('Invalid value for config item %a (%b)'), name, field
+            elif op == 'in' and not cval in v: return FX_ERROR_CONFIG, _('Invalid value for config item %a (%b), should be %c'), name, field, v
+            elif op == 'nin' and cval in v: return FX_ERROR_CONFIG, _('Invalid value for config item %a (%b), should not be %c'), name, field, v
+            elif op == 'gt' and not cval > v: return FX_ERROR_CONFIG, _('Invalid value for config item %a (%b), should be > %c'), name, field, v
+            elif op == 'lt' and not cval < v: return FX_ERROR_CONFIG, _('Invalid value for config item %a (%b), should be < %c'), name, field, v
+            elif op == 'ge' and not cval >= v: return FX_ERROR_CONFIG, _('Invalid value for config item %a (%b), should be >= %c'), name, field, v
+            elif op == 'le' and not cval <= v: return FX_ERROR_CONFIG, _('Invalid value for config item %a (%b), should be <= %c'), name, field, v
+            elif op == 'len' and not len(cval) == v: return FX_ERROR_CONFIG, _('Invalid value for config item %a, length should be %c'), name, field, v
 
-def humanize_date(string, today, yesterday, year):
-    """ Format date to be more human readable and context dependent """
-    date_short = string
-    date_short = date_short.replace(today, _("Today") )
-    date_short = date_short.replace(yesterday, _("Yesterday") )
-    date_short = date_short.replace(year,'')
-    return date_short
-
-
-
-def sanitize_file_size(size:int, **kargs):
-    """ Convert bytes to a nice string """
-    str_dict = {1: 'KB', 2:' MB', 3:'GB', 4:'TB', 5:'PB', 6:'EB' } # This is clearly an overkill :)
-    unit = ''
-
-    r = scast(size, float, None)
-    rs = float(0)
-    if r is None: return _('<???>')
-    for i in range(1,6):
-        r = r / 1024
-        if r < 1: break
-        rs = r
-        unit = str_dict[i]
-
-    return f"""{rs:.4f} {unit}"""
-
-
-
-def get_dir_size(start_path = '.'):
-    """ Calculates size recursively for everything under "start_path" directory """
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(start_path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            # skip if it is symbolic link
-            if not os.path.islink(fp):
-                total_size += os.path.getsize(fp)
-    return total_size
+        self.val_vals[field] = cval
+        return 0
 
 
 
 
-def random_str(**kargs):
-    """ Generates a random string with length=length for string=string 
-        Assures that random sequence is not in original text
-        Useful for escape sequences """
-    l = kargs.get('length',15)
-    string = kargs.get('string','')
-    rand_str = ''
- 
-    while rand_str in string:
-        for _ in range(l):
-            rand_int = randint(97, 97 + 26 - 1)
-            flip = randint(0, 1)
-            rand_int = rand_int - 32 if flip == 1 else rand_int
-            rand_str += (chr(rand_int))
-    
-    return rand_str
+    def validate(self, **kargs):
+        """ Validate all fields """
+        default = kargs.get('default', True)
+        self.val_vals = {}
+        self.val_vals['cli_cols'] = {}
+        for ix,f in enumerate(self.fields):
+            v = self.vals.get(f)
+            tp = self.types[ix]
+            err = self.validate_field(f, v)
+            if err != 0:
+                if tp == 'term_col':
+                    deflt = self.defaults[ix]
+                    msg(FX_ERROR_CONFIG, _('Defaulting %a to %b'), f, deflt)
+                    self.val_vals[f] = deflt
+                    self.val_vals['cli_cols'][f] = TCOLS.get(deflt,'')
+                elif default:
+                    deflt = self.defaults[ix]
+                    msg(FX_ERROR_CONFIG, _('Defaulting %a to %b'), f, deflt)
+                    self.val_vals[f] = deflt
+
+                else: return err
+        
+        
+        if kargs.get('apply',True): self.apply()
+        return 0
 
 
 
-
-def cli_mu(string:str, **kargs):
-    string = string.replace('<b>',f'{TERM_BOLD}')
-    string = string.replace('</b>',f'{TERM_NORMAL}')
-    string = string.replace('<i>',f'{TERM_FLAG}')
-    string = string.replace('</i>',f'{TERM_NORMAL}')
-    string = string.replace('&lt;','<')
-    string = string.replace('&gt;','>')
-    return string
-
-def clr_mu(string:str, **kargs):
-    string = string.replace('<b>','')
-    string = string.replace('</b>','')
-    string = string.replace('<i>','')
-    string = string.replace('</i>','')
-    string = string.replace('&lt;','<')
-    string = string.replace('&gt;','>')
-    return string
-
-
-def mu_print(string:str, **kargs):
-    """ Nice print for marked up messages - with bold etc. """
-    print(cli_mu(string))
-
-
-
-def check_paths(paths:list):
-    """ Check if paths in a list exist and create them if not """
-    for p in paths:
-        if not os.path.isdir(p): os.makedirs(p)
-
-
-def check_if_regex(string:str):
-    """ Check if string is a valid REGEX """
-    try:
-        re.compile(string)
-        is_valid = True
-    except re.error:
-        is_valid = False
-    return is_valid
-
-
-
-
-
-def check_url(string:str):
-    """ Check if a string is a valid URL or IP """
-    if type(string) is not str:
-        return False
-    matches = re.findall(URL_VALIDATE_RE, string)
-    if matches not in (None, (), []): return True
-    matches = re.findall(URL_VALIDATE_RE, f'http://{string}')
-    if matches not in (None, (), []):
-        return True
-    matches = re.findall(URL_VALIDATE_RE, f'https://{string}')
-    if matches not in (None, (), []):
-        return True
-    matches = re.findall(IP4_VALIDATE_RE, string)
-    if matches not in (None, (), []):
-        return True
-    matches = re.findall(IP6_VALIDATE_RE, string)
-    if matches not in (None, (), []):
-        return True
-
-    return False
+    def apply(self, **kargs):
+        """ Apply validated values """
+        self.vals = self.val_vals.copy()
+        self.val_vals = None
 
 
 
 
 
 
+    def parse(self, **kargs):
+        """ Read config from file """
+        if kargs.get('file') is not None: self.file = kargs.get('file')
+        
+        try: 
+            with open(self.file, 'r') as f: lines = f.readlines()
+        except (OSError, IOError,) as e:
+            raise FeedexConfigError(_('Error reading config from %a: %b'), cfile, e)
 
-def load_json(infile, default, **kargs):
-    """ Loads JSON file and returns default if failed  """
-    if not os.path.isfile(infile):
-        msg(FX_ERROR_IO, _('JSON file %a does not exist!'), infile)
-        if kargs.get('create_file',False) and not os.path.exists(infile): save_json(infile, default)         
-        return default
-    out = default
-    try:
-        with open(infile, 'r') as f:
-            out = json.load(f)
-    except (OSError, TypeError, json.JSONDecodeError) as e:
-        msg(FX_ERROR_IO, _('Error reading from %a: %b'), infile, e )
-        return default
-    return out
+        for l in lines:
+
+            l = l.strip()
+            if l == '': continue
+            if l.startswith('#'): continue
+            if '=' not in l: continue
+        
+            fields = l.split('=',1)
+
+            option = scast(slist(fields, 0, None), str, '').strip()
+            if option == '': continue
+            value = scast(slist(fields, 1, None), str, '').strip()
+            if value == '': continue
+
+            vfloat = scast(value, float, None)
+
+            if value.isdigit(): value = scast(value, int, 0)
+            elif vfloat is not None: value = vfloat
+            elif value in ('True','true','Yes','yes','YES'): value = True
+            elif value in ('False','false','No','no','NO'): value = False
+            else:
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:]
+                    value = value[:-1]
+                    value = value.replace('\"','"')
+                if value.startswith("'") and value.endswith("'"):
+                    value = value[1:]
+                    value = value[:-1]
+                    value = value.replace("'","")
+            
+                if PLATFORM == 'linux' and "/" in value and "~" in value: value = value.replace('~',os.getenv('HOME'))
+                elif PLATFORM == 'win32' and "\\" in value:
+                    value = value.replace('%LocalAppData%', f"{os.getenv('LOCALAPPDATA')}")
+                    value = value.replace('%AppData%', f"{os.getenv('APPDATA')}")
+
+            self[option] = value
+
+        #debug(7, self.vals)
+        return 0
 
 
-def save_json(ofile:str, data, **kargs):
-    """ Saves GUI attrs into text file """
-    if kargs.get('check',False):
-        if os.path.exists(ofile):
-            msg(FX_ERROR_IO, _('File %a already exists!'), ofile)
-            return -1
-    try:
-        with open(ofile, 'w') as f:
-            json.dump(data, f)
-        msg(_('Data saved to %a'), ofile)
-    except (OSError, TypeError, json.JSONDecodeError) as e:
-        msg(FX_ERROR_IO, _('Error writing to %a: %b'), ofile, e)
-        return -1
-    return 0
+
+
+    def save(self, **kargs):
+        """ Saves config to a file """
+        if kargs.get('file') is not None: self.file = kargs.get('file')
+        
+        contents = ''
+        for k,v in self.vals.items():
+            if k in ('cli_cols',): continue
+            ix = self.fields.index(k)
+            name = self.names[ix]
+            tp = self.types[ix]
+            conds = self.conds[ix]
+            cond_str = ''
+            for c in conds: cond_str = f'{cond_str}{c};'
+            if v in (None,''): v = ''
+            elif v is True: v = 'True'
+            elif v is False: v = 'False'
+            else: v = scast(v, str, '')
+            contents = f"""{contents}
+
+# {name} ({tp}); {cond_str}
+{k} = {v}"""
+
+        try:        
+            with open(self.file, 'w') as f: f.write(contents)
+            msg(_('Configuration saved to %a'), self.file)  
+            return 0
+        except OSError as e: return msg(FX_ERROR_IO, f'{_("Error saving configuration to %a:")} {e}', self.config_file )
 
 
 
-def print_json(data):
-    """ Prints data in JSON format """
-    try:
-        json_string = json.dumps(data)
-    except (OSError, json.JSONDecodeError, TypeError) as e:
-        msg(FX_ERROR_IO, _('Error converting to JSON: %a'), e)
-        return -1
-    print(json_string)
-    return 0
+
+
+
+
+
+
+
+
+

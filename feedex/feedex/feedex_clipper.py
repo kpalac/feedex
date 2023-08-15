@@ -54,8 +54,8 @@ class FeedexClipper:
         """ Parse string for clipboard parameters """
         rstr = random_str(string=text)
         text = text.replace('%%', rstr)
-        text = text.replace('%s', selection)
-        text = text.replace('%w', window)
+        text = text.replace('%s', scast(selection, str, ''))
+        text = text.replace('%w', scast(window, str, ''))
         text = text.replace(rstr, '%')
         return text
 

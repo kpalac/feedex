@@ -26,9 +26,10 @@ class FeedexRSSHandler:
         self.config = self.DB.config
         
         # Containers for entry and field processing
-        self.entry  = FeedexEntry(self.DB)
-        self.feed   = SQLContainerEditable('feeds', FEEDS_SQL_TABLE, types=FEEDS_SQL_TYPES)
-        self.ifeed  = SQLContainer('feeds', FEEDS_SQL_TABLE)
+        self.entry  = {}
+        self.feed_delta   = {}
+        self.feed_meta_delta = {}
+        self.ifeed  = None
 
         self.entries = []
 
@@ -57,11 +58,10 @@ class FeedexRSSHandler:
 
     def set_feed(self, feed):
         """ Setup feed and headers """
-        if isinstance(feed, SQLContainer):
-            self.ifeed.populate(feed.tuplify())
-        elif isinstance(feed, dict):
-            self.ifeed = feed.copy()
-        else: raise FeedexTypeError(_('Invalid type of input feed! Should be a SQLContainer or dict!'))
+        if not isinstance(feed, FeedexFeed): raise FeedexTypeError(_('Invalid type of input feed! Should be FeedexContainer!'))
+
+        self.ifeed = feed
+        self.feed_delta = {}
 
         # Set up http headers from saved feed data
         headers = {}
@@ -177,13 +177,21 @@ class FeedexRSSHandler:
         self.feed_raw = feed_raw
         self.etag = feed_raw.get('etag',None)
         self.modified = feed_raw.get('modified',None)    
+        
+        # Update feed meta
+        self.feed_delta['http_status'] = self.status
+        if self.error: self.feed_delta['error'] = scast(self.feed_delta.get('error'), int, 0) + 1
+        
+        # Mark deleted as unhealthy to avoid unnecessary fetching
+        if self.status == 410 and self.config.get('mark_deleted',False): self.feed_delta['error'] = self.config.get('error_threshold',5)
+        
         return 0
 
 
 
 
     
-    def fetch(self, feed, **kargs):
+    def fetch(self, **kargs):
         """ Consolidate and return downloaded RSS """
         force = kargs.get('force',False)
         pguids = list(kargs.get('pguids',()))
@@ -197,19 +205,35 @@ class FeedexRSSHandler:
         self.redirected = False
 
         self.entries = []
-        
+
+        now_last = int(datetime.now().timestamp())
+
         err = self.download(force=force)
         if err != 0 or self.error or self.feed_raw == {}: return err
+        self.feed_delta['lastchecked'] = now_last
         if not self.changed: return msg(_('Feed unchanged (304)'))
+
+        # Update current feed
+        self.feed_delta['etag'] = self.etag
+        self.feed_delta['modified'] = self.modified
+
+        if self.redirected: msg(_('Channel redirected: %a'), self.ifeed['url'], log=True)
+        
+        # Save permanent redirects to DB
+        if self.feed_raw.get('href',None) != self.ifeed['url'] and self.status == 301:
+                if self.config.get('save_perm_redirects', False): self.feed_delta['url'] = self.feed_raw.get('href',None)
+
+
 
         pub_date_raw = self.feed_raw['feed'].get('updated')
         pub_date = scast(convert_timestamp(pub_date_raw), int, 0)
 
         if pub_date <= last_read and pub_date_raw not in (None,''): return msg(_('Feed unchanged (Published Date)'))
+        self.feed_delta['lastread'] = now_last
 
-        if nullif(feed['rx_images'],'') is not None and feed['handler'] != 'html': rx_images = re.compile(scast(feed['rx_images'], str,''), re.DOTALL)
+        if nullif(self.ifeed['rx_images'],'') is not None and self.ifeed['handler'] != 'html': rx_images = re.compile(scast(self.ifeed['rx_images'], str,''), re.DOTALL)
         else: rx_images = None
-        if nullif(feed['rx_link'],'') is not None and feed['handler'] != 'html': rx_links = re.compile(scast(feed['rx_link'], str,''), re.DOTALL)
+        if nullif(self.ifeed['rx_link'],'') is not None and self.ifeed['handler'] != 'html': rx_links = re.compile(scast(self.ifeed['rx_link'], str,''), re.DOTALL)
         else: rx_links = None
 
         # Main loop
@@ -218,8 +242,8 @@ class FeedexRSSHandler:
             now = datetime.now()
             now_raw = int(now.timestamp())
             
-            pub_date_entry_str = entry.get('updated')
-            if pub_date_entry_str is None: 
+            pub_date_entry_str = scast(entry.get('updated'), str, None)
+            if pub_date_entry_str is None:
                 pub_date_entry_str = now
                 pub_date_entry = now_raw
             else:
@@ -231,18 +255,20 @@ class FeedexRSSHandler:
             if (entry.get('guid'),) in pguids and entry.get('guid') not in ('',None): continue
             if (entry.get('link'),) in plinks and entry.get('link') not in ('',None): continue
 
-            self.entry.clear()
+            self.entry = {}
 
             # Assign fields one by one (I find it more convenient...)
-            self.entry['feed_id']                 = feed['id']
+            self.entry['feed_id']                 = self.ifeed['id']
             self.entry['title']                   = slist(fdx.strip_markup(entry.get('title'), html=True), 0, None)
             
-            authors = entry.get('author','')
-            if authors == '' and type(entry.get('authors',())) in (list, tuple):
-                for a in entry.get('authors',()): 
-                   if a.get('name','') != '': authors = f"""{authors}{a.get('name','')}; """
+            authors = entry.get('author')
+            authors_str = ''
+            if type(authors) in (list, tuple):
+                for a in authors:
+                   a = scast(a.get('name'), str, '').strip() 
+                   if a != '': authors_str = f"""{authors_str}{a}; """
 
-            self.entry['author']                  = nullif(slist(fdx.strip_markup(authors), 0, ''),'')
+            self.entry['author']                  = nullif(slist(fdx.strip_markup(authors_str), 0, ''),'')
             self.entry['author_contact']          = nullif( f"""{entry.get('author_detail',{}).get('email','')}; {entry.get('author_detail',{}).get('href','')}""", '; ')
             
             contribs = ''
@@ -264,7 +290,7 @@ class FeedexRSSHandler:
             if self.prepend_homepage:
                 link = scast(entry.get('link'), str, '')
                 if link.startswith('/'):
-                    homepage = scast(feed['link'], str, '')
+                    homepage = scast(self.ifeed['link'], str, '')
                     if homepage.endswith('/'): homepage = homepage[:-1]
                     self.entry['link'] = f'{homepage}{link}'
                 else: self.entry['link']          = entry.get('link')
@@ -341,8 +367,8 @@ class FeedexRSSHandler:
             if not os.path.isfile(icon):
                 feed_url = ''
                 for f in fdx.feeds_cache:
-                    if f[self.feed.get_index('id')] == feed_id: 
-                        feed_url = f[self.feed.get_index('url')]
+                    if f[self.ifeed.get_index('id')] == feed_id: 
+                        feed_url = f[self.ifeed.get_index('url')]
                         break
                 if feed_url != '':
                     thumbnail = os.path.join(FEEDEX_FEED_CATALOG_CACHE, 'thumbnails', f"""{fdx.hash_url(feed_url)}.img""")
@@ -354,7 +380,7 @@ class FeedexRSSHandler:
 
 
 
-    def update(self, feed, **kargs):
+    def update_meta(self, **kargs):
         """ Consolidate feed data from RSS resource """
 
         if kargs.get('feed_raw') is not None:
@@ -362,57 +388,55 @@ class FeedexRSSHandler:
 
         if self.feed_raw.get('feed',None) is None: 
             self.error = True
-            return msg(f'{_("Downloaded feed empty")} ({feed.name()})!')
+            return msg(f'{_("Downloaded feed empty")} ({self.ifeed.name()})!')
 
-        self.feed.clear()
         # Get image urls for later download
         self.images = []
 
         icon = self.feed_raw['feed'].get('icon',None)
         if icon is not None:
-            self.images.append([feed['id'], None, icon, None])
+            self.images.append([self.ifeed['id'], None, icon, None])
         else:
             logo = self.feed_raw['feed'].get('logo',None)
             if logo is not None:
-                self.images.append([feed['id'], None, logo, None])
+                self.images.append([self.ifeed['id'], None, logo, None])
             else:
                 image = self.feed_raw['feed'].get('image',None)
                 if image is not None:
-                    self.images.append([feed['id'], None, image.get('href',None), image.get('title',None)])
+                    self.images.append([self.ifeed['id'], None, image.get('href',None), image.get('title',None)])
 
         # Overwrite Nones in current data and populate feed
-        self.feed['id']                       = feed['id']
-        self.feed['link']                     = self.feed_raw['feed'].get('link', None)
-        self.feed['charset']                  = coalesce(feed['charset'], self.feed_raw.get('encoding',None))
-        self.feed['lang']                     = coalesce(feed['lang'], self.feed_raw['feed'].get('lang',self.feed_raw['feed'].get('feed',{}).get('language',None)))
-        self.feed['generator']                = coalesce(feed['generator'], self.feed_raw['feed'].get('generator', None))
+        self.feed_meta_delta['link']                     = self.feed_raw['feed'].get('link')
+        self.feed_meta_delta['charset']                  = self.feed_raw.get('encoding')
+        self.feed_meta_delta['lang']                     = self.feed_raw['feed'].get('lang',self.feed_raw['feed'].get('feed',{}).get('language'))
+        self.feed_meta_delta['generator']                = self.feed_raw['feed'].get('generator')
 
-        authors = feed.get('author','')
-        if authors == '' and type(feed.get('authors',())) in (list, tuple):
-            for a in feed.get('authors',()): 
+        authors = self.ifeed.get('author','')
+        if authors == '' and type(self.ifeed.get('authors',())) in (list, tuple):
+            for a in self.ifeed.get('authors',()): 
                 if a.get('name','') != '': authors = f"""{authors}{a.get('name','')}; """
         
-        self.feed['author']                   = coalesce(feed['author'], nullif(authors,''))
-        self.feed['author_contact']           = nullif( coalesce(feed['author_contact'], self.feed_raw['feed'].get('author_detail',{}).get('email','') + "; " + self.feed_raw['feed'].get('author_detail',{}).get('href','')), '; ')
-        self.feed['publisher']                = coalesce(feed['publisher'], self.feed_raw['feed'].get('publisher', None))
-        self.feed['publisher_contact']        = nullif( coalesce(self.feed['publisher_contact'], self.feed_raw['feed'].get('publisher_detail',{}).get('email','') + "; " + self.feed_raw['feed'].get('publisher_detail',{}).get('href','')), '; ')
+        self.feed_meta_delta['author']                   = authors
+        self.feed_meta_delta['author_contact']           = nullif( self.feed_raw['feed'].get('author_detail',{}).get('email','') + "; " + self.feed_raw['feed'].get('author_detail',{}).get('href',''), '; ')
+        self.feed_meta_delta['publisher']                = self.feed_raw['feed'].get('publisher')
+        self.feed_meta_delta['publisher_contact']        = nullif( self.feed_raw['feed'].get('publisher_detail',{}).get('email','') + "; " + self.feed_raw['feed'].get('publisher_detail',{}).get('href',''), '; ')
 
         contribs = ''
-        if type(feed.get('contributors',())) in (list, tuple):
-            for c in feed.get('contributors',()): 
+        if type(self.ifeed.get('contributors',())) in (list, tuple):
+            for c in self.ifeed.get('contributors',()): 
                 if c.get('name','') != '': contribs = f"""{contribs}{c.get('name','')}; """
 
-        self.feed['contributors']             = coalesce(feed['contributors'], nullif(contribs,''))
-        self.feed['copyright']                = coalesce(feed['copyright'], self.feed_raw['feed'].get('copyright', None))
-        self.feed['title']                    = coalesce(feed['title'], self.feed_raw['feed'].get('title', None))
-        self.feed['subtitle']                 = coalesce(feed['subtitle'], self.feed_raw['feed'].get('subtitle', None))
-        self.feed['category']                 = coalesce(feed['category'], self.feed_raw['feed'].get('category', None))
+        self.feed_meta_delta['contributors']             = contribs
+        self.feed_meta_delta['copyright']                = self.feed_raw['feed'].get('copyright')
+        self.feed_meta_delta['title']                    = self.feed_raw['feed'].get('title')
+        self.feed_meta_delta['subtitle']                 = self.feed_raw['feed'].get('subtitle')
+        self.feed_meta_delta['category']                 = self.feed_raw['feed'].get('category')
 
         tags = ''
         for t in self.feed_raw['feed'].get('tags', ()): tags = f"""{tags} {scast(t.get('label',t.get('term','')), str, '')}"""
-        self.feed['tags']                     = coalesce(feed['tags'], tags)
-        self.feed['name']                     = coalesce(feed['name'], self.feed_raw['feed'].get('title', None))
-        self.feed['version']                  = self.feed_raw.get('version',None)
+        self.feed_meta_delta['tags']                     = tags
+        self.feed_meta_delta['name']                     = self.feed_raw['feed'].get('title')
+        self.feed_meta_delta['version']                  = self.feed_raw.get('version')
 
 
         err = self._get_images()
@@ -580,21 +604,21 @@ class FeedexScriptHandler:
             msg(FX_ERROR_HANDLER, _('No script file or command provided!'))
             return {}
 
-
-        # Setup transfer files' names
-        tmp_file = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")
-        while os.path.isfile(tmp_file): tmp_file = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")       
-
-        tmp_file_in = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")
-        while os.path.isfile(tmp_file_in): tmp_file_in = os.path.join(self.DB.cache_path, f"""{random_str(length=30)}.tmp""")       
-
-        # Send feed data to infile
-        save_json(tmp_file_in, self.ifeed.vals())
-
         # Setup running environ
         run_env = os.environ.copy()
-        run_env['FEEDEX_TMP_FILE'] = tmp_file
-        run_env['FEEDEX_TMP_FILE_FEED'] = tmp_file_in
+        run_env['FEEDEX_']
+        run_env['FEEDEX_FEED_ID'] = self.ifeed.get('id')
+        run_env['FEEDEX_FEED_URL'] = self.ifeed.get('url') 
+        run_env['FEEDEX_FEED_HOME'] = self.ifeed.get('link') 
+        run_env['FEEDEX_FEED_ETAG'] = self.ifeed.get('etag') 
+        run_env['FEEDEX_FEED_MODIFIED'] = self.ifeed.get('modified') 
+        run_env['FEEDEX_FEED_AGENT'] = self.ifeed.get('agent') 
+        run_env['FEEDEX_FEED_LAST_READ'] = self.ifeed.get('lastread') 
+        run_env['FEEDEX_FEED_LAST_CHECKED'] = self.ifeed.get('lastchecked') 
+        run_env['FEEDEX_FEED_HTTP_STATUS'] = self.ifeed.get('http_status') 
+        run_env['FEEDEX_FEED_INTERVAL'] = self.ifeed.get('interval') 
+        run_env['FEEDEX_FEED_NAME'] = self.ifeed.get('name')
+        run_env['FEEDEX_UID'] = fdx.uid
 
         # Substitute command line params ...
         rstr = random_str(string=command)
@@ -602,40 +626,48 @@ class FeedexScriptHandler:
         
         for i, arg, in enumerate(command):
             arg = arg.replace('%%',rstr)
-            arg = arg.replace('%T', tmp_file)
-            arg = arg.replace('%I', tmp_file_in)
+            arg = arg.replace('%I', fdx.uid)
+            arg = arg.replace('%U', self.ifeed.get('url'))
+            arg = arg.replace('%L', self.ifeed.get('lastread'))
+            arg = arg.replace('%l', self.ifeed.get('lastchecked'))
             arg = arg.replace('%A', self.http_headers.get('agent'))
             arg = arg.replace('%E', self.http_headers.get('etag'))
             arg = arg.replace('%M', self.http_headers.get('modified'))
-            arg = arg.replace('%U', self.ifeed.get('url'))
+            arg = arg.replace('%H', self.ifeed.get('link'))
             arg = arg.replace('%F', self.ifeed.get('id'))
+            arg = arg.replace('%s', self.ifeed.get('http_status'))
+            arg = arg.replace('%i', self.ifeed.get('interval'))
+            arg = arg.replace('%n', self.ifeed.get('name'))
             arg = arg.replace(rstr, '%')
             command[i] = arg
 
-        json_str = None
 
         debug(3, f"""Runing script: {' '.join(command)}""")
+        json_str = None
         try:
-            pr = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=run_env)
-            pr.wait()
-            json_str = load_json(tmp_file, None)
+            comm_pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=run_env)
+            json_str = comm_pipe.stdout.read()
         except Exception as e:
             self.error = True
             msg(FX_ERROR_HANDLER, _("Error executing script: %a"), e)
-        finally:
-            try: 
-                os.remove(tmp_file)
-                os.remove(tmp_file_in)
-            except (OSError, IOError,) as e: 
-                msg(FX_ERROR_IO, _('Error removing temp files!'), e)
-
-        
+  
         debug(3, f'Output: {json_str}')
-
-        if json_str is None:
+        feed_data_json = {}
+        try: feed_data_json =  json.loads(json_str)
+        except (OSError, json.JSONDecodeError,) as e:
             self.error = True
+            msg(FX_ERROR_HANDLER, _("Error decoding script output as JSON: %a"), e)
             return {}
-        else: return json_str
+        
+        if type(feed_data_json) is not dict:
+            self.error = True
+            msg(FX_ERROR_HANDLER, _("Invalid input format. Must be a dictionary"))
+            return {}
+        
+        if feed_data_json.get('feedex_uid') != fdx.uid:
+            self.error = True
+            msg(FX_ERROR_HANDLER, _("No valid instance ID provided. Aborting"))
+            return {}
 
 
         

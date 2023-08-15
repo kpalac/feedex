@@ -64,6 +64,11 @@ class FeedexTab(Gtk.VBox):
         self.prependable = True # Can new item be prepended to the top?
 
 
+        self.always_toggled = False # Is toggle always enabled?
+        self.start_toggled = False # Is toggle enabled initialy?
+
+
+
         # Setup main result table
         if self.type == FX_TAB_SEARCH:
             self.header_icon_name = 'edit-find-symbolic'
@@ -144,7 +149,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
 
 
         elif self.type == FX_TAB_RULES:
-            self.header_icon_name = 'view-list-compact-symbolic'
+            self.header_icon_name = 'system-run-symbolic'
             self.table = FeedexGUITable(self, ResultGUIRule(main_win=self.MW), grid=True)
             self.table.view.set_tooltip_markup(_("""These are manually added rules used for ranking and flagging.
 Each time articles are fetched or notes added, they are matched against these rules.
@@ -242,6 +247,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
         elif self.type == FX_TAB_CATALOG:
             self.header_icon_name = 'rss-symbolic'
+            self.always_toggled = True
             self.table = FeedexGUITable(self, ResultGUICatItem(main_win=self.MW), tree=True)
             self.table.view.set_tooltip_markup(_("""Mark Channels/Categories to Import.
 If Channel's parent category is selected, it will be imported as well (if a category of the same name does not exist)
@@ -270,6 +276,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.save_to_cache = False
             self.mutable = False
             self.prependable = False
+
 
 
 
@@ -326,7 +333,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 self.search_button.connect('button-press-event', self._on_button_press_header)
                 
                 if FEEDEX_FILTERS_PER_TABS[self.type].get('search') == 'catalog_combo':
-                    self.cat_import_button = f_button(_('Subscribe to Selected'), 'rss-symbolic', connect=self.MW.act.import_catalog, args=(self.table.result.toggled_ids,), tooltip=_('Import selected Channels for subscription')  )
+                    self.cat_import_button = f_button(_('Subscribe to Selected'), 'app-installed-symbolic', connect=self.MW.act.import_catalog, args=(self.table.result.toggled_ids,), tooltip=_('Import selected Channels for subscription')  )
 
 
             elif FEEDEX_FILTERS_PER_TABS[self.type].get('search') == 'button':
@@ -360,25 +367,28 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                     elif f == 'read':
                         curr_widget = self.read_combo = f_read_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Filter for Read/Unread news. Manually added entries are marked as read by default') )
                     elif f == 'flag':
-                        curr_widget = self.flag_combo = f_flag_combo(connect=self._on_filters_changed, ellipsize=False, filters=True, tooltip=_('Filter by Flag or lack thereof') )
+                        curr_widget = self.flag_combo = f_flag_filter_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Filter by Flag or lack thereof') )
                     elif f == 'notes':
-                        curr_widget = self.notes_combo = f_note_combo(search=True, ellipsize=False, tooltip=_("""Chose which item type to filter (Notes, News Items or both)"""))
+                        curr_widget = self.notes_combo = f_note_filter_combo(search=True, ellipsize=False, tooltip=_("""Chose which item type to filter (Notes, News Items or both)"""))
                     elif f == 'handler':
                         curr_widget = self.qhandler_combo = f_handler_combo(connect=self._on_filters_changed, ellipsize=False, local=True, all=True, tooltip=_('Which handler protocols should be taken into account?') )
                     elif f == 'type':
-                        curr_widget = self.qtype_combo = f_query_type_combo(connect=self._on_filters_changed, ellipsize=False, rule=False)
+                        curr_widget = self.qtype_combo = f_query_type_filter_combo(connect=self._on_filters_changed, ellipsize=False)
                     elif f == 'logic':
                         curr_widget = self.qlogic_combo = f_query_logic_combo(connect=self._on_filters_changed, ellipsize=False)
                     elif f == 'lang':
-                        curr_widget = self.qlang_combo = f_lang_combo(connect=self._on_filters_changed, ellipsize=False, with_all=True)
+                        curr_widget = self.qlang_combo = f_lang_filter_combo(connect=self._on_filters_changed, ellipsize=False)
                     elif f == 'field':
-                        curr_widget = self.qfield_combo = f_field_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Search in All or a specific field'), all_label=_('-- No Field --') )
+                        curr_widget = self.qfield_combo = f_field_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_('Choose a specific field to search'))
                     elif f == 'case':
-                        curr_widget = self.case_combo = f_dual_combo( (('___dummy',_("Detect case")),('case_sens', _("Case sensitive")),('case_ins',_("Case insensitive"))), ellipsize=False, tooltip=_('Set query case sensitivity'), connect=self._on_filters_changed)
+                        curr_widget = self.case_combo = f_case_filter_combo(ellipsize=False, connect=self._on_filters_changed)
+                    elif f == 'location':
+                        self.loc_combo, self.loc_entry = f_combo_entry(f_location_store(), connect_button=self._clear_loc_entry, tooltip=_("Filter by Channel's location"))
+                        curr_widget = self.loc_combo
                     elif f == 'catalog_field':
                         curr_widget = self.catalog_field_combo = f_catalog_field_combo()
                     elif f == 'page':
-                        self.page_len_combo     = f_page_len_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_("Choose page length for query"), default=self.config.get('page_length',3000))
+                        self.page_len_combo     = f_page_len_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_("Choose page length for query"), default=self.config.get('default_page_length',3000))
                         self.page_no_label      = f_label('Page: <b>1</b>', markup=True, wrap=False, char_wrap=False)
                         self.page_prev_button   = f_button(None, 'previous', connect=self._on_page_prev)
                         self.page_next_button   = f_button(None, 'next', connect=self._on_page_next)
@@ -438,7 +448,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         self.table.view.connect("button-press-event", self._on_button_press)
         self.connect("key-press-event", self._on_key_press)
 
-        debug(7, f'Tab created (id: {self.uid}, type:{self.type})')
+        debug(10, f'Tab created (id: {self.uid}, type:{self.type})')
 
 
         
@@ -487,6 +497,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.on_del_rule(result)
             elif isinstance(result, ResultFlag): self.MW.act.on_del_flag(result)
             elif isinstance(result, ResultPlugin): self.MW.act.on_del_plugin(result)
+            elif isinstance(result, ResultFeed): self.MW.act.on_del_feed(result)
 
 
         elif ctrl and key_name == self.config.get('gui_key_add','a'):
@@ -494,6 +505,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             elif isinstance(self.table.result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.act.on_edit_rule(None)
             elif isinstance(self.table.result, ResultFlag): self.MW.act.on_edit_flag(None)
             elif isinstance(self.table.result, ResultPlugin): self.MW.act.on_edit_plugin(None)
+            elif isinstance(result, ResultFeed): self.MW.act.on_add_from_url()
 
         elif ctrl and key_name == self.config.get('gui_key_edit','e'):
             result = self.table.get_selection()
@@ -501,6 +513,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.act.on_edit_rule(result)
             elif isinstance(result, ResultFlag): self.MW.act.on_edit_flag(result)
             elif isinstance(result, ResultPlugin): self.MW.act.on_edit_plugin(result)
+            elif isinstance(result, ResultFeed): self.MW.act.on_feed_cat('edit', result)
 
         elif ctrl and key_name in ('F2',): pass
         
@@ -509,7 +522,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             result = self.table.get_selection()
             self.MW.action_menu(result, self, event)
 
-        #debug(9, f"""{key_name}; {key}; {state}""")
+        #debug(10, f"""{key_name}; {key}; {state}""")
 
 
 
@@ -522,6 +535,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         if isinstance(self.table.result, (ResultEntry, ResultContext,)): 
             sel = self.table.get_selection()
             if isinstance(sel, (ResultEntry, ResultContext,)): self.MW.load_preview(sel)
+            elif isinstance(sel, (ResultFeed,)) and sel.get('is_category',0) != 1: self.MW.load_preview_feed(sel)
             else: self.MW.startup_decor()
 
         elif isinstance(self.table.result, ResultRule) and self.type in (FX_TAB_RULES, FX_TAB_LEARNED,): 
@@ -540,6 +554,8 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
 
 
+
+
     def _on_activate(self, widget, event, *args, **kargs):
         """ Result activation handler """
         result = self.table.get_selection()
@@ -549,10 +565,12 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         elif isinstance(result, ResultRule): self.MW.act.on_edit_rule(result)
         elif isinstance(result, ResultFlag): self.MW.act.on_edit_flag(result)
         elif isinstance(result, ResultPlugin): self.MW.act.on_edit_plugin(result)
-
+        elif isinstance(result, ResultFeed): self.MW.act.on_feed_cat('edit', result)
 
 
     def _clear_query_entry(self, *args, **kargs): self.query_entry.set_text('')
+    def _clear_loc_entry(self, *args, **kargs): self.loc_entry.set_text('')
+
     def _on_close(self, *args, **kargs): self.MW.remove_tab(self.uid, self.type)
 
     def _on_query_entry_menu(self, widget, menu, *args, **kargs):
@@ -658,7 +676,7 @@ Wildcard: <b>*</b>
 Field beginning/end: <b>^,$</b>
 Escape: \ (only if before wildcards and field markers)""") )
 
-            debug(7, 'Search filters changed...')
+            debug(10, 'Search filters changed...')
 
 
 
@@ -695,6 +713,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         if hasattr(self, 'group_combo'): self.search_filters['group'] = f_get_combo(self.group_combo)
         if hasattr(self, 'depth_combo'): self.search_filters['depth'] = f_get_combo(self.depth_combo)            
         if hasattr(self, 'rank_combo'): self.search_filters['rank'] = f_get_combo(self.rank_combo)
+        if hasattr(self, 'loc_entry'): self.search_filters['location'] = nullif(self.loc_entry.get_text().strip(), '')
 
         if hasattr(self, 'page_len_combo'): 
             self.search_filters['page_len'] = f_get_combo(self.page_len_combo)
@@ -706,7 +725,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         if hasattr(self, 'catalog_field_combo'): self.search_filters['field'] = f_get_combo(self.catalog_field_combo)       
 
 
-        debug(7, f'Search filters updated: {self.search_filters}')
+        debug(10, f'Search filters updated: {self.search_filters}')
         return 0
         
  
@@ -741,6 +760,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         if hasattr(self, 'group_combo'): f_set_combo(self.group_combo, search_filters.get('group'))
         if hasattr(self, 'depth_combo'): f_set_combo(self.depth_combo, search_filters.get('depth'))
         if hasattr(self, 'rank_combo'): f_set_combo(self.rank_combo, search_filters.get('rank'))
+        if hasattr(self, 'loc_entry'): self.loc_entry.set_text(scast(search_filters.get('location'), str, '').strip())
         if hasattr(self, 'page_len_combo'): f_set_combo(self.page_len_combo, search_filters.get('page_len'))
 
         self._on_filters_changed()
@@ -799,7 +819,7 @@ Escape: \ (only if before wildcards and field markers)""") )
 
         if self.type == FX_TAB_TREE:
             if self.search_filters.get('group',None) == 'similar': self.table.collapse_all()
-            else: self.table.expand_all()
+            else: self.table.expand_all()   
         elif self.type == FX_TAB_CATALOG:
             if self.query_entry.get_text().strip() != '': self.table.expand_all()
             else: self.table.collapse_all()  
@@ -845,6 +865,7 @@ Escape: \ (only if before wildcards and field markers)""") )
             DB = FeedexDatabase(connect=True)
             DB.connect_QP()
             QP = DB.Q
+
 
         if filters is not None: rank_scheme = filters.get('rank')
 
@@ -1005,7 +1026,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         elif self.type == FX_TAB_CATALOG:
             self.final_status = _('Find Feeds...')
             err = QP.query(qr, filters, load_all=True)
-
+        
 
 
         if err == 0: self.table.populate(QP)
@@ -1089,17 +1110,21 @@ Escape: \ (only if before wildcards and field markers)""") )
 
 
 
-
-    def apply(self, action, item, **kargs):
+    def _apply(self, action, item, **kargs):
         """ Updates local table from events from other widgets (e.g. delete, edit, new)"""
         if self.busy: return 0
         if action == FX_ACTION_EDIT and self.mutable: 
             self.table.replace(item['id'], item)
         elif action == FX_ACTION_ADD and self.mutable and self.prependable: 
             self.table.append(item)
-        elif action == FX_ACTION_DELETE and self.mutable: 
-            self.table.delete(item['id'], item.get('deleted'))
+        elif action == FX_ACTION_DELETE and self.mutable:
+            self.table.delete(item['id'], item.get('deleted', 2))
 
+    def apply(self, action, items, **kargs):
+        tp = type(items)
+        if tp is dict: self._apply(action, items, **kargs)
+        elif tp in (list, tuple):
+            for i in items: self._apply(action, i, **kargs)
 
 
 
@@ -1167,6 +1192,7 @@ class FeedexGUITable:
             self.tmp_store = None
 
         self.filtered_store = None
+        self.is_filtered = False
 
         # Currently active feed filters
         self.curr_feed_filters = None
@@ -1179,9 +1205,12 @@ class FeedexGUITable:
         if self.is_notes or self.is_grid:
             self.view.set_grid_lines(True)
 
+        self.has_toggles = False
+
         # Generate columns
         if 'gui_toggle' in self.result.gui_fields:
-            self.view.append_column( f_col('', 4, self.result.gindex('gui_toggle'), resizable=False, clickable=True, width=16, reorderable=False, connect=self._on_toggled) )
+            self.view.append_column( f_col('', 4, self.result.gindex('gui_toggle'), resizable=False, clickable=False, width=16, reorderable=False, connect=self._on_toggled) )
+            self.has_toggles = True
         if 'gui_icon' in self.result.gui_fields:
             self.view.append_column( f_col('', 3, self.result.gindex('gui_icon'), resizable=False, clickable=False, width=16, reorderable=False) )
         if 'gui_color' in self.result.gui_fields: self.color_col = self.result.gindex('gui_color')
@@ -1203,7 +1232,10 @@ class FeedexGUITable:
             if self.is_tree: self.view.set_search_equal_func(quick_find_case_ins_tree, self.view, self.result.search_col) 
             else: self.view.set_search_equal_func(quick_find_case_ins, self.view, self.result.search_col)
 
-
+        if self.has_toggles:
+            if self.parent.start_toggled or self.parent.always_toggled:
+                self.show_toggle()
+            else: self.hide_toggle()
 
 
 
@@ -1221,7 +1253,7 @@ class FeedexGUITable:
                 self.layout = self.MW.gui_cache['layouts'][self.result.table]
                 return -1
 
-            if field in self.result.gui_fields: col_name = self.result.col_names[self.result.get_index(field)]
+            if field in self.result.gui_fields: col_name = self.result.get_col_name(field)
             else: col_name = field
 
             if field in self.result.gui_markup_fields: ctype = 1
@@ -1280,7 +1312,11 @@ class FeedexGUITable:
         if to_temp:
             if self.is_tree: self.tmp_store = Gtk.TreeStore(*self.result.gui_types)
             else: self.tmp_store = Gtk.ListStore(*self.result.gui_types)
-        
+
+        if self.has_toggles:
+            self.result.toggled_ids.clear()
+            self.result.toggled_gui_ixs.clear()
+            
         self.curr_node = None
         for ix, r in enumerate(self.results):
             self.result.populate(r)
@@ -1366,15 +1402,19 @@ class FeedexGUITable:
 
     def remove(self, id, **kargs):
         """ Wrapper for removing item with a certain field value """
+        if self.has_toggles: 
+            while id in self.result.toggled_ids: self.result.toggled_ids.remove(id)
         if self.store is not None: self.store.foreach(self._for_each_remove, id)
         if self.filtered_store is not None: self.filtered_store.foreach(self._for_each_remove, id)
 
 
     def delete(self, id, lev, **kargs):
         """ Wrapper for nicely displaying deletion """
-        if isinstance(self.result, (ResultEntry, ResultContext,)): 
-            if lev == 2: self.replace(id, {'deleted':2}) 
-            else: self.replace(id, {'deleted':1})      
+        if 'deleted' in self.result.fields:
+            if self.has_toggles:
+                while id in self.result.toggled_ids: self.result.toggled_ids.remove(id)
+            if lev == 2: self.remove(id) 
+            else: self.replace(id, {'deleted':1})
         else: self.remove(id)
 
 
@@ -1444,7 +1484,7 @@ class FeedexGUITable:
                 
                 if self.result.get('feed_id') not in (0,'', None):
                     item = ResultFeed()
-                    feed = fdx.find_f_o_c(self.result.get('feed_id'), load=True)
+                    feed = fdx.load_parent(self.result.get('feed_id'))
                     if feed != -1:
                         item.populate(feed)
                         return item
@@ -1510,11 +1550,22 @@ class FeedexGUITable:
             if commit: self.commit_filter_by_feed()
 
 
+
     def commit_filter_by_feed(self, **kargs):
         """ Commit filtering """
         self.lock.acquire()
-        if self.curr_feed_filters is not None: self.view.set_model(self.filtered_store)
-        else: self.view.set_model(self.store)
+        if self.has_toggles:
+            self.result.toggled_ids.clear()
+            self.result.toggled_gui_ixs.clear()
+        
+        if self.curr_feed_filters is not None:
+            if self.has_toggles and self.toggle_visible: self.filtered_store.foreach(self._untoggle_all_foreach)
+            self.view.set_model(self.filtered_store)
+            self.is_filtered = True
+        else:
+            if self.has_toggles and self.toggle_visible: self.store.foreach(self._untoggle_all_foreach)
+            self.view.set_model(self.store)
+            self.is_filtered = False
         self.lock.release()
 
 
@@ -1530,31 +1581,50 @@ class FeedexGUITable:
 
 
 
-    def _on_toggled_node(self, model, path, iter, parent_id, btog):
-        if coalesce(model[iter][self.result.gindex('parent_id')],0) == parent_id:
-            id = model[iter][self.result.gindex('id')]
-            model[iter][self.result.gindex('gui_toggle')] = btog
-            if btog:
-                if id not in self.result.toggled_ids: self.result.toggled_ids.append(id)
-            else:
-                while id in self.result.toggled_ids: self.result.toggled_ids.remove(id)
-        return False
 
 
-
-    def _on_toggled(self, widget, path, *args):
+    def _on_toggled(self, widget, path, *args, **kargs):
         """ Handle toggled signal and pass results to nodes if needed """
-        id = self.store[path][self.result.gindex('id')]
-        btog = not self.store[path][self.result.gindex('gui_toggle')]
-        self.store[path][self.result.gindex('gui_toggle')] = btog
+        btog = kargs.get('btog')
+        model = kargs.get('model')
 
-        if btog:
-            if id not in self.result.toggled_ids: self.result.toggled_ids.append(id)
-        else: 
-            while id in self.result.toggled_ids: self.result.toggled_ids.remove(id)
+        if model is None:
+            if self.is_filtered: model = self.filtered_store
+            else: model = self.store
         
-        if self.store[path][self.result.gindex('is_node')] == 1:
-            self.store.foreach(self._on_toggled_node, id, btog)
+        row = model[path]
+        iter = model.get_iter(path)
+
+        id = row[self.result.gindex('id')]
+        gui_ix = row[self.result.gindex('gui_ix')]
+        if self.is_tree: is_node = row[self.result.gindex('is_node')]
+        else: is_node = 0
+        if btog is None: btog = not row[self.result.gindex('gui_toggle')]
+        row[self.result.gindex('gui_toggle')] = btog
+
+        if is_node == 1 and not isinstance(self.result, ResultCatItem):
+            if btog:
+                if id not in self.result.toggled_gui_ixs: self.result.toggled_gui_ixs.append(gui_ix)
+            else: 
+                while gui_ix in self.result.toggled_gui_ixs: self.result.toggled_gui_ixs.remove(gui_ix)
+        else:
+            if btog: 
+                if id not in self.result.toggled_ids: self.result.toggled_ids.append(id)
+            else: 
+                while id in self.result.toggled_ids: self.result.toggled_ids.remove(id)
+
+        if is_node == 1:
+            for i in range(model.iter_n_children(iter)):
+                citer = model.iter_nth_child(iter, i)
+                if citer is not None:
+                    cpath = model.get_path(citer)
+                    self._on_toggled(widget, cpath, citer, btog=btog)
+        debug(10, f'Toggled ids: {self.result.toggled_ids}')
+
+
+
+
+
 
 
     def _untoggle_all_foreach(self, model, path, iter):
@@ -1563,8 +1633,50 @@ class FeedexGUITable:
 
     def untoggle_all(self, *args, **kargs):
         """ Untoggle all checkboxes """
-        self.result.toggled_ids = []
+        self.result.toggled_ids.clear()
+        self.result.toggled_gui_ixs.clear()
         self.store.foreach(self._untoggle_all_foreach)
+        if self.filtered_store is not None: self.filtered_store.foreach(self._untoggle_all_foreach)
+        debug(10, f'Toggled ids: {self.result.toggled_ids}')
+
+
+
+    def _toggle_all_foreach(self, model, path, iter, apply):
+        model[iter][self.result.gindex('gui_toggle')] = True
+        if apply:
+            if 'is_node' in self.result.gui_fields: 
+                is_node = model[iter][self.result.gindex('is_node')]
+            else: is_node = 0
+            
+            if is_node:
+                gui_ix = model[iter][self.result.gindex('gui_ix')] 
+                if gui_ix not in self.result.toggled_gui_ixs: self.result.toggled_gui_ixs.append(gui_ix)
+            else:
+                id = model[iter][self.result.gindex('id')]
+                if id not in self.result.toggled_ids: self.result.toggled_ids.append(id)
+
+
+    def toggle_all(self, *args, **kargs):
+        """ Toggle all checkboxes """
+        self.result.toggled_ids.clear()
+        self.result.toggled_gui_ixs.clear()
+        self.store.foreach(self._toggle_all_foreach, True)
+        if self.filtered_store is not None: self.filtered_store.foreach(self._toggle_all_foreach, False)
+        debug(10, f'Toggled ids: {self.result.toggled_ids}')
+
+
+
+    def show_toggle(self, *args, **kargs):
+        if not self.has_toggles: return 0
+        self.view.get_column(0).set_visible(True)
+        self.toggle_visible = True
+
+
+    def hide_toggle(self, *args, **kargs):
+        if not self.has_toggles: return 0
+        self.view.get_column(0).set_visible(False)
+        self.untoggle_all()
+        self.toggle_visible = False
 
 
 
@@ -1581,7 +1693,7 @@ class FeedexGUITable:
         
         self.MW.gui_cache['layouts'][self.result.table] = layout.copy()
         msg(_('Layout marked as default for this tab type') )
-        debug(7, f'Layout saved: {self.MW.gui_cache}')
+        debug(10, f'Layout saved: {self.MW.gui_cache}')
 
 
 

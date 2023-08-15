@@ -99,6 +99,7 @@ class BasicDialog(Gtk.Dialog):
 
 
 
+
     def on_close(self, *args):
         self.response = None
         self.close()
@@ -152,8 +153,7 @@ class PreferencesDialog(Gtk.Dialog):
     def __init__(self, parent, **kargs):
 
         self.parent = parent
-        self.config = parent.config.copy()
-        self.config_def = parent.config.copy()
+        self.config = self.parent.config
 
         Gtk.Dialog.__init__(self, title=_('FEEDEX Preferences'), transient_for=parent, flags=0)
         box = self.get_content_area()
@@ -163,8 +163,8 @@ class PreferencesDialog(Gtk.Dialog):
         self.set_position(Gtk.WindowPosition.CENTER)
 
 
-        self.result = {}
-        self.response = 0        
+        self.result = self.config.clone()
+        self.response = 0
 
 
         self.desktop_notify_button = Gtk.CheckButton.new_with_label(_('Enable desktop notifications?') )
@@ -338,6 +338,9 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         self.no_history_button = Gtk.CheckButton.new_with_label(_('Do not save queries in History?'))
         self.no_history_button.set_tooltip_markup(_('Should saving search phrases to History be ommitted?'))
 
+        self.allow_pipe_button = Gtk.CheckButton.new_with_label(_('Allow listening for requests?'))
+        self.allow_pipe_button.set_tooltip_markup(_("""If checked, Feedex GUI session will listen for requests from another processes.
+This allows for adding entries, rules and feeds from external Feedex instances, useful for desktop hotkeys etc."""))
 
         self.err_label = f_label('', markup=True)
 
@@ -444,12 +447,11 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         system_grid.attach(search_engine_combo, 6,8, 20,1)
         system_grid.attach(win_name_excl_label, 1,9, 4,1)
         system_grid.attach(self.win_name_excl_entry, 6,9, 20,1)
-
-        system_grid.attach(clear_cache_label, 1,10, 5,1)
-        system_grid.attach(self.clear_cache_entry, 7,10, 3,1)
-
-        system_grid.attach(profile_name_label, 1,11, 5,1)
-        system_grid.attach(self.profile_name_entry, 7,11, 3,1)
+        system_grid.attach(self.allow_pipe_button, 1,10, 7,1)
+        system_grid.attach(clear_cache_label, 1,11, 5,1)
+        system_grid.attach(self.clear_cache_entry, 7,11, 3,1)
+        system_grid.attach(profile_name_label, 1,12, 5,1)
+        system_grid.attach(self.profile_name_entry, 7,12, 3,1)
 
 
 
@@ -479,6 +481,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         self.on_changed()
 
         self.show_all()
+
 
 
 
@@ -616,7 +619,10 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
         if self.config.get('no_history', False): self.no_history_button.set_active(True)
         else: self.no_history_button.set_active(False)
-
+        
+        if self.config.get('allow_pipe', False): self.allow_pipe_button.set_active(True)
+        else: self.allow_pipe_button.set_active(False)
+        
         self.win_name_excl_entry.set_text(coalesce(self.config.get('window_name_exclude'),'Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird'))
 
         self.on_changed()
@@ -706,11 +712,14 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
         if self.no_history_button.get_active(): self.result['no_history'] = True
         else: self.result['no_history'] = False
 
+        if self.allow_pipe_button.get_active(): self.result['allow_pipe'] = True
+        else: self.result['allow_pipe'] = False
+
 
 
     def validate_entries(self, *args):
         self.get_data()
-        err = fdx.validate_config(config=self.result, strict=True, load=False)
+        err = self.result.validate(default=False, apply=False)
         if err != 0:
             self.err_label.set_markup(gui_msg(*err))
             return False            
@@ -723,11 +732,7 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
 
     def on_save(self, *args):
         if self.validate_entries():
-            old_config = self.config.copy()
-            fdx.config = self.result.copy()
-            self.parent.config = self.result.copy()
-            err = fdx.save_config()
-            fdx.validate_config(load=True, strict=False)
+            err = self.result.save()
             if err == 0:
                 
                 self.response = 1
@@ -740,6 +745,8 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
                         self.result.get('recom_algo') !=  self.config.get('recom_algo'):
                     self.parent.DB.load_terms()
                 
+                if not self.result.get('allow_pipe',False) and fdx.listen: self.parent.stop_listen()
+                elif self.result.get('allow_pipe',False) and not fdx.listen: self.parent.start_listen()
                 
                 if  self.result.get('gui_layout') !=  self.config.get('gui_layout') or \
                     self.result.get('gui_orientation') !=  self.config.get('gui_orientation'): 
@@ -755,15 +762,13 @@ It will prevent littering database with Mozilla, Chrome, Safar headers when addi
                         lang.install(FEEDEX_LOCALE_PATH)
                     self.response = 2
                 
-                
+                fdx.config = self.result
 
-            else: 
-                fdx.config = old_config.copy()
-                self.parent.config = old_config.copy()
+                
 
     def on_cancel(self, *args):
         self.response = 0
-        self.result = {}
+        self.result.clear()
         self.close()
 
 
@@ -828,8 +833,12 @@ class CalendarDialog(Gtk.Dialog):
         right_box.pack_start(self.to_clear_button, False, False, 1)
 
         self.show_all()
+
         self.on_to_selected()
         self.on_from_selected()
+
+
+
 
     def on_accept(self, *args):
         self.response = 1
@@ -875,6 +884,211 @@ class CalendarDialog(Gtk.Dialog):
 
 
 
+
+
+
+
+
+class MassEditItem(Gtk.HBox):
+    """ Item for mass editting: checkbox + widget """
+    def __init__(self, label, widget, field_name, MW, **kargs):
+        tooltip = kargs.get('tooltip')
+        self.MW = MW
+        self.label = label
+        self.field_name = field_name
+        self.widget_type = widget
+        self.toggled = False
+        
+        Gtk.HBox.__init__(self)        
+
+        self.error = ''
+
+        self.button = Gtk.CheckButton.new_with_label(self.label)
+
+        if self.widget_type == 'feeds': self.cwidget = f_feed_combo(self.MW, with_feeds=True, no_empty=True)
+        elif self.widget_type == 'cats': self.cwidget = f_feed_combo(self.MW, with_feeds=False, no_empty=False)
+        elif self.widget_type == 'feeds_rule': self.cwidget = f_feed_combo(self.MW, with_feeds=True)
+        elif self.widget_type == 'flags': self.cwidget = f_flag_combo(filters=False)
+        elif self.widget_type == 'notes': self.cwidget = f_note_combo(search=False)
+        elif self.widget_type == 'num_entry_int': self.cwidget = Gtk.Entry()
+        elif self.widget_type == 'num_entry_float': self.cwidget = Gtk.Entry()
+        elif self.widget_type == 'text_entry': self.cwidget = Gtk.Entry()
+
+        elif self.widget_type == 'fields': self.cwidget = f_field_combo()
+        elif self.widget_type == 'query_type': self.cwidget = f_query_type_combo(rule=True)
+        elif self.widget_type == 'lang': self.cwidget = f_lang_combo()
+
+        elif self.widget_type == 'no_yes': self.cwidget = f_yesno_combo()
+
+        elif self.widget_type == 'color': self.cwidget = Gtk.ColorButton()
+        elif self.widget_type == 'color_cli': self.cwidget = f_cli_color_combo()
+
+        elif self.widget_type == 'handler': self.cwidget = f_handler_combo(local=True)
+        elif self.widget_type == 'user_agent': self.cwidget, self.user_agent_entry = f_user_agent_combo()
+
+
+        if tooltip is not None: self.set_tooltip_markup(tooltip)
+        self.cwidget.set_sensitive(False)
+        self.button.connect('toggled', self.on_toggled)
+
+        self.pack_start(self.button, False, False, 2)
+        self.pack_start(self.cwidget, False, False, 2)
+
+        self.show_all()
+
+
+
+
+    def on_toggled(self, *args):
+        self.toggled = not self.toggled
+        if self.toggled: self.cwidget.set_sensitive(True)
+        else: self.cwidget.set_sensitive(False)
+
+
+    def get_val(self, *args):
+        if not self.toggled: return -2
+        else:
+            if self.widget_type in ('feeds','cats','feeds_rule','flags','notes','fields','query_type','color_cli','langs','no_yes','handler',): 
+                return f_get_combo(self.cwidget)
+            elif self.widget_type in ('user_agent'):
+                return scast(self.user_agent_entry.get_text(), str, '')
+            elif self.widget_type in ('text_entry',):
+                return scast(self.cwidget.get_text(), str, '')
+            elif self.widget_type in ('num_entry_int',): 
+                val = scast(self.cwidget.get_text(), int, None)
+                if val is not None: return val
+                else: 
+                    self.error = f"""{self.label} {_('must be an integer')}"""
+                    return -3
+            elif self.widget_type in ('num_entry_float',): 
+                val = scast(self.cwidget.get_text(), float, None)
+                if val is not None: return val
+                else: 
+                    self.error = f"""{self.label} {_('must be a decimal number')}"""
+                    return -3
+            elif self.widget_type in ('color',): 
+                color = self.cwidget.get_color()
+                return color.to_string()
+
+
+
+
+
+
+
+class MassEditDialog(Gtk.Dialog):
+    """ Edit category dialog (change title and subtitle) """
+    def __init__(self, parent, item, item_no, **kargs):
+
+        self.MW = parent
+        self.item = item
+
+        if isinstance(item, ResultEntry): 
+            item_type = FX_ENT_ENTRY
+            title = f"""{_('Edit')} {item_no} {_('Entries...')}"""
+        elif isinstance(item, ResultRule):
+            item_type = FX_ENT_RULE
+            title = f"""{_('Edit')} {item_no} {_('Rules...')}"""
+        elif isinstance(item, ResultFlag):
+            item_type = FX_ENT_FLAG
+            title = f"""{_('Edit')} {item_no} {_('Flags...')}"""
+        elif isinstance(item, ResultFeed):
+            item_type = FX_ENT_FEED
+            title = f"""{_('Edit')} {item_no} {_('Feeds...')}"""
+
+
+        Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
+        self.set_border_width(10)
+        self.set_default_size(kargs.get('width',400), kargs.get('height',150))
+        box = self.get_content_area()
+
+        self.table = []
+        if item_type == FX_ENT_ENTRY:
+            self.table.append(MassEditItem(_('Feed/Category'), 'feeds', 'feed_id', self.MW, tooltip=_('Change Feed/Category of selected items') )) 
+            self.table.append(MassEditItem(_('Flag'), 'flags', 'flag', self.MW, tooltip=_('Change Flag for selected items') )) 
+            self.table.append(MassEditItem(_('Notes/News'), 'notes', 'note', self.MW, tooltip=_('Change News/Note status for selected items') )) 
+            self.table.append(MassEditItem(_('Weight/Read'), 'num_entry_int', 'read', self.MW, tooltip=_('Change Read Status/Weight used in recommendations') )) 
+            self.table.append(MassEditItem(_('Importance'), 'num_entry_float', 'importance', self.MW, tooltip=_('Change Importance boost used in recommendations') )) 
+
+        elif item_type == FX_ENT_RULE:
+            self.table.append(MassEditItem(_('Feed/Category'), 'feeds_rule', 'feed_id', self.MW, tooltip=_('Which specific Feed/Category should be matched?') ))
+            self.table.append(MassEditItem(_('Flag'), 'flags', 'flag', self.MW, tooltip=_('Which flag rules will be giving?') ))
+            self.table.append(MassEditItem(_('Query Field'), 'fields', 'field', self.MW, tooltip=_('Which specific field should be queried?') ))
+            self.table.append(MassEditItem(_('Query Type'), 'query_type', 'type', self.MW, tooltip=_('Rules matching type') ))
+            self.table.append(MassEditItem(_('Language'), 'lang', 'lang', self.MW, tooltip=_('Language used for full text stemming/matching') ))
+            self.table.append(MassEditItem(_('Case Ins.'), 'no_yes', 'case_insensitive', self.MW, tooltip=_('Is matching case insensitive?') )) 
+            self.table.append(MassEditItem(_('Additive?'), 'no_yes', 'additive', self.MW, tooltip=_("""Are Rules' weights additive?""") )) 
+            self.table.append(MassEditItem(_('Weight/Boost'), 'num_entry_float', 'weight', self.MW, tooltip=_('Change Importance boost used in recommendations') )) 
+
+        elif item_type == FX_ENT_FLAG:
+            self.table.append(MassEditItem(_('Color'), 'color', 'color', self.MW, tooltip=_('Flag color used') )) 
+            self.table.append(MassEditItem(_('Color (CLI)'), 'color_cli', 'color_cli', self.MW, tooltip=_('Flag color used in CLI display') )) 
+
+        elif item_type == FX_ENT_FEED:
+            self.table.append(MassEditItem(_('Category'), 'cats', 'parent_id', self.MW, tooltip=_("Channel's parent category") ))
+            self.table.append(MassEditItem(_('Fetch?'), 'no_yes', 'fetch', self.MW, tooltip=_("""Should Channel be fetched from? You can decide if some Channels should be skipped""") )) 
+            self.table.append(MassEditItem(_('Autoupdate?'), 'no_yes', 'autoupdate', self.MW, tooltip=_("""Should Channel's metadata be updated upon fetching?""") )) 
+            self.table.append(MassEditItem(_('Check interval'), 'num_entry_int', 'interval', self.MW, tooltip=_('How often (in minutes) should thes Channel be checked for new items?') )) 
+            self.table.append(MassEditItem(_('Errors'), 'num_entry_int', 'error', self.MW, tooltip=_('Error count for a Chanel. You can use this to mark all of them as healthy/unhealthy') )) 
+            self.table.append(MassEditItem(_('Handler'), 'handler', 'handler', self.MW, tooltip=_('Which handler to use for fetching?') )) 
+            self.table.append(MassEditItem(_('User Agent'), 'user_agent', 'user_agent', self.MW, tooltip=_('Which user agent to use for fetching?') )) 
+            self.table.append(MassEditItem(_('Location'), 'text_entry', 'location', self.MW)) 
+
+
+        self.err_label = f_label('')
+
+        save_button = f_button(_('Save'),'object-select-symbolic', connect=self.on_save)
+        cancel_button = f_button(_('Cancel'),'action-unavailable-symbolic', connect=self.on_cancel)
+    
+        self.response = 0
+        self.result = {}
+
+        tbox = Gtk.Box()
+        tbox.set_orientation(Gtk.Orientation.VERTICAL)
+        tbox.set_homogeneous(False)
+        tbox.set_border_width(2)
+
+        for t in self.table: tbox.pack_start(t, False, False, 1)
+
+        tbox.pack_start(self.err_label, False, False, 5)
+
+
+        bbox = Gtk.Box()
+        bbox.set_orientation(Gtk.Orientation.HORIZONTAL)
+        bbox.set_homogeneous(False)
+        bbox.set_border_width(5)
+
+        bbox.pack_start(cancel_button, False, False, 5)
+        bbox.pack_end(save_button, False, False, 5)
+            
+        box.add(tbox)
+        box.add(bbox)
+
+        self.show_all()
+
+
+
+
+    def get_data(self):
+        self.result = {}
+        for t in self.table:
+            val = t.get_val()
+            if val == -2: continue
+            elif val == -3:
+                self.err_label.set_markup(gui_msg(FX_ERROR_VAL, t.error))
+                return False
+            else: self.result[t.field_name] = val
+        return True
+
+
+    def on_cancel(self, *args):
+        self.response = 0
+        self.close()
+
+    def on_save(self, *args):
+        self.response = 1
+        if self.get_data() is False: return 0
+        self.close()
 
 
 

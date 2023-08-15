@@ -21,11 +21,10 @@ class FeedexMainWin(Gtk.Window, FeedexGUISession):
         
         # Init main bus vars
         fdx.task_counter = 0
-        
+
 
         # Main DB interface - init and check for lock and/or DB errors
-        self.connect_db(None) 
-        fdx.db_lock = False
+        self.connect_db(None)
 
         # Init action coordinator
         self.act = FeedexGUIActions(self)
@@ -61,6 +60,7 @@ class FeedexMainWin(Gtk.Window, FeedexGUISession):
         self.new_rule = {'additive':1}
         self.new_flag = {}
         self.new_plugin = {}
+
         # ... and for preview
         self.prev_entry = {}
         self.prev_entry_links = []
@@ -80,6 +80,9 @@ class FeedexMainWin(Gtk.Window, FeedexGUISession):
         Gtk.Window.__init__(self, title='Feedex')
         self.lock = threading.Lock()
         GLib.timeout_add(interval=250, function=self._on_timer)
+
+        # Pipe listening
+        self.start_listen()
 
         self.set_border_width(10)
         self.set_icon(self.icons['main'])
@@ -215,8 +218,6 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         self.connect('window-state-event', self._on_state_event)
         self.connect('delete-event', self._on_delete_event)
 
-
-
         # Launch startup tabs
         self.add_tab({'type':FX_TAB_PLACES, 'query':FX_PLACE_LAST, 'filters': {}, 'do_search':True})
 
@@ -229,9 +230,6 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
         # Run onboarding after DB creation
         if self.DB.created: self.add_tab({'type':FX_TAB_CATALOG, 'do_search':True})
-
-
-
 
 
 
@@ -314,8 +312,13 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
 
     def _on_close(self, *args):
-        self.DB.close()
         self._save_gui_cache()
+        # Piping cleanup
+        if self.config.get('allow_pipe',False): self.stop_listen()
+        self.DB.clear_param('session_id')
+        # Close DB
+        self.DB.close()
+
 
     def _on_state_event(self, widget, event): self.gui_cache['win_maximized'] = bool(event.new_window_state & Gdk.WindowState.MAXIMIZED)
 
@@ -356,7 +359,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.gui_cache['tabs'].append(tab_dc)
 
         err = save_json(self.gui_cache_path, self.gui_cache)
-        if err == 0: debug(7, 'Saved GUI attributes: ', self.gui_cache)
+        if err == 0: debug(10, 'Saved GUI attributes: ', self.gui_cache)
 
 
 
@@ -405,8 +408,9 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
 
         # Handle signals from main bus
-        if len(fdx.bus_q) > 0:
-            m = fdx.bus_q[0]
+        if fdx.handle_bus:
+
+            m = fdx.bus_pop()
             
             if type(m) is int: code = m
             else: code = m[0]
@@ -467,6 +471,18 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                 self.button_feeds_download.set_sensitive(True)
                 self.button_new.set_sensitive(True)
 
+            elif code == FX_ACTION_RELOAD_TRASH:
+                for i in range(self.upper_notebook.get_n_pages()):
+                    tb = self.upper_notebook.get_nth_page(i)
+                    if tb is None: continue
+                    if tb.type == FX_TAB_PLACES and self.curr_place == FX_PLACE_TRASH_BIN:
+                        tb.query(FX_PLACE_TRASH_BIN, {})
+                        break
+
+            elif code == FX_ACTION_HANDLE_REQUEST:
+                if self.config.get('allow_pipe', False) and self.child_windows == 0: 
+                    self.act.on_handle_req(fdx.req_pop())
+
             else:
                 item = m[1]
                 tab_types = m[2]
@@ -474,10 +490,6 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                     tb = self.upper_notebook.get_nth_page(i)
                     if tb is None: continue
                     if tb.type in tab_types: tb.apply(code, item)
-
-
-            fdx.bus_del(0)
-
 
         return True
 
@@ -501,7 +513,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             event.button = 3
             self.main_alt_menu(event)
         
-        #debug(9, f"""{key_name}; {key}; {state}""")
+        #debug(10, f"""{key_name}; {key}; {state}""")
 
     def _on_prev_clicked(self, *args): self.tab_changing = True
 
@@ -548,8 +560,6 @@ It will also take some time to perform""") ))
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Clear cache'), self.act.on_clear_cache, icon='edit-clear-all-symbolic', tooltip=_("""Clear downloaded temporary files with images/thumbnails to reclaim disk space""") ) )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
-        menu.append( f_menu_item(1, _('Unlock fetching'), self.act.on_unlock_fetching, icon='system-lock-screen-symbolic', tooltip=_("""Manually unlock DB for fetching""") ) )
-        menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Database statistics'), self.act.on_show_stats, icon='drive-harddisk-symbolic') )
         return menu
 
@@ -562,7 +572,7 @@ It will also take some time to perform""") ))
 
     def main_menu(self, *args):
         menu = Gtk.Menu()
-        menu.append( f_menu_item(1, _('Rules'), self.add_tab, kargs={'type':FX_TAB_RULES, 'do_search':True}, icon='view-list-compact-symbolic', tooltip=_('Open a new tab showing Saved Rules') ) )
+        menu.append( f_menu_item(1, _('Rules'), self.add_tab, kargs={'type':FX_TAB_RULES, 'do_search':True}, icon='system-run-symbolic', tooltip=_('Open a new tab showing Saved Rules') ) )
         menu.append( f_menu_item(1, _('Flags'), self.add_tab, kargs={'type':FX_TAB_FLAGS, 'do_search':True}, icon='marker-symbolic', tooltip=_('Open a new tab showing Flags') ) )
         menu.append( f_menu_item(1, _('Learned Keywords'), self.add_tab, kargs={'type':FX_TAB_LEARNED, 'do_search':True}, icon='applications-engineering-symbolic', tooltip=_('Open a new tab showing Learned Keywords for recommendations') ) )
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -682,13 +692,35 @@ It will also take some time to perform""") ))
             if tab.table.result_no > 0: plugin_filter.append(FX_PLUGIN_RESULTS)
 
 
+        if tab.type in (FX_TAB_FEEDS,):
+
+            if tab.edit_mode and len(tab.feed.toggled_ids) > 0:
+                if menu is None: menu = Gtk.Menu()
+                else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Edit selected...'), self.act.on_multi, args=(tab.feed, FX_ENT_ACT_UPD,), icon='edit-symbolic') )
+                menu.append( f_menu_item(1, _('Delete selected...'), self.act.on_multi, args=(tab.feed, FX_ENT_ACT_DEL,), icon='edit-delete-symbolic') )
+
+
+        elif tab.type not in (FX_TAB_CATALOG,):
+            if tab.table.has_toggles and tab.table.toggle_visible and len(tab.table.result.toggled_ids) > 0:
+                if menu is None: menu = Gtk.Menu()
+                else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
+            
+                if tab.type == FX_TAB_PLACES and self.curr_place == FX_PLACE_TRASH_BIN:
+                    menu.append( f_menu_item(1, _('Permanently del. selected...'), self.act.on_multi, args=(tab.table.result, FX_ENT_ACT_DEL_PERM,), icon='edit-delete-symbolic') )
+                    menu.append( f_menu_item(1, _('Restore selected...'), self.act.on_multi, args=(tab.table.result, FX_ENT_ACT_RES,), icon='edit-redo-rtl-symbolic') )
+            
+                else:
+                    if isinstance(tab.table.result, (ResultEntry, ResultRule, ResultFlag,)):
+                        menu.append( f_menu_item(1, _('Edit selected...'), self.act.on_multi, args=(tab.table.result, FX_ENT_ACT_UPD,), icon='edit-symbolic') )
+                    menu.append( f_menu_item(1, _('Delete selected...'), self.act.on_multi, args=(tab.table.result, FX_ENT_ACT_DEL,), icon='edit-delete-symbolic') )
+
 
 
         if isinstance(item, (ResultEntry, ResultContext,)):
             
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
-            
             if coalesce(item.get('is_deleted'),0) == 0:
                 mark_menu = Gtk.Menu()
                 mark_menu.append( f_menu_item(1, _('Read (+1)'), self.act.on_mark, args=('read', item,), icon='bookmark-new-symbolic', tooltip=_("Number of reads if counted towards this entry keyword's weight when ranking incoming articles") ) )
@@ -840,21 +872,6 @@ It will also take some time to perform""") ))
                     menu.append( f_menu_item(1, _('Add Channel'), self.act.on_feed_cat, args=('new_channel', None), icon='list-add-symbolic') )
                     menu.append( f_menu_item(1, _('Add Category'), self.act.on_feed_cat, args=('new_category', None), icon='folder-new-symbolic') )
                     
-                    menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                    if item['is_category'] == 1: menu.append( f_menu_item(1, _('Move Category...'), self.feed_tab.copy_feed, icon='edit-cut-symbolic') ) 
-                    else: menu.append( f_menu_item(1, _('Move Feed...'), self.feed_tab.copy_feed, icon='edit-cut-symbolic') ) 
-                    
-                    if not fdx.db_fetch_lock and self.feed_tab.copy_selected.get('id') is not None:
-                        if self.feed_tab.copy_selected['is_category'] == 1:
-                            if item['is_category'] == 1:
-                                menu.append( f_menu_item(1, f'{_("Insert")} {esc_mu(self.feed_tab.copy_selected.get("name",""))} {_("here ...")}', self.feed_tab.insert_feed, args=(item,), icon='edit-paste-symbolic') )
-                        else:
-                            if item['is_category'] == 1:
-                                menu.append( f_menu_item(1, f'{_("Assign")} {esc_mu(self.feed_tab.copy_selected.get("name",""))} {_("here ...")}', self.feed_tab.insert_feed, args=(item,), icon='edit-paste-symbolic') ) 
-                            else:
-                                menu.append( f_menu_item(1, f'{_("Insert")} {esc_mu(self.feed_tab.copy_selected.get("name",""))} {_("here ...")}', self.feed_tab.insert_feed, args=(item,), icon='edit-paste-symbolic') )
-                
-
                 if item['is_category'] != 1:
                     menu.append( f_menu_item(1, _('Go to Channel\'s Homepage'), self.act.on_go_home, args=(item,), icon='user-home-symbolic') )
         
@@ -875,11 +892,18 @@ It will also take some time to perform""") ))
 
                     plugin_filter.append(FX_PLUGIN_FEED)
 
+
                 elif not fdx.db_fetch_lock:
                     menu.append( f_menu_item(1, _('Edit Category'), self.act.on_feed_cat, args=('edit',item,), icon='edit-symbolic') )
                     menu.append( f_menu_item(1, _('Remove Category'), self.act.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
 
                     plugin_filter.append(FX_PLUGIN_CATEGORY)
+
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Move'), self.feed_tab.reorder_copy, icon='edit-cut-symbolic') )
+                if self.feed_tab.reorder_buffer != {}:
+                    menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                    menu.append( f_menu_item(1, f"{_('Insert')} {self.feed_tab.reorder_buffer.get('name')} {_('here...')}", self.feed_tab.reorder_insert, icon='edit-paste-symbolic') )
 
 
             elif (not fdx.db_fetch_lock) and item['deleted'] == 1 and tab.type == FX_TAB_FEEDS:
@@ -898,7 +922,6 @@ It will also take some time to perform""") ))
             menu.append( f_menu_item(1, _('Empty Trash'), self.act.on_empty_trash, icon='edit-delete-symbolic') )
 
         else:
-            
             if tab.type == FX_TAB_LEARNED and not fdx.db_fetch_lock:
                 if menu is None: menu = Gtk.Menu()
                 else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -920,15 +943,42 @@ It will also take some time to perform""") ))
                 else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(3, _('Plugins...'), pl_menu, icon='extension-symbolic') )
 
+        if tab.type in (FX_TAB_FEEDS,):
+                
+            if tab.edit_mode:
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Select all'), tab.toggle_all, icon='list-add-symbolic'))  
+                menu.append( f_menu_item(1, _('Unselect all'), tab.untoggle_all, icon='list-remove-symbolic'))  
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Normal Mode...'), tab.hide_toggle, icon='go-previous-symbolic'))  
+            else:
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Edit Mode...'), tab.show_toggle, icon='checkbox-checked-symbolic', tooltip=_("""Multiple selection mode allows user to check many items at once and perform mass operations on them. 
+Toggle items to select and choose <b>Edit selected...</b> menu option to edit multiple entries at once.
+Choose <b>Delete</b> to delete selected items""")) )
 
-            if tab.type not in (FX_TAB_FEEDS,) and tab.table.result_no > 0:
-                if tab.table.is_tree:
+        elif tab.table.result_no > 0:
+            if tab.table.is_tree:
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Expand all'), tab.table.expand_all, icon='expand-all-symbolic'))  
+                menu.append( f_menu_item(1, _('Collapse all'), tab.table.collapse_all, icon='collapse-all-symbolic'))  
+                    
+        if  tab.type not in (FX_TAB_FEEDS,) and tab.table.has_toggles:
+            if tab.type == FX_TAB_CATALOG:
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Unselect all'), tab.table.untoggle_all, icon='list-remove-symbolic'))  
+            elif tab.table.toggle_visible:
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Select all'), tab.table.toggle_all, icon='list-add-symbolic'))  
+                menu.append( f_menu_item(1, _('Unselect all'), tab.table.untoggle_all, icon='list-remove-symbolic'))  
+                if not tab.always_toggled:
                     menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                    menu.append( f_menu_item(1, _('Expand all'), tab.table.expand_all, icon='list-add-symbolic'))  
-                    menu.append( f_menu_item(1, _('Collapse all'), tab.table.collapse_all, icon='list-remove-symbolic'))  
-                    if tab.type == FX_TAB_CATALOG:
-                        menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                        menu.append( f_menu_item(1, _('Untoggle all'), tab.table.untoggle_all, icon='list-remove-symbolic'))  
+                    menu.append( f_menu_item(1, _('Normal Mode...'), tab.table.hide_toggle, icon='go-previous-symbolic'))  
+            else: 
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Edit Mode...'), tab.table.show_toggle, icon='checkbox-checked-symbolic', tooltip=_("""Multiple selection mode allows user to check many items at once and perform mass operations on them. 
+Toggle items to select and choose <b>Edit selected...</b> menu option to edit multiple entries at once.
+Choose <b>Delete</b> to delete selected items""")) )
 
 
         if tab.type not in (FX_TAB_FEEDS,):
@@ -973,7 +1023,7 @@ It will also take some time to perform""") ))
         if not (selection == () or len(selection) != 3):
             text = widget.get_text()
             selection_text = scast(text[selection[1]:selection[2]], str, '')
-            debug(7, f'Selected text: {selection_text}')
+            debug(10, f'Selected text: {selection_text}')
             if selection_text != '':
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Search for this Term'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'query':selection_text}, icon='edit-find-symbolic'))  
@@ -1035,11 +1085,12 @@ It will also take some time to perform""") ))
     def _on_show_details(self, *args, **kargs):
         """ Denerate detail string for entry preview """
         entry = FeedexEntry(self.DB, id=self.prev_entry.get('id',-1))
+        
         if not entry.exists: return 0
         
         disp_str = ''
 
-        entry.ling(index=False, rank=False, learn=True, save_terms=False)
+        entry.ling(index=False, rank=False, learn=True)
         kwd_str = ''
         for k in entry.terms: kwd_str = f"""{kwd_str}{esc_mu(k['form'])} (<i>{round(k['weight'],3)}</i>); """
 
@@ -1114,7 +1165,6 @@ It will also take some time to perform""") ))
         if tp == FX_TAB_CATALOG and self.catalog_tab != -1:
             self._show_upn_page(self.catalog_tab)
             return 0
-    
 
 
         tab = FeedexTab(self, type=tp, title=kargs.get('title',''), top_entry=top_entry)
@@ -1215,7 +1265,7 @@ It will also take some time to perform""") ))
             self.feed_tab.redecorate((), {})
 
         if self.curr_upper.top_entry_prev: self.load_preview(self.curr_upper.top_entry)
-        elif isinstance(self.curr_upper.table.result, (ResultEntry, ResultContext, ResultRule, ResultCatItem,)): self.curr_upper._on_changed_selection()
+        elif isinstance(self.curr_upper.table.result, (ResultEntry, ResultContext, ResultRule, ResultCatItem, ResultFeed,)): self.curr_upper._on_changed_selection()
         else: self.startup_decor()
 
         self._set_adj()
@@ -1417,6 +1467,88 @@ It will also take some time to perform""") ))
 
 
 
+
+
+    def load_preview_feed(self, result, *args, **kargs):
+        """ Load a feed into preview window """
+        adj = self.preview_box.get_vadjustment()
+        adj.set_value(0)
+
+        result.humanize()
+
+        self.prev_entry = {}
+
+        for c in self.prev_images.get_children(): self.prev_images.remove(c)
+        try: 
+            pb = GdkPixbuf.Pixbuf.new_from_file_at_size(fdx.icons_cache[result.get('id')], 64, 64)
+            image = Gtk.Image.new_from_pixbuf(pb)
+        except: image = Gtk.Image.new_from_pixbuf(self.icons['large']['default'])
+
+        self.prev_images.pack_start(image, True, True, 0)
+        image.show()
+        
+        self.curr_prev = FX_PREV_FEED
+
+        lastchecked = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(scast(result['lastchecked'], int, 0)))
+        lastread = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(scast(result['lastread'], int, 0)))                           
+
+        info_str = ''
+        for f in FEEDS_INFO: info_str = f"""{info_str}{esc_mu(result.get_col_name(f))}: <b>{esc_mu(result.vals[f])}</b>
+"""
+
+        prev_text = f"""
+
+
+
+
+<b>{esc_mu(result['name'])}</b>
+
+{esc_mu(result['subtitle'])}
+
+<i>{esc_mu(result['location'])}</i>
+
+{_('Category:')} <b>{esc_mu(result['parent_category_name'])}</b>
+
+{_('URL:')} <b>{esc_mu(result['url'])}</b>
+
+{_('Homepage:')} <b>{esc_mu(result['link'])}</b>
+
+
+
+
+
+
+<small>-------------------------------------------------------------------
+{_('Last checked:')} <b>{esc_mu(lastchecked)}</b>
+{_('Last fetched:')} <b>{esc_mu(lastread)}</b>
+
+{_('HTTP Status:')} <b>{esc_mu(result['http_status'])}</b>
+{_('ETag:')} <b>{esc_mu(result['etag'])}</b>
+{_('Modified tag:')} <b>{esc_mu(result['modified'])}</b>
+{_('Feed version:')} <b>{esc_mu(result['version'])}</b>
+{_('User agent:')} <b>{esc_mu(result['user_agent'])}</b>
+
+{_('Fetch?:')} <b>{esc_mu(result['sfetch'])}</b>
+{_('Autoupdate?:')} <b>{esc_mu(result['sautoupdate'])}</b>
+{_('Check interval:')} <b>{esc_mu(result['interval'])}</b>
+{_('Handler:')} <b>{esc_mu(result['handler'])}</b>
+{_('Weight for Recommendations:')}<b>{esc_mu(result['recom_weight'])}</b>
+
+{info_str}
+
+
+</small>
+
+"""
+        self.preview_label.set_line_wrap(True)
+        self.preview_label.set_markup(prev_text)
+
+
+
+
+
+
+
     def load_preview_catalog(self, result, *args, **kargs):
         """ Load a catalog item into preview window """
         adj = self.preview_box.get_vadjustment()
@@ -1557,6 +1689,18 @@ It will also take some time to perform""") ))
 
 
 
+    def _run_dialog(self, dialog, **kargs):
+        """ Wrapper for running dialog windows """
+        self.child_windows += 1
+        debug(10, f'New window: {self.child_windows}')
+        dialog.run()
+        dialog.destroy()
+        self.child_windows -= 1
+        debug(10, f'Closed window: {self.child_windows}')
+        if kargs.get('unblock',True): 
+            if self.child_windows == 0 and len(fdx.req_q) > 0: fdx.bus_append(FX_ACTION_HANDLE_REQUEST)
+        return dialog
+
 
 
 
@@ -1609,15 +1753,11 @@ It will also take some time to perform""") ))
         if self.profile_name != '': self.hbar.props.subtitle = f"{self.profile_name}"
         self.hbar.show_all()
 
-    def set_profile(self, *args):
-        """ Setup path to caches, plugins etc. """
-        self.profile_name = self.config.get('profile_name','')
-        if self.profile_name == '': 
-            self.gui_cache_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex_gui_cache.json')
-            self.gui_plugins_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex_plugins.json')
-        else:
-            self.gui_cache_path = os.path.join(FEEDEX_SHARED_PATH, f'feedex_gui_cache_{fdx.hash_url(self.profile_name)}.json')
-            self.gui_plugins_path = os.path.join(FEEDEX_SHARED_PATH, f'feedex_plugins_{fdx.hash_url(self.profile_name)}.json')
+
+
+
+
+
 
 
 
@@ -1636,3 +1776,123 @@ def feedex_run_main_win(*args, **kargs):
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()
+
+
+
+def feedex_run_aux_win(ent, idict, **kargs):
+    """ Runs dialog for adding entities """
+
+    def add_ent_thr(ent, item, **kargs):
+        """ It is better to send requests to threads """
+        DB = FeedexDatabase(connect=True)
+        item.set_interface(DB)
+        if ent == FX_ENT_ENTRY: fdx.dnotify('edit', _('Adding new Note...'))
+        elif ent == FX_ENT_FEED: fdx.dnotify('rss', _('Adding new Feed...'))
+        elif ent == FX_ENT_RULE: fdx.dnotify('script', _('Adding new Rule...'))
+
+        err = item.add()
+        if err != 0:
+            if ent == FX_ENT_ENTRY: fdx.dnotify('error', _('Error adding new Note!'))
+            elif ent == FX_ENT_FEED: fdx.dnotify('error', _('Error adding new Feed!'))
+            elif ent == FX_ENT_RULE: fdx.dnotify('error', _('Error adding new Rule!'))
+        else:
+            if ent == FX_ENT_ENTRY: fdx.dnotify('edit', _('Note added'))
+            elif ent == FX_ENT_FEED: fdx.dnotify('rss', _('Feed added'))
+            elif ent == FX_ENT_RULE: fdx.dnotify('script', _('Rule added'))
+        DB.close()
+        return err
+
+
+    send_req = False
+    session = FeedexGUISession(config=fdx.config)
+    err = session.connect_db(None, load_min=True, pipe_on_lock=True)
+    if err == FX_ERROR_LOCK:
+        debug(10, f'r. pipe: {session.ret_in_pipe}; r. session: {session.ret_session_id};')
+        if session.ret_in_pipe is not None and session.ret_session_id is not None and fdx.config.get('allow_pipe', False):
+            fdx.connect_IPC()
+            session.connect_db(None, load_min=True, main_conn=False)
+            send_req = True
+        else:
+            session.DB.connect_DN()
+            fdx.dnotify('error', _('Database locked!')) 
+            return FX_ERROR_LOCK
+
+    session.set_profile()
+    session.gui_cache = session.validate_gui_cache( load_json(session.gui_cache_path, {}) ) #Load cached GUI settings/layouts/tabs from previous session
+    session.get_icons()
+    session.DB.connect_DN()
+
+    err = 0
+    if ent == FX_ENT_ENTRY:
+
+        if send_req:
+            if FX_LOCK_ENTRY in session.ret_locks:
+                fdx.dnotify('error', _('Locked for adding Entries!'))
+                return FX_ERROR_LOCK
+
+        entry = FeedexEntry(session.DB)
+        entry.action = FX_ENT_ACT_ADD
+        entry.merge(idict)
+        entry.deraw_vals()
+
+        dialog = EditEntry(session, entry, new=True)
+        dialog.run()
+        dialog.destroy()
+        if dialog.response == 1:
+            if send_req: err = fdx.IPC.send_local(session.ret_in_pipe, ent, FX_ENT_ACT_ADD, entry.vals.copy(), session_id=session.ret_session_id)
+            else:
+                t = threading.Thread(target=add_ent_thr, args=(ent, entry,))
+                t.start()
+
+
+    elif ent == FX_ENT_FEED:
+
+        if send_req:
+            if FX_LOCK_FEED in session.ret_locks:
+                fdx.dnotify('error', _('Locked for adding Feeds!'))
+                return FX_ERROR_LOCK
+            elif FX_LOCK_FETCH in session.ret_locks:
+                fdx.dnotify('error', _('Locked for Fetching!'))
+                return FX_ERROR_LOCK
+
+        feed = FeedexFeed(session.DB)
+        feed.action = FX_ENT_ACT_ADD
+        feed.merge(idict)
+        feed.deraw_vals()
+
+        dialog = EditFeed(session, feed, new=True)
+        dialog.run()
+        dialog.destroy()
+        if dialog.response == 1:
+            if send_req: err = fdx.IPC.send_local(session.ret_in_pipe, ent, FX_ENT_ACT_ADD, feed.vals.copy(), session_id=session.ret_session_id)
+            else:
+                t = threading.Thread(target=add_ent_thr, args=(ent, feed,))
+                t.start()
+
+
+    elif ent == FX_ENT_RULE:
+
+        if send_req:
+            if FX_LOCK_RULE in session.ret_locks:
+                fdx.dnotify('error', _('Locked for adding Rules!'))
+                return FX_ERROR_LOCK
+            elif FX_LOCK_FETCH in session.ret_locks:
+                fdx.dnotify('error', _('Locked for Fetching!'))
+                return FX_ERROR_LOCK
+
+        rule = FeedexRule(session.DB)
+        rule.action = FX_ENT_ACT_ADD
+        rule.merge(idict)
+        rule.deraw_vals()
+
+        dialog = EditRule(session, rule, new=True)
+        dialog.run()
+        dialog.destroy()
+        if dialog.response == 1:
+            if send_req: err = fdx.IPC.send_local(session.ret_in_pipe, ent, FX_ENT_ACT_ADD, rule.vals.copy(), session_id=session.ret_session_id)
+            else:            
+                t = threading.Thread(target=add_ent_thr, args=(ent, rule,))
+                t.start()
+
+    session.DB.close()
+    return err

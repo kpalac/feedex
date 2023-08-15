@@ -8,11 +8,15 @@ from feedex_headers import *
 class FeedexQueryInterface:
     """ A query interface """
     def __init__(self) -> None:
+        self.entity = FX_ENT_QUERY_RES
+        self.action = None
+
         self.result = None # Result template to unpack the list
         self.results = [] # Result list
         self.result_no = 0 
         self.result_no2 = 0 # Sometimes two result numbers are needed
         self.result_max = 0 # Max value is needed for plots
+
 
     def clear(self):
         """ Clear interface """
@@ -30,6 +34,20 @@ class FeedexQueryInterface:
         self.result_no2 = 0
         self.result_max = 0
 
+    def to_dict(self, **kargs):
+        """ Converts query to dictionary for IPC """
+        odict = {
+        'entity': self.entity,
+        'action' : self.action,
+        'body': {
+            'result': self.result.entity,
+            'results': self.results.copy(),
+            'result_no' : self.result_no,
+            'result_no2' : self.result_no2,
+            'result_max' : self.result_max,
+            }
+        }
+        return odict
 
 
 
@@ -96,6 +114,8 @@ class FeedexQuery(FeedexQueryInterface):
 
     def query(self, qr:str, filters:dict, **kargs):
         """ Main Query method """
+        if self.action is None: self.action = FX_ENT_QR_BASE
+        
         qr = scast(qr, str, '')
 
         ret = self._validate_filters(qr, filters)
@@ -140,7 +160,7 @@ class FeedexQuery(FeedexQueryInterface):
             else: ix_qr, enquire = ret
 
 
-            ix_matches = enquire.get_mset( filters['start_n'],  filters['page_len'] )
+            ix_matches = enquire.get_mset(filters['start_n'],  filters['page_len'] )
 
             self.ix_results.clear()
             self.ix_results_ids.clear()
@@ -183,20 +203,13 @@ class FeedexQuery(FeedexQueryInterface):
 
         # Query SQL database
         (query, vals) = self._build_sql(self.phrase, filters, **kargs)
-        results_tmp = self.DB.qr_sql(query, vals, all=True)
-        if self.DB.status != 0:
-            self._empty(result=ResultEntry())
-            return FX_ERROR_QUERY
-        
-        debug(5, "Results: ", len(results_tmp))
-
-
 
         # Merge Xapian stats with SQL results
         ranked = False #Are results ranked?
         if qtype ==  1 and not self.phrase['empty']:
             ranked = True
-            for r in results_tmp:
+            #for r in results_tmp:
+            for r in self.DB.qr_sql_iter(query, vals):
                 self.result.populate(r)
 
                 if rank or cnt or snippets: ix_result = self.ix_results.get(self.result['ix_id'], (0,0,0,[]))
@@ -240,15 +253,9 @@ class FeedexQuery(FeedexQueryInterface):
         # Pure SQL has its limitations and we need something beyond boolean matching
         elif qtype == 0 and not self.phrase['empty']:
             ranked = True
-            # No point doing this if no string was given or there was only one result
-            matched_docs_count = len(results_tmp)
-            if rank and matched_docs_count > 0:
-                doc_count = kargs.get('doc_count', self.DB.get_doc_count())
-                idf = log10(doc_count/matched_docs_count)
 
             # Calculate ranking for each result
-            for r in results_tmp:
-
+            for r in self.DB.qr_sql_iter(query, vals):
                 self.result.populate(r)
 
                 if snippets: 
@@ -274,14 +281,11 @@ class FeedexQuery(FeedexQueryInterface):
 
                 if snippets: self.result['snippets'] = tuple(snips)
 
-                # Append TF-IDF rank or match count - depending on what option was chosen
-                if rank: # Construct TF-IDF
+                # Append a simple rank 
+                if rank:
                     doc_len = scast(self.result["word_count"], int, 1)
                     if doc_len == 0: rnk = 0
-                    else:
-                        tf = count/doc_len
-                        # Final ranking measure - modify at your fancy
-                        rnk = tf * idf
+                    else: rnk = count/doc_len
                     # append...
                     self.result['rank'] = rnk
                     self.result['count'] = count
@@ -292,7 +296,12 @@ class FeedexQuery(FeedexQueryInterface):
 
                 self.results.append(self.result.tuplify(all=True))
 
-        else: self.results = results_tmp
+        else: self.results = self.DB.qr_sql(query, vals, all=True)
+
+        # Error handling
+        if self.DB.status != 0:
+            self._empty(result=ResultEntry())
+            return FX_ERROR_QUERY            
 
         # Sort by recom. ranking and importance, add fed freqs if needed
         if recom:
@@ -302,7 +311,7 @@ class FeedexQuery(FeedexQueryInterface):
                     self.result['rank'] = fdx.feed_freq_cache.get(self.result['feed_id'],0)
                     self.results[i] = self.result.tuplify()
 
-            self.results.sort(key=lambda x: (x[self.result.get_index('importance')], x[self.result.get_index('rank')]), reverse=True)
+            self.results.sort(key=lambda x: (coalesce(x[self.result.get_index('importance')],0), x[self.result.get_index('rank')]), reverse=True)
 
         # Sort results by rank or count if no other sorting method was chosen
         elif (not sort) and ranked:
@@ -333,7 +342,6 @@ class FeedexQuery(FeedexQueryInterface):
 
 
         self.results = tuple(self.results)
-
         return 0
 
 
@@ -356,6 +364,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def recommend(self, filters, **kargs):
         """ Rank by recommendation from filterred entries """
+        if self.action is None: self.action = FX_ENT_QR_RECOM
         self.DB.cache_terms()
         filters['qtype'] = 1
         err = self.query(fdx.recom_qr_str, filters, w_scheme='tfidf', rank=True, recom=True, snippets=False, no_history=True, no_wildcards=True, allow_group=kargs.get('allow_group',True))        
@@ -367,6 +376,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def trends(self, qr, filters, **kargs):
         """ Extract trends from group of entries (can get time consuming) """
+        if self.action is None: self.action = FX_ENT_QR_TRENDS
         qr = scast(qr, str, '')
 
         rev = kargs.get('rev', filters.get('rev',False))
@@ -415,6 +425,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def trending(self, qr, filters, **kargs):
         """ Get trending articles from given filters"""
+        if self.action is None: self.action = FX_ENT_QR_TRENDING
         qr = scast(qr, str, '')
 
         rev = kargs.get('rev', filters.get('rev',False))
@@ -443,6 +454,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def similar(self, id, filters, **kargs):
         """ Find entry similar to specified by ID based on extracted features """
+        if self.action is None: self.action = FX_ENT_QR_SIMILAR
         id = scast(id, int, 0)
 
         self.result = ResultEntry()
@@ -628,6 +640,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def relevance_in_time(self, id, filters, **kargs):
         """ Gets keywords from entry and produces time series for them """
+        if self.action is None: self.action = FX_ENT_QR_RIT
         id = scast(id, int, 0)
 
         # Get similar items
@@ -659,6 +672,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def context(self, qr, filters, **kargs):
         """ Get term's context (find entries and print immediate surroundings) """
+        if self.action is None: self.action = FX_ENT_QR_CONTEXT
         qr = scast(qr, str, '').strip()
         if qr == '': 
             self._empty(result=ResultContext())
@@ -705,6 +719,7 @@ class FeedexQuery(FeedexQueryInterface):
     def term_net(self, term, filters, **kargs):
         """ Show terms/features connected to a given term by analising contexts """
         # Check for empty term
+        if self.action is None: self.action = FX_ENT_QR_TERM_NET
         term = scast(term, str, '').strip()
         result = ResultEntry()
         if term == '':
@@ -763,6 +778,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def time_series(self, term:str, filters, **kargs):
         """ Get term frequency in time and output as a table of data points or a plot in terminal """
+        if self.action is None: self.action = FX_ENT_QR_TS
         term = scast(term, str, '').strip()
         if term == '':
             self._empty(result=ResultTimeSeries())
@@ -1006,6 +1022,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_feeds(self, **kargs):
         """ Lists feeds in DB """
+        if self.action is None: self.action = FX_ENT_QR_META_FEEDS
         self.DB.cache_feeds()
         cats_only = kargs.get('cats_only',False)
         feeds_only = kargs.get('feeds_only',False)
@@ -1034,21 +1051,26 @@ class FeedexQuery(FeedexQueryInterface):
 
     def feed_tree(self, **kargs):
         """ Generate Feed/Category tree """
+        if self.action is None: self.action = FX_ENT_QR_META_FED_TREE
         self.DB.cache_feeds()
         self.result = ResultFeed()
         result_tmp = ResultFeed()
         node_tmp = []
         self.results = []
-        feeds_tmp = fdx.feeds_cache
+        
+        feeds_tmp = fdx.feeds_cache.copy()
+
+        # Append dummy node for unasigned feeds
+        result_tmp.clear()
+        result_tmp['id'] = 0
+        result_tmp['name'] = _('--- Unassigned ---')
+        result_tmp['is_category'] = 1
+        result_tmp['display_order'] = -1
+        feeds_tmp.append(result_tmp.tuplify())
+
         feeds_tmp.sort(key=lambda x: coalesce(x[self.result.get_index('display_order')],0), reverse=True)
 
-        for f in feeds_tmp:        
-            self.result.populate(f)
-            if self.result['is_category'] != 1 and coalesce(self.result['parent_id'],0) == 0:
-                self.results.append(self.result.tuplify())
-
         for f in feeds_tmp:
-            result_tmp.clear()
             result_tmp.populate(f)
             if result_tmp['is_category'] == 1: 
                 count = 0
@@ -1056,7 +1078,7 @@ class FeedexQuery(FeedexQueryInterface):
                 node_tmp = []
                 for ff in feeds_tmp:
                     self.result.populate(ff)
-                    if self.result['is_category'] != 1 and self.result['parent_id'] == f[self.result.get_index('id')]:
+                    if self.result['is_category'] != 1 and coalesce(self.result['parent_id'],0) == f[self.result.get_index('id')]:
                         count += 1
                         self.result['is_node'] = 0
                         node_tmp.append(self.result.tuplify())
@@ -1079,6 +1101,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_rules(self, **kargs):
         """ List user's rules in DB """
+        if self.action is None: self.action = FX_ENT_QR_META_RULES
         self.DB.cache_rules()
         self.result = ResultRule()
         self.results = fdx.rules_cache
@@ -1091,6 +1114,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_learned_terms(self, **kargs):
         """ List user's rules in DB """
+        if self.action is None: self.action = FX_ENT_QR_META_KW_TERMS
         if kargs.get('short', True):
             self.DB.cache_terms()
             self.result = ResultKwTermShort()
@@ -1108,6 +1132,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_flags(self, **kargs):
         """ Lists flags in DB """
+        if self.action is None: self.action = FX_ENT_QR_META_FLAGS
         self.DB.cache_flags()
         self.result = ResultFlag()
         self.results = []
@@ -1120,6 +1145,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_history(self, **kargs):
         """ List saved history items """
+        if self.action is None: self.action = FX_ENT_QR_META_HISTORY
         self.DB.cache_history()
         self.result = ResultHistoryItem()
         self.results = fdx.search_history_cache.copy()
@@ -1131,6 +1157,7 @@ class FeedexQuery(FeedexQueryInterface):
 
     def list_fetches(self, **kargs):
         """ Display fetch history """
+        if self.action is None: self.action = FX_ENT_QR_META_FETCHES
         self.DB.cache_fetches()
         self.result = ResultFetch()
         self.results = fdx.fetches_cache.copy()
@@ -1157,7 +1184,7 @@ class FeedexQuery(FeedexQueryInterface):
     def _validate_filters(self, string:str, filters:dict, **kargs):
         """ Validate and process query filters into single standard """
        
-        qtype = fdx.resolve_qtype(filters.get('qtype'))
+        qtype = fdx.res_qtype(filters.get('qtype'))
         if qtype == -1: return msg(FX_ERROR_QUERY, _('Invalid query type!'))
         filters['qtype'] = qtype
         
@@ -1166,27 +1193,37 @@ class FeedexQuery(FeedexQueryInterface):
         if qtype in (1,): self.LP.set_model(lang)
 
         if filters.get('field') is not None:
-            filters['field'] = fdx.resolve_field(filters.get('field'))
+            filters['field'] = fdx.res_field(filters.get('field'))
             if filters['field'] == -1: return msg(FX_ERROR_QUERY, _('Invalid search field value!'))
             
-        if filters.get('category') is not None:
-            filters['category'] = fdx.find_category(filters.get('category'))
-            if filters['category'] == -1: return msg(FX_ERROR_QUERY, _('Category not found!'))
+
+
+        if filters.get('cat') is not None:
+            filters['cat'] = fdx.res_cat_name(filters.get('cat'))
+            if filters['cat'] == -1: return msg(FX_ERROR_QUERY, _('Category not found!'))
 
         if filters.get('feed') is not None:
-            filters['feed'] = fdx.find_feed(filters.get('feed'))
-            if filters['feed'] == -1: return msg(FX_ERROR_QUERY, _('Channel not found!'))
+            filters['feed'] = scast(filters['feed'], int, -1)
+            if filters['feed'] == -1 or fdx.is_cat_feed(filters['feed']) != 2: return msg(FX_ERROR_QUERY, _('Channel not found!'))
+
+        if filters.get('cat_id') is not None:
+            filters['cat'] = scast(filters['feed'], int, -1)
+            if filters['cat'] == -1 or fdx.is_cat_feed(filters['cat']) != 1: return msg(FX_ERROR_QUERY, _('Category not found!'))
+
+        if filters.get('parent_id') is not None:
+            filters['feed_or_cat'] = scast(filters['parent_id'], int, -1)
 
         if filters.get('feed_or_cat') is not None:
-            filters['feed_or_cat'] = fdx.find_f_o_c(filters.get('feed_or_cat'))
-            if filters['feed_or_cat'] == -1: return msg(FX_ERROR_QUERY, _('Category or Channel not found!'))
-            elif filters['feed_or_cat'][0] == -1:
-                filters['category'] = filters['feed_or_cat'][1]
-                filters['feed_or_cat'] = None
-            elif filters['feed_or_cat'][1] == -1:
-                filters['feed'] = filters['feed_or_cat'][0]
-                filters['feed_or_cat'] = None
+            filters['feed_or_cat'] = scast(filters['feed_or_cat'], int, -1)
+            st = fdx.is_cat_feed(filters['feed_or_cat'])
+            if st == 1: filters['cat'] = filters['feed_or_cat']
+            elif st == 2: filters['feed'] = filters['feed_or_cat']
+            else: return msg(FX_ERROR_QUERY, _('Category or Channel not found!'))
+
+        filters['feed_or_cat'], filters['cat_id'] = None, None
         
+
+
         case_ins = None
         if filters.get('case_ins') is True:
             case_ins = True
@@ -1203,7 +1240,14 @@ class FeedexQuery(FeedexQueryInterface):
                 case_ins = True
                 filters['case_ins'] = True
         
-        filters['flag'] = self._resolve_flag(filters.get('flag'))
+        if filters.get('flag') is not None:
+            filters['flag'] = self._res_flag(filters.get('flag'))
+            if filters['flag'] == -2: return msg(FX_ERROR_QUERY, _('Flag not found!'))
+
+
+
+        if filters.get('location') is not None:
+            filters['FEED_ID_list'] = self._res_loc(filters.get('location'))
 
 
         # Resolve preset date filters
@@ -1371,11 +1415,11 @@ class FeedexQuery(FeedexQueryInterface):
             vals['feed_id'] = scast(filters.get('feed'), int, 0)
             query = f"{query}\nand ( f.id = :feed_id and f.is_category <> 1 )"
 
-        elif filters.get("category") is not None:
+        elif filters.get("cat") is not None:
             if filters.get("deleted", False): del_str = ''
             else: del_str = 'and coalesce(c.deleted,0) <> 1'
-            vals['parent_category'] = scast(filters.get('category'), int, 0)
-            query = f"""{query}\nand ((c.id = :parent_category or f.id = :parent_category) {del_str}) """
+            vals['cat'] = scast(filters.get('cat'), int, 0)
+            query = f"""{query}\nand ((c.id = :cat or f.id = :cat) {del_str}) """
             
         if filters.get("id") is not None:
             vals['id'] = scast(filters.get('id'), int, 0)
@@ -1428,6 +1472,16 @@ class FeedexQuery(FeedexQueryInterface):
 
         ext_filter = False
         # This one is risky, so we have to be very careful every ID is a valis integer
+        if filters.get('FEED_ID_list') is not None and type(filters.get('FEED_ID_list')) in (list,tuple) and len(filters.get('FEED_ID_list',[])) > 0:
+            ids = ''
+            for i in filters.get('FEED_ID_list',[]):
+                i = scast(i, int, None)
+                if i is None: continue
+                ids = f'{ids}{i},'
+            ids = ids[:-1]
+            query = f"{query}\nand f.id in ({ids})"
+            ext_filter = True
+
         if filters.get('ID_list') is not None and type(filters.get('ID_list')) in (list,tuple) and len(filters.get('ID_list',[])) > 0:
             ids = ''
             for i in filters.get('ID_list',[]):
@@ -1500,18 +1554,27 @@ class FeedexQuery(FeedexQueryInterface):
         del_filter_str = '' # Part of q.s. that handles deleted feeds/categories
         for f in fdx.feeds_cache:
             if f[FEEDS_SQL_TABLE.index('deleted')]: del_filter_str = f"""{del_filter_str} OR FEED_ID:{f[FEEDS_SQL_TABLE.index('id')]}"""
-            if del_filter_str.startswith(' OR '): del_filter_str = del_filter_str[4:]
+        if del_filter_str.startswith(' OR '): del_filter_str = del_filter_str[4:]
         if del_filter_str != '': filter_qr = f'{filter_qr} AND NOT ({del_filter_str})'
 
 
         if filters.get('feed') is not None: filter_qr = f"""{filter_qr} AND FEED_ID:{scast(filters.get('feed'), str, '-1')}"""
             
-        if filters.get('category') is not None:
-            cat_id = scast(filters.get('category'), int, -1)
+        if filters.get('cat') is not None:
+            cat_id = scast(filters.get('cat'), int, -1)
             feed_str = f'FEED_ID:{cat_id}'
             for f in fdx.feeds_cache:
                 if f[FEEDS_SQL_TABLE.index('parent_id')] == cat_id: feed_str = f"""{feed_str} OR FEED_ID:{f[FEEDS_SQL_TABLE.index('id')]}"""
             filter_qr = f"""{filter_qr} AND ({feed_str})"""
+
+        if filters.get('FEED_ID_list') is not None and type(filters.get('FEED_ID_list')) in (list,tuple) and len(filters.get('FEED_ID_list',[])) > 0:
+            feed_ids = 'FEED_ID:-1'
+            for i in filters.get('FEED_ID_list',[]):
+                i = scast(i, int, None)
+                if i is None: continue
+                feed_ids = f'{feed_ids} OR FEED_ID:{i}'
+            filter_qr = f"{filter_qr} AND ({feed_ids})"
+            ext_filter = True
 
         if filters.get('raw_pubdate_from') is not None or filters.get('raw_pubdate_to') is not None:
             filter_qr = f"""{filter_qr} AND {scast(filters.get('raw_pubdate_from'), str, '')}..{scast(filters.get('raw_pubdate_to'), str, '')}XPUB""" 
@@ -1530,7 +1593,13 @@ class FeedexQuery(FeedexQueryInterface):
         if filters.get('read') is not None and coalesce(filters.get('read'), False): filter_qr = f"""{filter_qr} AND READ:1"""
         if filters.get('unread') is not None and coalesce(filters.get('unread'), False): filter_qr = f"""{filter_qr} AND READ:0"""
 
-        if filters.get('handler') is not None: filter_qr = f"""{filter_qr} AND HANDLER:{filters.get('handler')}"""
+        if filters.get('handler') is not None: 
+            handler_qr = ''
+            for f in fdx.feeds_cache:
+                if f[FEEDS_SQL_TABLE.index('handler')] == filters.get('handler'): 
+                    handler_qr = f"""{handler_qr} OR FEED_ID:{f[FEEDS_SQL_TABLE.index('id')]}"""
+            if handler_qr.startswith(' OR '): handler_qr = handler_qr[4:]
+            if handler_qr != '': filter_qr = f"""{filter_qr} AND ({handler_qr})"""
 
 
 
@@ -1691,6 +1760,28 @@ class FeedexQuery(FeedexQueryInterface):
 #
 
 
+    def _res_loc(self, string, **kargs):
+        """ Build feed id list from feeds matching location string """
+        string = scast(string, str, '').lower()
+        phr = self.parse_query(string, str_match=True)
+        print(phr)
+        if phr['empty']: return None
+        ids = []
+        for f in fdx.feeds_cache:
+            fs = scast(f[FEEDS_SQL_TABLE.index('location')], str, '').lower()
+            matched = self.DB.LP.str_matcher(phr['spl_string'], phr['spl_string_len'], phr['beg'], phr['end'], fs, snippets=False)[0]
+            if matched > 0: ids.append(f[FEEDS_SQL_TABLE.index('id')])
+        return ids
+
+    def _res_flag(self, flag:str):
+        if flag in (None,'','all'): return None
+        elif flag == 'all_flags': return 0
+        elif flag == 'no': return -1
+        else: 
+            flag = scast(flag, int, -2)
+            if fdx.is_flag(flag): return flag
+            else: return -2
+
 
     def _has_caps(self, string):
         """ Checks if a string contains capital letters """
@@ -1698,12 +1789,6 @@ class FeedexQuery(FeedexQueryInterface):
             if c.isupper(): return True
         return False
 
-    def _resolve_flag(self, flag:str):
-        if flag in (None,'','all'): return None
-
-        elif flag == 'all_flags': return 0
-        elif flag == 'no': return -1
-        else: return fdx.find_flag(flag)
 
     def _sqlize(self, string:str, **kargs):
         """ Escapes SQL wildcards """
@@ -1804,7 +1889,7 @@ class FeedexCatalogQuery(FeedexQueryInterface):
             return msg(FX_ERROR_VAL, _('Invalid search field! Must be name, desc, tags or location.'))
 
         # Resolve category
-        category = filters.get('category') 
+        category = filters.get('cat') 
         if category is not None:
             category = self.resolve_cat(category)
             if category == -1:

@@ -7,11 +7,12 @@
 printf "Installing FEEDEX ...\n\n"
 
 sudo mkdir -p "/usr/share/feedex/data"
+sudo mkdir -p "/usr/share/feedex/feedex"
 
 sudo cp -r ./data "/usr/share/feedex"
-sudo cp -r ./feedex "/usr/share/feedex"
+sudo cp ./feedex/*.py "/usr/share/feedex/feedex"
 
-sudo cp ./scripts/feedex "/usr/bin/feedex"
+sudo cp ./feedex/feedex "/usr/bin/feedex"
 
 
 sudo cp ./data/examples/config /etc/feedex.conf

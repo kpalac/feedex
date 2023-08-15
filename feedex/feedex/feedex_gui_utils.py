@@ -43,7 +43,6 @@ if PLATFORM == 'linux':
 
 FEEDEX_GUI_VALID_KEYS='qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890'
 
-
 FEEDEX_GUI_USER_AGENTS=(
 "UniversalFeedParser/5.0.1 +http://feedparser.org/",
 "Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0",
@@ -62,10 +61,15 @@ FEEDEX_GUI_SEARCH_ENGINES=(
 )
 
 
-FEEDEX_GUI_ICONS=('rss','www','script','mail','twitter','calendar','document','ok','edit','comment','warning','archive','bookmark','hand','heart','link',
-                  'money', 'violence', 'no_violence', 'community', 'terminal', 'dev', 'education', 'electronics','game','image','health','media',
-                  'science','utils','bug','toolkit','radio','google','player','audio','weather','notes','lightbulb', 'travel', 'sport','surprise',
-                  'markup', 'law', 'python', 'database', 'card', 'avatar', 'cert', 'shield', 'sun', 'night', 'voltage', 'clouds', 'rain', 'disk',)
+FEEDEX_GUI_ICONS=('rss','www','script','mail','twitter','calendar','document','ok','edit','comment','warning','archive','bookmark',
+                  'rss_doc', 'exec', 'font', 'curled', 'address', 'office', 'spreadsheet','presentation',
+                  'hand','heart','link', 'network',
+                  'money', 'violence', 'no_violence', 'community', 'terminal', 'dev', 'education', 'electronics','game','image','health','media', 'music', 'photos', 'video',
+                  'science','utils','bug','toolkit','radio','google','player','audio','weather','notes','lightbulb', 'travel', 'sport','surprise', 'radar', 'playlist',
+                  'markup', 'law', 'python', 'database', 'card', 'avatar', 'cert', 'shield', 'sun', 'night', 'voltage', 'clouds', 'rain', 'disk',
+                  'angel','angry','confused','cool','crying','devil','embarrassed','glasses','hat','heartbreak','laugh','monkey','sad','wink',
+                  'yawn','worried','sick', 'graveyard', 'timer', 'magic', 'hourglass', 'stopwatch', 'safety', 'note', 'beer', 'phonecall', 'pin',
+                   'butt', 'bell', 'plane', 'clock', 'coffee',)
 
 
 
@@ -135,6 +139,9 @@ FX_ACTION_DELETE = 8
 FX_ACTION_HANDLE_IMAGES = 9
 FX_ACTION_FINISHED_SEARCH = 10
 FX_ACTION_FINISHED_FILTERING = 11
+FX_ACTION_RELOAD_TRASH = 12
+
+
 
 # Preview IDs
 FX_PREV_STARTUP = 0
@@ -204,16 +211,16 @@ FX_TAB_FLAGS : {},
 FX_TAB_PLUGINS : {},
 FX_TAB_LEARNED: {},
 
-FX_TAB_SEARCH :         {'search':'combo',  'filters': ('time', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',) },
-FX_TAB_NOTES :          {'search':'combo',  'filters': ('time', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',) },
-FX_TAB_TREE :           {'search':'combo',  'filters': ('time', 'group', 'depth', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
-FX_TAB_TIME_SERIES :    {'search':'combo',  'filters': ('time', 'time_series', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
-FX_TAB_TERM_NET :       {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
-FX_TAB_TRENDS :         {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat',) },
-FX_TAB_CONTEXTS :       {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'cat', 'page',) },
+FX_TAB_SEARCH :         {'search':'combo',  'filters': ('time', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat', 'page',) },
+FX_TAB_NOTES :          {'search':'combo',  'filters': ('time', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat', 'page',) },
+FX_TAB_TREE :           {'search':'combo',  'filters': ('time', 'group', 'depth', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat',) },
+FX_TAB_TIME_SERIES :    {'search':'combo',  'filters': ('time', 'time_series', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat',) },
+FX_TAB_TERM_NET :       {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat',) },
+FX_TAB_TRENDS :         {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat',) },
+FX_TAB_CONTEXTS :       {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat', 'page',) },
 
-FX_TAB_SIMILAR :        {'search':'button', 'filters': ('time', 'depth', 'read', 'flag', 'notes', 'handler', 'cat',) },
-FX_TAB_REL_TIME :       {'search':'button', 'filters': ('time', 'group', 'read', 'flag', 'notes', 'handler', 'cat',) },
+FX_TAB_SIMILAR :        {'search':'button', 'filters': ('time', 'depth', 'read', 'flag', 'notes', 'handler', 'location', 'cat',) },
+FX_TAB_REL_TIME :       {'search':'button', 'filters': ('time', 'group', 'read', 'flag', 'notes', 'handler', 'location', 'cat',) },
 
 FX_TAB_CATALOG :        {'search':'catalog_combo',  'filters': ('catalog_field',) },
 
@@ -221,7 +228,7 @@ FX_TAB_CATALOG :        {'search':'catalog_combo',  'filters': ('catalog_field',
 
 
 
-
+FEEDEX_IMAGE_EXTS = ('png','jpg','jpeg','bmp','jpe','ico','tif','tiff','icon','bitmap','pcx',)
 
 
 # HTML REGEX templates
@@ -363,25 +370,23 @@ def f_label(text:str, **kargs):
 
 
 
-def f_list_store(store):
+
+def f_list_store(store, **kargs):
     """ Create list store from given list or tuple """
-    sample = store[-1]
-    types = []
-
-    sample_type = type(sample)
-    if sample_type in (list, tuple):
-        for f in sample:
-            types.append(type(f))
-
-    else:
+    types = kargs.get('types')
+    if types is None:
+        sample = store[-1]
         types = []
-        types.append(sample_type)
 
-    list_store = Gtk.ListStore()
-    list_store.set_column_types(types)
+        sample_type = type(sample)
+        if sample_type in (list, tuple):
+            for f in sample: types.append(type(f))
+        else:
+            types = []
+            types.append(sample_type)
 
+    list_store = Gtk.ListStore(*types)
     for r in store: list_store.append(r)
-
     return list_store
 
 
@@ -390,12 +395,11 @@ def f_dual_combo(store, **kargs):
     """ Construct dual combo from store """
     start_at = kargs.get('start_at')
     color = kargs.get('color', False)
-    icon = kargs.get('icon',False)
     style = kargs.get('style',False)
     tooltip = kargs.get('tooltip')
     connect = kargs.get('connect')
 
-    list_store = f_list_store(store)
+    list_store = f_list_store(store, types=kargs.get('types'))
     combo = Gtk.ComboBox.new_with_model(list_store)
  
     rend = Gtk.CellRendererText()
@@ -406,7 +410,6 @@ def f_dual_combo(store, **kargs):
  
     if color: combo.add_attribute(rend, 'foreground', 2)
     elif style: combo.add_attribute(rend, 'weight', 2)
-
     if tooltip is not None: combo.set_tooltip_markup(tooltip)
 
     if start_at is not None:
@@ -522,8 +525,15 @@ def f_feed_icon_combo(main_win, **kargs):
     return f_combo_with_icons(store, **kargs)
 
 
+def f_yesno_combo(**kargs):
+    store = ((0,_("No")),(1,_("Yes")),)
+    return f_dual_combo(store, types=(int, str,), **kargs)
 
 
+def f_case_filter_combo(**kargs):
+    store = (('___dummy',_("Detect case")),('case_sens', _("Case sensitive")),('case_ins',_("Case insensitive")),)
+    tooltip=kargs.get('toolitp', _('Set query case sensitivity'))
+    return f_dual_combo(store, types=(str, str,), tooltip=tooltip, **kargs)
 
 
 def f_layout_combo(**kargs):
@@ -533,7 +543,7 @@ def f_layout_combo(**kargs):
     (1,_('Horizontal panes') ),
     (2,_('Horiz. panes, preview on top') ),
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(int, str,), **kargs)
 
 def f_orientation_combo(**kargs):
     """ Construct combo for GUI pane orientation """
@@ -541,7 +551,7 @@ def f_orientation_combo(**kargs):
     (0,_('Left to Right') ),
     (1,_('Right to Left') ),
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(int, str,), **kargs)
 
 
 def f_loc_combo(**kargs):
@@ -550,9 +560,18 @@ def f_loc_combo(**kargs):
     (None,_('System default') ),
     ('en','English'),
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
+
+
+
+def f_location_store(**kargs):
+    store = Gtk.ListStore(str, str)
+    for f in fdx.feeds_cache: 
+        loc = scast(f[FEEDS_SQL_TABLE.index('location')], str, '').strip()
+        if loc != '': store.append( (loc, loc) )
+    return store
 
 
 
@@ -576,7 +595,7 @@ def f_time_combo(**kargs):
     if kargs.get('add') is not None:
         for d in kargs.get('add'): store.append(d)
 
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
 def f_time_series_combo(**kargs):
@@ -586,7 +605,7 @@ def f_time_series_combo(**kargs):
     ('daily',_('Group Daily') ),
     ('hourly',_('Group Hourly') ),
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 def f_group_combo(**kargs):
     """ Construct combo for tree grouping """
@@ -609,7 +628,7 @@ def f_group_combo(**kargs):
         tmp_store = store
         store =  tmp_store + (('number', _('Just number') ),)
 
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 def f_depth_combo(**kargs):
     """ Construct combo for tree grouping depth """
@@ -624,7 +643,7 @@ def f_depth_combo(**kargs):
     (250,_('Top 250') ),
     (9999,_('All') )
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(int, str,), **kargs)
 
 FX_RANK_RECOM = 1
 FX_RANK_TREND = 2
@@ -639,12 +658,12 @@ def f_rank_combo(**kargs):
     (FX_RANK_LATEST,_('Most Recent') ),
     (FX_RANK_DEBUBBLE,_('"Debubble"') ),
     )
-    kargs['tooltip'] = _("""Default ranking/sorting
+    tooltip = _("""Default ranking/sorting
 Use <b>Recommended</b> to rank by most interesting entries for you based on previously read articles
 Use <b>Trending</b> to rank by most talked about subjects (<i>time consming for large time ranges</i>)
 Use <b>Most Recent</b> to simply sort by date
 Use <b>Debubble</b> to show news with the least importance for each grouping""")
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(int, str,), tooltip=tooltip,  **kargs)
 
 
 
@@ -655,36 +674,33 @@ def f_read_combo(**kargs):
     ('read', _('Read') ),
     ('unread', _('Unread') )
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
+
+def f_flag_store_filters(**kargs):
+    store = [
+    (None, _("Flagged and Unflagged"), None),
+    ('no', _("Unflagged"), None),
+    ('all_flags', _("All Flags"), None)]
+    for fl in fdx.flags_cache.keys(): store.append( (scast(fl,str,'-1'), fdx.get_flag_name(fl), fdx.get_flag_color(fl) ) )
+    return store
 
 def f_flag_store(**kargs):
-    if kargs.get('filters',True):
-        store = [
-        (None, _("Flagged and Unflagged"), None),
-        ('no', _("Unflagged"), None),
-        ('all_flags', _("All Flags"), None)]
-        for fl in fdx.flags_cache.keys(): store.append( (scast(fl,str,'-1'), fdx.get_flag_name(fl), fdx.get_flag_color(fl) ) )
-
-    else:
-        store = [(-1, _("No Flag"), None)]
-        for fl in fdx.flags_cache.keys(): store.append( (fl, fdx.get_flag_name(fl), fdx.get_flag_color(fl) ) )
-    
-    if kargs.get('list_store',False):
-        lstore = Gtk.ListStore(str, str, str)
-        for si in store: lstore.append(si)
-        return lstore
-    
+    store = [(-1, _("No Flag"), None)]
+    for fl in fdx.flags_cache.keys(): store.append( (fl, fdx.get_flag_name(fl), fdx.get_flag_color(fl) ) )
     return store
 
 
 def f_flag_combo(**kargs):
     """ Constr. combo for flag choosers and search filters """
     store = f_flag_store(**kargs)
-    kargs['color'] = True
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(int, str, str,), color=True, **kargs)
 
+def f_flag_filter_combo(**kargs):
+    """ Constr. combo for flag choosers and search filters """
+    store = f_flag_store_filters(**kargs)
+    return f_dual_combo(store, types=(str, str, str,), color=True, **kargs)
 
 
 
@@ -694,7 +710,7 @@ def f_cli_color_combo(**kargs):
     tooltip = kargs.get('tooltip',_("""Choose color for command line interface """))
     store = []
     for a in TCOLS.keys(): store.append( (a,a.replace('_',' ')) )
-    return f_dual_combo(store, tooltip=tooltip, **kargs)
+    return f_dual_combo(store, types=(str, str,), tooltip=tooltip, **kargs)
 
 
 
@@ -708,8 +724,7 @@ def f_feed_store(main_win, **kargs):
     empty_label = kargs.get('empty_label' , _('-- No Category --'))
     exclude_id = kargs.get('exclude_id')
 
-    if not kargs.get('no_empty',False):
-        store.append((-1, None, empty_label, 400))
+    if not kargs.get('no_empty',False): store.append((-1, None, empty_label, 400))
 
     if kargs.get('with_templates',False):
         for k,v in FEEDEX_REGEX_HTML_TEMPLATES.items():
@@ -758,29 +773,19 @@ using <i>--add-entries</i>, <i>--add-entries-from-file</i>, <i>--add-entries-fro
     if kargs.get('all', False):
         store.insert(0, (None, _('All handlers')) )
 
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
 
 
-
-
+def f_note_filter_combo(**kargs):
+    store = ( (-1, _("Notes and News")), (1, _("Notes")), (0, _("News")), )
+    return f_dual_combo(store, types=(int, str,), **kargs)
 
 def f_note_combo(**kargs):
     """ Build combo for note/news choice """ 
-    if kargs.get('search',True):
-        store = (
-        (-1, _("Notes and News")),
-        (1, _("Notes")),
-        (0, _("News"))
-    )
-    else:
-        store = (
-        (1, _("Note")),
-        (0, _("News Item"))
-    )
-
-    return f_dual_combo(store, **kargs)
+    store = ( (1, _("Note")), (0, _("News Item")), )
+    return f_dual_combo(store, types=(int, str,), **kargs)
 
 
 
@@ -793,7 +798,7 @@ def f_auth_combo(**kargs):
     ('digest', _('Digest') ),
     ('basic', _('Basic') )
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
 def f_query_logic_combo(**kargs):
@@ -805,60 +810,56 @@ def f_query_logic_combo(**kargs):
     ('near', _('Terms near') ),
     ('phrase', _('Phrase') )
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
 
 
+def f_query_type_filter_combo(**kargs):
+    store = ( (1,_('Full Text Search')), (0,_('String matching')) )
+    tooltip = kargs.get('tooltip', _("""Set query type:
+<b>Full Text Search:</b> stemmed and tokenized (use capitalized terms for exact/unstemmed match)
+<b>String matching</b>: simple string comparison"""))
+    return f_dual_combo(store, types=(int, str,), tooltip=tooltip, **kargs)
 
 
 def f_query_type_combo(**kargs):
     """ Construct combo for choice of query type for search or a rule"""
-
-    if kargs.get('rule',False):
-        store = ( (0,_('String matching')), (1,_('Full text matching')), (2,_('REGEX')) )
-        kargs['tooltip'] = kargs.get('tooltip',_("""Set query type to match this rule:
+    store = ( (0,_('String matching')), (1,_('Full text matching')), (2,_('REGEX')) )
+    tooltip = kargs.get('tooltip',_("""Set query type to match this rule:
 <b>String matching</b>: simple string comparison
 <b>Full text matching</b>: stemmed and tokenized (no subqueries, logical markers, wildcards or nearness operators)
 <b>REGEX</b>: REGEX matching""") )
-    else:
-        store = ( (1,_('Full Text Search')), (0,_('String matching')) )
-        kargs['tooltip'] = kargs.get('tooltip',_("""Set query type:
-<b>Full Text Search:</b> stemmed and tokenized (use capitalized terms for exact/unstemmed match)
-<b>String matching</b>: simple string comparison""") )
-
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(int, str,), tooltip=tooltip, **kargs)
 
 
 
+
+def f_lang_filter_combo(**kargs):
+    store = [(None, _("All Languages"),)]
+    for l in fdx.lings:
+        if l['names'][0] != 'heuristic':
+            store.append( (l['names'][0], l['names'][0].upper()) )
+    tootlip = kargs.get('tooltip', _('Select language used fort query tokenizing and stemming') )
+    return f_dual_combo(store, types=(str, str,), tooltip=tootlip, **kargs)
 
 
 def f_lang_combo(**kargs):
     """ Build combo list of languages """
-
-    kargs['tooltip'] = kargs.get('tooltip', _('Select language used fort query tokenizing and stemming') )
-
-    if kargs.get('with_all',True): store = [(None, _("All Languages"),)]
-    else: store = []
-
+    store = []
     for l in fdx.lings:
         if l['names'][0] != 'heuristic':
             store.append( (l['names'][0], l['names'][0].upper()) )
-
-    return f_dual_combo(store, **kargs)
-
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
 def f_field_combo(**kargs):
     """ Build field combo """
-    all_label = kargs.get('all_label',_('-- All --') )
-    store = []
-    store.append((None, all_label,))
+    store = [(None, kargs.get('all_label',_('-- All Fields --'),))]
     for f,p in PREFIXES.items():
         if type(p) is dict:
             if p['prefix'] != '': store.append((f, p['name']))
-    
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
 
@@ -884,8 +885,7 @@ def f_page_len_combo(**kargs):
     (3000,_('3000') ),
     (5000,_('5000') ),
     )
-
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(int, str,), **kargs)
 
 
 
@@ -898,9 +898,8 @@ def f_recom_algo_combo(**kargs):
     (2,_('Simil. offset by doc, weight')),
     (3,_('Simil. boosted by readability')),
     )
-    tooltip = """Which algorithm should be used when recommending documents?"""
-    kargs['tooltip'] = tooltip
-    return f_dual_combo(store, **kargs)
+    tooltip = kargs.get('tooltip', _("""Which algorithm should be used when recommending documents?""") )
+    return f_dual_combo(store, types=(int, str,), tooltip=tooltip, **kargs)
 
 
 
@@ -914,7 +913,7 @@ def f_plugin_type_combo(**kargs):
     (FX_PLUGIN_CATEGORY, _('Category') ),
     (FX_PLUGIN_ENTRY, _('Article/Note') ),
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(int, str,), **kargs)
 
 
 
@@ -929,7 +928,7 @@ def f_catalog_field_combo(**kargs):
     ('location', _('Location') ),
     ('tags', _('Tags') ),
     )
-    return f_dual_combo(store, **kargs)
+    return f_dual_combo(store, types=(str, str,), **kargs)
 
 
 
@@ -1240,7 +1239,6 @@ def f_chooser(parent, main_win, *args, **kargs):
         header = kargs.get('header',_('Save as...'))
         dialog = Gtk.FileChooserDialog(header, parent=parent, action=Gtk.FileChooserAction.SAVE)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
-        dialog.set_do_overwrite_confirmation(True)
 
     elif action == 'open_file':
         header = kargs.get('header',_('Open File'))
@@ -1256,7 +1254,7 @@ def f_chooser(parent, main_win, *args, **kargs):
         header = kargs.get('header',_('Choose Image'))
         filter = Gtk.FileFilter()
         filter.set_name(_('Image files'))
-        for e in ('png','jpg','jpeg','bmp','jpe','ico','tif','tiff','icon','bitmap','pcx',):
+        for e in FEEDEX_IMAGE_EXTS:
             filter.add_pattern(f'*.{e}')
             filter.add_pattern(f'*.{e.upper()}')
 
@@ -1280,10 +1278,20 @@ def f_chooser(parent, main_win, *args, **kargs):
     else: filename = False
     dialog.destroy()
 
-    if action == 'save':
+    if action == 'save' and filename not in ('',None,False,):
         if os.path.isdir(filename):
             msg(FX_ERROR_IO, _('Target %a is a directory!'), filename)
             filename = False
+        elif os.path.isfile(filename):
+            ow_dialog = YesNoDialog(parent, _('Overwrite?'), f"""{'Overwrite'} <b>{esc_mu(filename)}</b>?""" )
+            ow_dialog.run()
+            ow_dialog.destroy()
+            if ow_dialog.response == 1:
+                try: os.remove(filename)
+                except (OSError, IOError,) as e: 
+                    msg(FX_ERROR_IO, _('Could not remove %a: %b'), filename, e)
+                    filename = False
+            else: filename == False
 
     if filename in ('',None,False,): filename = False
     elif filename != -1: main_win.gui_cache['last_dir'] = os.path.dirname(filename)
@@ -1457,6 +1465,9 @@ class FeedexGUISession:
     def __init__(self, *args, **kargs) -> None:
 
         self.config = kargs.get('config', fdx.config)        
+        
+        # Child window counter
+        self.child_windows = 0
 
 
 #####################################################################################
@@ -1466,10 +1477,15 @@ class FeedexGUISession:
 
     def connect_db(self, parent, **kargs):
         """ Establish database connection and elegantly handle errors """
+        pipe_on_lock = kargs.get('pipe_on_lock', False)
+        unlock = kargs.get('unlock', False)
+
         db_path = kargs.get('db_path', self.config.get('db_path'))
-        self.DB = FeedexDatabase(db_path=db_path, allow_create=True, main_conn=True)
+        self.DB = FeedexDatabase(db_path=db_path, allow_create=True, main_conn=kargs.get('main_conn', True))
+
         try:
-            self.DB.connect(defaults=True, default_feeds=False, unlock=kargs.get('unlock'))
+            self.DB.connect(defaults=True, default_feeds=False, unlock=unlock)
+            if unlock: self.DB.connect(defaults=True, default_feeds=False, unlock=False, lock=False)
             if kargs.get('load_all', True):
                 self.DB.load_all()
                 self.DB.cache_icons()
@@ -1483,13 +1499,17 @@ class FeedexGUISession:
 
 
         except FeedexDatabaseLockedError as e:
-            
+
+            if pipe_on_lock: 
+                self.ret_in_pipe, self.ret_session_id, self.ret_locks = e.in_pipe, e.session_id, e.locks
+                return FX_ERROR_LOCK
+
             dialog = YesNoDialog(parent, _("Feedex: Database is Locked"), f"<b>{_('Database is Locked! Proceed and unlock?')}</b>", emblem='system-lock-screen-symbolic',
                                  subtitle=_("Another instance can be performing operations on Database or Feedex did not close properly last time. Proceed anyway?"))
             dialog.run()
             dialog.destroy()
             if dialog.response == 1:
-                self.connect_db(unlock=True)
+                return self.connect_db(parent, unlock=True)
             else:
                 self.DB.close()
                 sys.exit(e.code)
@@ -1505,7 +1525,24 @@ class FeedexGUISession:
             dialog.destroy()
             def_db_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex.db')
             if db_path == def_db_path: sys.exit(e.code)
-            else: self.connect_db(db_path=def_db_path)
+            else: return self.connect_db(parent, db_path=def_db_path)
+
+        self.DB.connect_DN(parent=self, icons=fdx.icons_cache)
+        
+        return 0
+
+
+
+
+    def set_profile(self, *args):
+        """ Setup path to caches, plugins etc. """
+        self.profile_name = self.config.get('profile_name','')
+        if self.profile_name == '': 
+            self.gui_cache_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex_gui_cache.json')
+            self.gui_plugins_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex_plugins.json')
+        else:
+            self.gui_cache_path = os.path.join(FEEDEX_SHARED_PATH, f'feedex_gui_cache_{fdx.hash_url(self.profile_name)}.json')
+            self.gui_plugins_path = os.path.join(FEEDEX_SHARED_PATH, f'feedex_plugins_{fdx.hash_url(self.profile_name)}.json')
 
 
 
@@ -1652,19 +1689,26 @@ class FeedexGUISession:
 
 
 
+    def start_listen(self, **kargs):
+        err = self.DB.set_session_id(type=0)
+        if err == 0 and self.config.get('allow_pipe', False):
+            err = self.DB.create_pipe(type=0)
+            if err == 0:
+                fdx.connect_IPC()
+                fdx.listen = True
+                t = threading.Thread(target=fdx.IPC.local_pipe_listen)
+                t.start()
+
+    def stop_listen(self, **kargs):
+        fdx.listen = False
+        self.DB.destroy_pipe(type=0)
 
 
 
 
 
-
-
-
-
-
-from feedex_desktop_notifier import DesktopNotifier
-from feedex_gui_containers import ResultGUI, ResultGUIEntry, ResultGUINote, ResultGUITree, ResultGUIContext, ResultGUIRule, ResultGUIFlag, ResultGUITerm, ResultGUITimeSeries, FeedexPlugin, FeedexCatalogQuery, ResultGUIPlugin, ResultGUICatItem, ResultPlugin, ResultCatItem, ResultGUIKwTerm
-from feedex_gui_dialogs_utils import BasicDialog, YesNoDialog, PreferencesDialog, CalendarDialog
+from feedex_gui_containers import ResultGUI, ResultGUIEntry, ResultGUINote, ResultGUITree, ResultGUIContext, ResultGUIRule, ResultGUIFlag, ResultGUITerm, ResultGUITimeSeries, FeedexPlugin, FeedexCatalogQuery, ResultGUIPlugin, ResultGUICatItem, ResultPlugin, ResultCatItem, ResultGUIKwTerm, ResultGUIFeedTree
+from feedex_gui_dialogs_utils import BasicDialog, YesNoDialog, PreferencesDialog, CalendarDialog, MassEditDialog
 from feedex_gui_tabs import FeedexTab, FeedexGUITable
 from feedex_gui_feeds import FeedexFeedTab
 from feedex_gui_dialogs_entts import NewFromURL, EditCategory, EditEntry, EditFlag, EditPlugin, EditRule, EditFeedRegex, EditFeed

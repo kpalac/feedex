@@ -1,106 +1,169 @@
-# Example configuration for Feedex News Reader
 
 
-# Profile name connected with this configuration
-# If specified, GUI session will be treated as separate from default
-#profile_name = Feedex
+# Profile Name (<class 'str'>); 
+profile_name = 
 
-
-# Display language
-lang = 
-
-
-# Path to log file
+# Log File (<class 'str'>); 
 log = ~/.local/share/feedex/feedex.log
 
-# Path to news SQLite3 database
+# Path to DB (<class 'str'>); nn;
 db_path = ~/.local/share/feedex/feedex.db
-# Database timeout
+
+# Language (<class 'str'>); 
+lang = en
+
+# WWW Browser (<class 'str'>); 
+browser = xdg-open %u
+
+# Def. User Agent (<class 'str'>); 
+user_agent = UniversalFeedParser/5.0.1 +http://feedparser.org/
+
+# Fallback User Agent (<class 'str'>); 
+fallback_user_agent = 
+
+# DB Timeout (<class 'int'>); ('gt', 0);
 timeout = 120
 
+# Fetching Oper. Timeout (<class 'int'>); ('gt', 0);
+fetch_timeout = 20
 
-# Command for openning URLs and Images
-browser = xdg-open %u
-image_viewer = xdg-open %u
+# Default News Check Interval (<class 'int'>); ('gt', 0);
+default_interval = 60
 
-default_rule_weight = 2
+# Feed Error Limit (<class 'int'>); ('ge', 0);
+error_threshold = 30
 
+# Max Items per Transaction (<class 'int'>); ('gt', 0);
+max_items_per_transaction = 2000
 
-# What weight should manually added (not fetched from RSS/HTML/Script) items get
-# It will affect ranking. Zero (0) will disable learning on added entries 
-default_entry_weight = 2
-
-# Use feature learning at all>
+# Use Keyword Learning (<class 'bool'>); 
 use_keyword_learning = True
-# Recommendation algorithm
+
+# Recomm. Algorithm (<class 'int'>); ('in', (1, 2, 3));
 recom_algo = 1
-# Limit terms in recommendation queries
-recom_limit = 200
 
+# Recomm. Term Limit (<class 'int'>); ('gt', 0);
+recom_limit = 2000
 
-
-# Snippet length (to exclude long wildcard matches)
-max_context_length = 500
-
-# Don't save search history
+# No Search History (<class 'bool'>); 
 no_history = False
 
+# Default New Note Weight (<class 'int'>); ('ge', 0);
+default_entry_weight = 2
 
-# Default depth for query grouping
-default_depth = 5
+# Default New Rule Weight (<class 'int'>); ('ge', 0);
+default_rule_weight = 20
 
-
-# Limit similarity search results for better performance
-default_similarity_limit = 30
-
-# How similarity query should increase entry's importance?
+# Weight to add during Simil. Query (<class 'int'>); ('ge', 0);
 default_similar_weight = 0
 
-# Fetching and WWW connections
-error_threshold = 5
-default_interval = 45
+# Default Limit for Simil. Query (<class 'int'>); ('ge', 0);
+default_similarity_limit = 50
+
+# Default Query Depth (<class 'int'>); ('gt', 0);
+default_depth = 10
+
+# Default Page Length (<class 'int'>); ('gt', 0);
+default_page_len = 3000
+
+# Max Context Length (<class 'int'>); ('gt', 0);
+max_context_length = 500
+
+# Follow Link Redirects? (<class 'bool'>); 
 do_redirects = True
+
+# Save Perm. Link Redirects? (<class 'bool'>); 
 save_perm_redirects = False
+
+# Mark unhealthy Feeds as deleted? (<class 'bool'>); 
 mark_deleted = True
-ignore_modified = True
-user_agent = UniversalFeedParser/5.0.1 +http://feedparser.org/
-fetch_timeout = 20  # Timeout for fetching remote resources
 
+# Ignore MODIFIED and ETag? (<class 'bool'>); 
+ignore_modified = False
 
-# This UA wil be used for resource download if default fails
-#fallback_user_agent = Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0
-
-# GUI options
-gui_new_color = #0f0fdadacaca
-gui_deleted_color = #bababdbdb6b6
-gui_hilight_color = #00000000ffff
+# Notify on Fetched News? (<class 'bool'>); 
 gui_desktop_notify = True
+
+# Fetch periodicallly in bckgr.? (<class 'bool'>); 
 gui_fetch_periodically = False
-gui_notify_group = feed
-gui_notify_depth = 5
-gui_default_flag_color = #cccc00000000
-gui_key_search = s
-gui_key_new_entry = n
-gui_key_new_rule = r
+
+# Grouping for Notif. (<class 'str'>); ('in', ('category', 'feed', 'flag', 'number'));
+gui_notify_group = flag
+
+# Depth for Notif. (<class 'int'>); ('gt', 0);
+gui_notify_depth = 10
+
+# New Item Color (<class 'str'>); 
+gui_new_color = #0f0fdadacaca
+
+# Deleted Item Color (<class 'str'>); 
+gui_deleted_color = #bababdbdb6b6
+
+# Hilight Color (<class 'str'>); 
+gui_hilight_color = #00000000ffff
+
+# Default Flag Color (<class 'str'>); 
+gui_default_flag_color = #cece5c5c0000
+
+# Window Layout (<class 'int'>); ('in', (0, 1, 2));
 gui_layout = 0
+
+# Tab Orientation (<class 'int'>); ('in', (0, 1));
 gui_orientation = 0
 
-search_engine = https://duckduckgo.com/?t=ffab&q=%Q&ia=web
-
-# Clear cache (thumbnails, temp files) from items older than ...
-gui_clear_cache = 30
-
-# Desktop integration options 
-# Exclude those strings from window names when adding entry from desktop selection buffer
+# Excluded Window Name Strings (<class 'str'>); 
 window_name_exclude = Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird
 
-# CLI display beautifiers
-# Available colors: WHITE, WHITE_BOLD, YELLOW, YELLOW_BOLD, CYAN, CYAN_BOLD, BLUE, BLUE_BOLD, RED, RED_BOLD, GREEN, GREEN_BOLD, PURPLE, PURPLE_BOLD, LIGHT_RED, LIGHT_RED_BOLD
+# Image Viewer (<class 'str'>); 
+image_viewer = xdg-open %u
 
-#normal_color = WHITE
-#bold_color = CYAN_BOLD
+# Search Engine (<class 'str'>); 
+search_engine = https://duckduckgo.com/?t=ffab&q=%Q&ia=web
 
-# Bold markup (e.g. for snippets and contexts
-#bold_markup_beg = <b>
-#bold_markup_end = </b>
+# Clear Cache Interval (<class 'int'>); ('ge', 0);
+gui_clear_cache = 365
 
+# Add Entry Hotkey (hotkey); 
+gui_key_new_entry = n
+
+# Add Rule Hotkey (hotkey); 
+gui_key_new_rule = r
+
+# Add Item Hotkey (hotkey); 
+gui_key_add = a
+
+# Edit Item Hotkey (hotkey); 
+gui_key_edit = e
+
+# Search Hotkey (hotkey); 
+gui_key_search = s
+
+# CLI Normal Color (term_col); 
+normal_color = DEFAULT
+
+# CLI Bold Color (term_col); 
+bold_color = WHITE_BOLD
+
+# CLI Emphasis Color (term_col); 
+emph_color = YELLOW_BOLD
+
+# CLI Deleted Color (term_col); 
+deleted_color = LIGHT_RED
+
+# CLI Snippet Color (term_col); 
+snipp_hilight_color = CYAN_BOLD
+
+# Begin Bold Markup (<class 'str'>); 
+bold_markup_beg = <b>
+
+# End Bold Markup (<class 'str'>); 
+bold_markup_end = <b>
+
+# CLI Read Marker (<class 'str'>); 
+read_marker = =>
+
+# CLI Note Marker (<class 'str'>); 
+note_marker = (*)
+
+# Allow Desktop Inter-Process Comm.? (<class 'bool'>); 
+allow_pipe = True

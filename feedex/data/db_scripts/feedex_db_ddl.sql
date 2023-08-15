@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS "rules" (
 	"name"	TEXT,
 	"type"	INTEGER,
 	"feed_id"	INTEGER,
-	"field_id"	TEXT,
+	"field"	TEXT,
 	"string"	TEXT,
 	"case_insensitive"	INTEGER,
 	"lang"	TEXT,
@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS "feeds" (
 	"icon_name"	TEXT,
 	"display_order"	INTEGER,
 	"recom_weight" INTEGER,
+	"location" TEXT,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 
@@ -206,7 +207,9 @@ CREATE INDEX IF NOT EXISTS "idx_feeds_id_desc" ON "feeds" ( "id" DESC);
 CREATE INDEX IF NOT EXISTS "idx_feeds_name" ON "feeds" ( "name" );
 CREATE INDEX IF NOT EXISTS "idx_feeds_parent_id" ON "feeds" ( "parent_id" );
 CREATE INDEX IF NOT EXISTS "idx_feeds_parent_id_desc" ON "feeds" ( "parent_id" DESC);
-CREATE INDEX IF NOT EXISTS "idx_feeds_title" ON "feeds" ( "link" );
+CREATE INDEX IF NOT EXISTS "idx_feeds_link" ON "feeds" ( "link" );
+CREATE INDEX IF NOT EXISTS "idx_feeds_location" ON "feeds" ( "location" );
+CREATE INDEX IF NOT EXISTS "idx_feeds_title" ON "feeds" ( "title" );
 
 
 

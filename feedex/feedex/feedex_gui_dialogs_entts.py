@@ -14,7 +14,10 @@ class NewFromURL(Gtk.Dialog):
         self.feed = feed
         self.parent = parent
 
-        Gtk.Dialog.__init__(self, title=_("Add Channel from URL"), transient_for=parent, flags=0)
+        if isinstance(self.parent, Gtk.Window): par_win=self.parent
+        else: par_win=None
+
+        Gtk.Dialog.__init__(self, title=_("Add Channel from URL"), transient_for=par_win, flags=0)
         self.set_border_width(10)
         self.set_default_size(kargs.get('width',800), kargs.get('height',100))
         box = self.get_content_area()
@@ -55,6 +58,7 @@ class NewFromURL(Gtk.Dialog):
         self.on_changed()
 
 
+
     def on_changed(self, *args):
         handler = f_get_combo(self.handler_combo)
         if handler in ('rss', 'html'): self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
@@ -64,6 +68,7 @@ class NewFromURL(Gtk.Dialog):
         handler = f_get_combo(self.handler_combo)
         category = f_get_combo(self.cat_combo)
         self.feed.clear()
+        self.feed['is_category'] = 0
         self.feed['handler'] = handler
         self.feed['parent_id'] = category
         self.feed['url'] = self.url_entry.get_text()
@@ -87,6 +92,7 @@ class EditCategory(Gtk.Dialog):
     def __init__(self, parent, category, **kargs):
 
         self.parent = parent
+
         self.category = category
         self.new = kargs.get('new',True)
         if self.new: title = _("Add New Category")
@@ -143,6 +149,8 @@ class EditCategory(Gtk.Dialog):
         self.show_all()
 
 
+
+
     def on_restore(self, *args):
         """ Restore data to defaults """
         self.name_entry.set_text(scast(self.category.backup_vals.get('name'), str, ''))
@@ -182,8 +190,12 @@ class EditEntry(Gtk.Dialog):
     """ Edit Entry dialog """
     def __init__(self, parent, entry, **kargs):
 
-        self.entry = entry
         self.parent = parent
+
+        self.entry = entry
+
+        if isinstance(self.parent, Gtk.Window): par_win=self.parent
+        else: par_win=None
 
         self.new = kargs.get('new',True)
         if self.new:
@@ -195,7 +207,7 @@ class EditEntry(Gtk.Dialog):
 
         self.config = self.parent.config
 
-        Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
+        Gtk.Dialog.__init__(self, title=title, transient_for=par_win, flags=0)
         self.set_default_size(kargs.get('width',800), kargs.get('height',700))
         box = self.get_content_area()
 
@@ -373,7 +385,6 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
 
         self.title_entry.grab_focus()
 
-        self.connect("destroy", self._on_close)
 
 
 
@@ -401,7 +412,7 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         
 
     def get_data(self):
-        idict = { 'feed_or_cat': f_get_combo(self.cat_combo),
+        idict = { 'feed_id': f_get_combo(self.cat_combo),
                     'notes': f_get_combo(self.note_combo),
                     'title': nullif(self.title_entry.get_text(),''), 
 
@@ -466,7 +477,8 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
             return False                    
         return True
 
-    def _on_close(self, *args, **kargs): self.parent.gui_cache['div_entry_edit'] = self.div_horiz.get_position()
+    def _on_close(self, *args, **kargs): 
+        self.MW.gui_cache['div_entry_edit'] = self.div_horiz.get_position()
 
     def on_save(self, *args):
         self.get_data()
@@ -519,11 +531,13 @@ class EditFlag(Gtk.Dialog):
 
         self.parent = parent
         self.config = self.parent.config
-
+        
         self.flag = flag
 
+        if isinstance(self.parent, Gtk.Window): par_win=self.parent
+        else: par_win=None
 
-        Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
+        Gtk.Dialog.__init__(self, title=title, transient_for=par_win, flags=0)
         self.set_default_size(kargs.get('width',500), kargs.get('height',200))
         box = self.get_content_area()
 
@@ -592,8 +606,10 @@ class EditFlag(Gtk.Dialog):
         box.add(vbox)
         self.on_restore()
         self.show_all()
-
+        
         self.name_entry.grab_focus()
+
+
 
 
 
@@ -658,11 +674,14 @@ class EditPlugin(Gtk.Dialog):
 
         self.parent = parent
         self.config = self.parent.config
-
+        
         self.plugin = plugin
 
+        if isinstance(self.parent, Gtk.Window): par_win=self.parent
+        else: par_win=None
 
-        Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
+
+        Gtk.Dialog.__init__(self, title=title, transient_for=par_win, flags=0)
         self.set_default_size(kargs.get('width',500), kargs.get('height',200))
         box = self.get_content_area()
 
@@ -724,8 +743,8 @@ class EditPlugin(Gtk.Dialog):
         box.add(vbox)
         self.on_restore()
         self.show_all()
-
         self.name_entry.grab_focus()
+
 
 
 
@@ -791,9 +810,13 @@ class EditRule(Gtk.Dialog):
 
         self.parent = parent
         self.config = self.parent.config
+       
         self.rule = rule
 
-        Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
+        if isinstance(self.parent, Gtk.Window): par_win=self.parent
+        else: par_win=None
+
+        Gtk.Dialog.__init__(self, title=title, transient_for=par_win, flags=0)
         self.set_default_size(kargs.get('width',1000), kargs.get('height',400))
         box = self.get_content_area()
 
@@ -821,7 +844,7 @@ It is used according to <b>Type</b> and should be compatibile with it (e.g. a va
         lang_label = f_label(_('Language:'), wrap=False, xalign=1)
         self.lang_combo = f_lang_combo(connect=self.on_changed, tooltip=_("Which language should this rule use for Full Text Search?") )
         case_label = f_label(_('Case:'), wrap=False, xalign=1)
-        self.case_combo = f_dual_combo( ((0,_("Case sensitive")),(1,_("Case insensitive"))), connect=self.on_changed, tooltip=_('Should this Rule be case sensitive?') )
+        self.case_combo = f_dual_combo( ((0,_("Case sensitive")),(1,_("Case insensitive"))), types=(int, str,), connect=self.on_changed, tooltip=_('Should this Rule be case sensitive?') )
 
         weight_label = f_label(_('Weight:'), wrap=False, xalign=1)
         self.weight_entry = Gtk.Entry()
@@ -885,13 +908,12 @@ However, a rule can simply increase importance by its <b>weight</b> without flag
 
 
 
-
     def on_restore(self, *args):
         self.name_entry.set_text(coalesce(self.rule.backup_vals.get('name',''),''))
         self.string_entry.set_text(coalesce(self.rule.backup_vals.get('string',''),''))
 
         f_set_combo(self.type_combo, self.rule.backup_vals.get('type'))
-        f_set_combo(self.field_combo, self.rule.backup_vals.get('field_id'))
+        f_set_combo(self.field_combo, self.rule.backup_vals.get('field'))
         f_set_combo(self.feed_combo, self.rule.backup_vals.get('feed_id'))
         f_set_combo(self.lang_combo, self.rule.backup_vals.get('lang'), null_val=None)
         f_set_combo(self.case_combo, self.rule.backup_vals.get('case_insensitive'))
@@ -921,7 +943,7 @@ However, a rule can simply increase importance by its <b>weight</b> without flag
         idict = { 'name': nullif(self.name_entry.get_text().strip(),''),
                         'string': nullif(self.string_entry.get_text(),''), 
                         'type': f_get_combo(self.type_combo),
-                        'field_id': f_get_combo(self.field_combo), 
+                        'field': f_get_combo(self.field_combo), 
                         'feed_id': nullif(f_get_combo(self.feed_combo), 0), 
                         'lang': f_get_combo(self.lang_combo),
                         'case_insensitive': f_get_combo(self.case_combo),
@@ -1148,11 +1170,7 @@ Parsing will be done match by match with each REGEX below""" ))
         box.add(vbox)
         self.on_restore()
         self.show_all()
-
-
-
-
-
+        
 
 
 
@@ -1383,7 +1401,6 @@ class EditFeed(Gtk.Dialog):
 
         self.new = kargs.get('new',True)
 
-        self.response = 0
         self.parent = parent
         self.config = self.parent.config
 
@@ -1394,7 +1411,12 @@ class EditFeed(Gtk.Dialog):
         if self.new: title = _('Add new Feed')
         else: title = title = f'{_("Edit ")}{self.feed.name(id=False)}{_(" Channel")}'
 
-        Gtk.Dialog.__init__(self, title=title, transient_for=parent, flags=0)
+        if isinstance(self.parent, Gtk.Window): par_win=self.parent
+        else: par_win=None
+
+        self.response = 0
+
+        Gtk.Dialog.__init__(self, title=title, transient_for=par_win, flags=0)
         self.set_default_size(kargs.get('width',1000), kargs.get('height',500))
         box = self.get_content_area()
 
@@ -1416,7 +1438,10 @@ Categories are useful for bulk-filtering and general organizing""") )
 
         url_label = f_label(_('URL:'), xalign=1)
         self.url_entry = Gtk.Entry()
-        
+
+        loc_label = f_label(_('Location:'), xalign=1)
+        self.loc_entry = Gtk.Entry()
+
         home_label = f_label(_('Homepage:'), xalign=1)
         self.home_entry = Gtk.Entry()
         self.home_entry.set_tooltip_markup(_("URL to Channel's Homepage"))
@@ -1507,7 +1532,9 @@ Categories are useful for bulk-filtering and general organizing""") )
         grid.attach(url_label, 1,5, 3,1)
         grid.attach(self.url_entry, 4,5, 14,1)
         grid.attach(home_label, 1,6, 3,1)
-        grid.attach(self.home_entry, 4,6, 14,1)
+        grid.attach(self.home_entry, 4,6, 7,1)
+        grid.attach(loc_label, 11,6, 3,1)
+        grid.attach(self.loc_entry, 14,6, 4,1)
 
         grid.attach(author_label, 1,7, 3,1)
         grid.attach(self.author_entry, 4,7, 5,1)
@@ -1574,6 +1601,7 @@ Categories are useful for bulk-filtering and general organizing""") )
         self.on_restore()
         self.on_changed()
         self.show_all()
+
 
 
 
@@ -1650,6 +1678,7 @@ Scripted feeds are updated by script defined below during fetching""") )
         self.subtitle_entry.set_text(coalesce(self.feed.backup_vals.get('subtitle',''),''))
         self.url_entry.set_text(coalesce(self.feed.backup_vals.get('url',''),''))
         self.home_entry.set_text(coalesce(self.feed.backup_vals.get('link',''),''))
+        self.loc_entry.set_text(coalesce(self.feed.backup_vals.get('location',''),''))
         if self.feed.backup_vals.get('autoupdate',0) == 1: self.autoupdate_button.set_active(True)
         else: self.autoupdate_button.set_active(False)
         if self.feed.backup_vals.get('fetch',0) == 1: self.fetch_button.set_active(True)
@@ -1675,6 +1704,7 @@ Scripted feeds are updated by script defined below during fetching""") )
 
     def validate_entries(self, *args):
         err = self.feed.validate()
+        print(err)
         if err != 0:
             self.err_label.set_markup(gui_msg(*err))
             return False
@@ -1690,6 +1720,7 @@ Scripted feeds are updated by script defined below during fetching""") )
         idict['subtitle'] = nullif(self.subtitle_entry.get_text(),'')
         idict['url'] = nullif(self.url_entry.get_text(),'')
         idict['link'] = nullif(self.home_entry.get_text(),'')
+        idict['location'] = nullif(self.loc_entry.get_text(),'')
         if self.autoupdate_button.get_active(): idict['autoupdate'] = 1
         else: idict['autoupdate'] = 0
         if self.fetch_button.get_active(): idict['fetch'] = 1

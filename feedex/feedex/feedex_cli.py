@@ -26,7 +26,7 @@ class FeedexCLI:
 
         # Output flags
         self.output = kargs.get('output','cli')
-        if self.output not in ('long','headlines','notes','csv','json','json_dict','cli',): self.output = 'cli'
+        if self.output not in ('long','headlines','notes','csv','json','json_dict','cli','desktop',): self.output = 'cli'
         self.plot = kargs.get('plot', False)
 
         # CLI display options
@@ -38,20 +38,19 @@ class FeedexCLI:
         self.trunc          = scast(kargs.get('trunc'), int ,200)
         self.term_width     = scast(kargs.get('term_width'), int ,150)
 
-        self.read_marker = scast(kargs.get('read_marker'), str, '=>  ')
-        self.note_marker = scast(kargs.get('note_marker'), str, '(*)  ')
+        self.read_marker = scast(kargs.get('read_marker', self.config.get('read_marker')), str, '=>  ')
+        self.note_marker = scast(kargs.get('note_marker', self.config.get('note_marker')), str, '(*)  ')
 
 
-        self.snip_beg = scast(kargs.get('bold_beg'), str, self.config.get('BOLD_MARKUP_BEG', BOLD_MARKUP_BEG) )
-        self.snip_end = scast(kargs.get('bold_end'), str, self.config.get('BOLD_MARKUP_END', BOLD_MARKUP_END) )
-
-        # Terminal colors
-        self.STERM_NORMAL = self.config.get('TERM_NORMAL', TERM_NORMAL)
-        self.STERM_READ = self.config.get('TERM_READ', TERM_READ)
-        self.STERM_DELETED = self.config.get('TERM_DELETED', TERM_DELETED)
+        self.snip_beg = scast(kargs.get('bold_beg', self.config.get('bold_markup_beg')), str, '<b>')
+        self.snip_end = scast(kargs.get('bold_end', self.config.get('bold_markup_end')), str, '</b>')
         self.SBOLD_MARKUP_BEG = self.snip_beg
         self.SBOLD_MARKUP_END = self.snip_end
-        self.STERM_SNIPPET_HIGHLIGHT = self.config.get('TERM_SNIPPET_HIGHLIGHT', TERM_SNIPPET_HIGHLIGHT)
+
+        # Terminal colors
+        self.STERM_NORMAL = self.config['cli_cols'].get('normal_color', TERM_NORMAL)
+        self.STERM_DELETED = self.config['cli_cols'].get('deleted_color', TERM_ERR)
+        self.STERM_SNIPPET_HIGHLIGHT = self.config['cli_cols'].get('snipp_hilight_color', TERM_BOLD)
 
         # Date strings
         self.today = date.today()
@@ -68,13 +67,18 @@ class FeedexCLI:
         # Curtom mask
         self.display_cols = scast(kargs.get('display_cols'), str, None)
 
-        # Desktop notifier
-        self.DN = None
 
 
-    def connect_DN(self, notifier, **kargs):
-        """ Lazily connect desktop notifier """
-        if self.DN is None: self.DN = notifier
+    def cprint(self, ent, **kargs):
+        """ Print entity deciding format """
+        if isinstance(ent, FeedexQueryInterface): return self.out_table(ent, **kargs)
+        elif isinstance(ent, FeedexEntry): return self.out_entry(ent, **kargs)
+        elif isinstance(ent, FeedexFeed): return self.out_feed(ent, **kargs)
+        elif isinstance(ent, FeedexDBStats): return self.out_db_stats(ent)
+        else: print(ent)
+
+
+
 
 
 
@@ -203,8 +207,8 @@ Available column names for this query: %b"""), c, fld_list)
         snip_delim = ''
         
 
-        if self.output in ('cli', 'long', 'headlines','notes', 'csv'):
-
+        if self.output in ('cli', 'long', 'headlines','notes', 'csv',):
+            
             if isinstance(table, ResultEntry):
                 footer = f"""{result_no} {_('results')}"""
                 if result_no2 != 0: footer = f"""{footer} {_('out of')} {result_no2} {_('entries')}"""
@@ -314,8 +318,8 @@ Available column names for this query: %b"""), c, fld_list)
 
 
             header = ''
-            for c in coalesce(mask, table.vals.keys()): 
-                cname = table.col_names[table.get_index(c)] 
+            for c in coalesce(mask, table.vals.keys()):
+                cname = table.get_col_name(c) 
                 header = f"""{header}{self.delim} {cname} """
             header = f"""{header}{self.delim}"""
 
@@ -329,16 +333,27 @@ Available column names for this query: %b"""), c, fld_list)
 
 
 
-        
-        if self.plot and allow_plot: 
+        if self.output == 'desktop':
+
+            if not isinstance(table, ResultEntry): return msg(FX_ERROR_VAL, _('Result type not supported by desktop notifications. Need to be entries'))
+            if not isinstance(qr, FeedexQuery): return msg(FX_ERROR_VAL, _('Invalid interface for desktop notifications'))
+
+            qr.DB.connect_DN()
+            
+            fdx.DN.clear()
+            fdx.DN.load(results)
+            fdx.DN.show()
+
+
+
+
+        elif self.plot and allow_plot: 
+
             print(cli_mu(header))
             self._plot(results, mx=qr.result_max)
             print(cli_mu(footer))
-        
-        elif self.DN is not None: 
-            self.DN.clear()
-            self.DN.load(results)
-            self.DN.show()
+
+
 
         elif self.output == 'json':
 
@@ -536,6 +551,7 @@ Available column names for this query: %b"""), c, fld_list)
 
     def out_feed(self, feed, **kargs):
         """ Nice print feed"""
+        if kargs.get('test_regex'): return self.out_test_regex(feed)
         if not feed.exists: return ''
 
         do_print = kargs.get('do_print', True)
@@ -610,53 +626,7 @@ Available column names for this query: %b"""), c, fld_list)
 
 
 
-
-
-    def out_db_stats(self, stats, **kargs):
-        """ Nice print db stats """
-        stat_str=f"""
-
-{_('Statistics for database')}: <b>{stats['db_path']}</b>
-
-{_('FEEDEX version')}:          <b>{stats['version']}</b>
-
-{_('Main database size')}:      <b>{stats['db_size']}</b>
-{_('Index size')}:              <b>{stats['ix_size']}</b>
-{_('Cache size')}:              <b>{stats['cache_size']}</b>
-
-{_('Total size')}:              <b>{stats['total_size']}</b>
-
-
-
-{_('Entry count')}:             <b>{stats['doc_count']}</b>
-{_('Last entry ID')}:           <b>{stats['last_doc_id']}</b>
-
-{_('Rule count')}:              <b>{stats['rule_count']}</b>
-{_('Learned terms count')}:     <b>{stats['learned_kw_count']}</b>
-
-{_('Feed count')}:              <b>{stats['feed_count']}</b>
-{_('Category count')}:          <b>{stats['cat_count']}</b>
-
-{_('Last news update')}:        <b>{stats['last_update']}</b>
-{_('First news update')}:       <b>{stats['first_update']}</b>
-
-"""
-
-        if stats['fetch_lock']: 
-            stat_str = f"""{stat_str}
-{_('DATABASE LOCKED FOR FETCHING')}
-
-
-"""
-
-        if stats['due_maintenance']: 
-            stat_str = f"""{stat_str}
-{_('DATABASE MAINTENANCE ADVISED')}
-{_('Use')} <b>feedex --db-maintenance</b> {_('command')}
-
-
-"""
-        print(cli_mu(stat_str))
+    def out_db_stats(self, stats, **kargs): print(cli_mu(stats.mu_str()))
 
 
 

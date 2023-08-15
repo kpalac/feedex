@@ -57,13 +57,11 @@ class DesktopNotifier:
             self.notif_list.append(n)
 
 
-    def notify(self, title:str, body:str, icon:int):
+    def notify(self, icon, title:str, body:str):
         """ Quickly send a desktop notification """
-        if icon == 0: icon = os.path.join(FEEDEX_SYS_ICON_PATH, 'script.svg')
-        elif icon == -1: icon = os.path.join(FEEDEX_SYS_ICON_PATH, 'error.svg')
-        elif icon == -2: icon = os.path.join(FEEDEX_SYS_ICON_PATH, 'ok.svg')
-        elif icon == -3: icon = os.path.join(FEEDEX_SYS_ICON_PATH, 'rss.svg')
-        else: icon = self.icons.get(icon)
+        if icon is not None: 
+            if type(icon) is str: icon = os.path.join(FEEDEX_SYS_ICON_PATH, f'{icon.lower()}.svg')
+            else: icon = self.icons.get(icon)
 
         n = Notify.Notification.new(title, body, icon)
         n.set_timeout(0)

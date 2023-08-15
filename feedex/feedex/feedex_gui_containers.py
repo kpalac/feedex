@@ -20,6 +20,8 @@ class ResultGUI:
         self.gui_vals = {}
         self.gui_markup_fields = ()
         self.search_col = None
+        self.toggled_ids = []
+        self.toggled_gui_ixs = []
 
     def gindex(self, field):
         """ Returns a GUI field index """
@@ -66,10 +68,10 @@ class ResultGUIEntry(ResultGUI, ResultEntry):
     def __init__(self, **kargs):
         ResultEntry.__init__(self, replace_nones=True, **kargs)
         ResultGUI.__init__(self, **kargs)
-        self.gui_fields = ('gui_ix', 'gui_icon', 'id', 'pubdate_short', 'pubdate', 'title', 'feed_name', 'feed_id', 'desc', 'author', 'flag_name',
+        self.gui_fields = ('gui_ix', 'gui_icon', 'gui_toggle', 'id', 'pubdate_short', 'pubdate', 'title', 'feed_name', 'feed_id', 'desc', 'author', 'flag_name',
              'category', 'tags', 'read', 'importance', 'readability', 'weight', 'word_count', 'rank',
              'count', 'adddate_str', 'pubdate_str', 'publisher', 'link', 'is_node', 'gui_color', 'gui_bold')
-        self.gui_types = (int, GdkPixbuf.Pixbuf, int,   str, int,   str, str, int, str, str, str, 
+        self.gui_types = (int, GdkPixbuf.Pixbuf, bool, int,   str, int,   str, str, int, str, str, str, 
                           str, str, int, float, float, float, int, float, 
                           int, str, str, str, str, int,  str, int)
         self.search_col = self.gindex('title')
@@ -101,7 +103,8 @@ class ResultGUIEntry(ResultGUI, ResultEntry):
         self.gui_vals['publisher'] = self.vals['publisher']
         self.gui_vals['link'] = self.vals['link']
         self.gui_vals['is_node'] = self.vals['is_node']
-
+        if self.vals['id'] in self.toggled_ids: self.gui_vals['gui_toggle'] = True
+        else: self.gui_vals['gui_toggle'] = False
 
     def prep_gui_vals(self, ix, **kargs):        
         """ Prepares values for display and generates icon and style fields """
@@ -133,7 +136,8 @@ class ResultGUITree(ResultGUIEntry):
         if self.vals['is_node'] == 1 and self.vals['id'] is None:
 
             self.gui_vals.clear()
-            self.gui_vals['gui_ix'] = ix  
+            self.gui_vals['gui_ix'] = ix
+            self.gui_vals['id'] = self.vals['id']  
             self.gui_vals['title'] = esc_mu(self.vals['title'])
             self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
             self.gui_vals['is_node'] = 1
@@ -144,6 +148,9 @@ class ResultGUITree(ResultGUIEntry):
 
             self.gui_vals['gui_bold'] = 800
             self.gui_vals['title'] = f"""<u>{self.gui_vals['title']} ({esc_mu(self.vals['children_no'])})</u>"""
+            if self.gui_vals['gui_ix'] in self.toggled_gui_ixs: self.gui_vals['gui_toggle'] = True
+            elif self.gui_vals['id'] is not None and self.gui_vals['id'] in self.toggled_ids: self.gui_vals['gui_toggle'] = True
+            else: self.gui_vals['gui_toggle'] = False
 
         else:
             self.pre_prep_gui_vals(ix, **kargs)
@@ -176,10 +183,10 @@ class ResultGUINote(ResultGUIEntry):
         ResultEntry.__init__(self, replace_nones=True, **kargs)
         ResultGUI.__init__(self, **kargs)
         self.table = 'notes'
-        self.gui_fields = ('gui_ix', 'gui_icon', 'id', 'pubdate_short', 'pubdate', 'title', 'feed_name', 'feed_id', 'entry', 'author', 'flag_name',
+        self.gui_fields = ('gui_ix', 'gui_icon', 'gui_toggle', 'id', 'pubdate_short', 'pubdate', 'title', 'feed_name', 'feed_id', 'entry', 'author', 'flag_name',
              'category', 'tags', 'read', 'importance', 'readability', 'weight', 'word_count', 'rank',
              'count', 'adddate_str', 'pubdate_str', 'publisher', 'link', 'is_node', 'gui_color',)
-        self.gui_types = (int, GdkPixbuf.Pixbuf, int,   str, int,   str, str, int, str, str, str, 
+        self.gui_types = (int, GdkPixbuf.Pixbuf, bool, int,   str, int,   str, str, int, str, str, str, 
                           str, str, int, float, float, float, int, float, 
                           int, str, str, str, str, int,  str,)
         self.gui_markup_fields = ('entry',)
@@ -267,6 +274,61 @@ class ResultGUIContext(ResultGUI, ResultContext):
 
 
 
+class ResultGUIFeedTree(ResultGUI, ResultFeed):
+    """ GUI result for tree view """
+    def __init__(self, **kargs):
+        ResultFeed.__init__(self, replace_nones=True, **kargs)
+        ResultGUI.__init__(self, **kargs)
+        self.table = 'feed_tree'
+        self.gui_fields = ('gui_ix', 'gui_icon', 'gui_toggle', 'id', 'name', 'title', 'subtitle', 'url', 'link', 'location', 'handler', 'sfetch', 'sautoupdate', 'interval', 'is_category', 'display_order', 'parent_id', 
+                           'gui_color', 'is_node',)
+        self.gui_types = (int, GdkPixbuf.Pixbuf, bool,    int,    str, str, str,   str,str,  str, str,  str, str,  int, int,  int, int,
+                          str,   int)
+        
+        self.search_col = self.gindex('name')
+        self.gui_markup_fields = ('name',)
+
+
+    def prep_gui_vals(self, ix, **kargs):
+        self.gui_vals.clear()
+        self.gui_vals['gui_ix'] = ix
+        self.gui_vals['id'] = self.vals['id']
+        self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["id"], self.MW.icons['default'])
+
+
+        self.gui_vals['name'] = esc_mu(self.name())
+        self.gui_vals['title'] = scast(self.vals['title'], str, '')
+        self.gui_vals['subtitle'] = ellipsize(scast(self.vals['subtitle'], str, ''), 150).replace('\n',' ').replace('\r',' ').replace('\t', ' ')
+
+        if self.gui_vals['gui_ix'] in self.toggled_gui_ixs: self.gui_vals['gui_toggle'] = True
+        elif self.gui_vals['id'] is not None and self.gui_vals['id'] in self.toggled_ids: self.gui_vals['gui_toggle'] = True
+        else: self.gui_vals['gui_toggle'] = False
+
+        if scast(self.vals['deleted'], int, 0) == 1: self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
+
+        self.gui_vals['is_category'] = self.vals['is_category']
+        self.gui_vals['parent_id'] = self.vals['parent_id']
+        
+        self.gui_vals['display_order'] = self.vals['display_order']
+
+        if self.vals['is_node'] == 1:
+            self.gui_vals['is_node'] = 1
+            self.gui_vals['name'] = f"""<u><b>{self.gui_vals['name']} ({esc_mu(self.vals['children_no'])})</b></u>"""
+
+        else:
+            self.gui_vals['url'] = self.vals['url']
+            self.gui_vals['link'] = self.vals['link']
+            self.gui_vals['location'] = self.vals['location']
+            self.gui_vals['handler'] = self.vals['handler']
+            self.gui_vals['sfetch'] = self.vals['sfetch']
+            self.gui_vals['sautoupdate'] = self.vals['sautoupdate']
+            self.gui_vals['interval'] = self.vals['interval']
+            self.gui_vals['is_node'] = 0
+
+
+
+
+
 
 class ResultGUIRule(ResultGUI, ResultRule):
     """ GUI result for rule """
@@ -274,9 +336,9 @@ class ResultGUIRule(ResultGUI, ResultRule):
         ResultRule.__init__(self, replace_nones=True, **kargs)
         ResultGUI.__init__(self, **kargs)
 
-        self.gui_fields = ('gui_ix', 'id', 'name', 'string', 'weight', 'scase_insensitive', 'query_type', 'flag_name', 'field_name', 'feed_name', 
+        self.gui_fields = ('gui_ix', 'gui_toggle', 'id', 'name', 'string', 'weight', 'scase_insensitive', 'query_type', 'flag_name', 'field_name', 'feed_name', 
                            'lang', 'matched', 'sadditive', 'flag', 'gui_color',)
-        self.gui_types = (int, int, str, str, float, str, str, str, str, str, str, int, str,  int, str,)
+        self.gui_types = (int, bool, int, str, str, float, str, str, str, str, str, str, int, str,  int, str,)
         self.search_col = self.gindex('string')
 
 
@@ -297,7 +359,8 @@ class ResultGUIRule(ResultGUI, ResultRule):
         self.gui_vals['sadditive'] = self.vals['sadditive']        
         self.gui_vals['flag'] = self.vals['flag']        
         if coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
-
+        if self.vals['id'] in self.toggled_ids: self.gui_vals['gui_toggle'] = True
+        else: self.gui_vals['gui_toggle'] = False
 
 
 
@@ -306,8 +369,8 @@ class ResultGUIFlag(ResultGUI, ResultFlag):
     def __init__(self, **kargs):
         ResultFlag.__init__(self, replace_nones=True, **kargs)
         ResultGUI.__init__(self, **kargs)
-        self.gui_fields = ('gui_ix', 'id', 'name', 'desc', 'color', 'color_cli', 'gui_color',)
-        self.gui_types = (int, int,  str, str, str, str, str,)
+        self.gui_fields = ('gui_ix', 'gui_toggle', 'id', 'name', 'desc', 'color', 'color_cli', 'gui_color',)
+        self.gui_types = (int, bool, int,  str, str, str, str, str,)
         self.search_col = self.gindex('name')
 
     def prep_gui_vals(self, ix, **kargs):
@@ -318,7 +381,8 @@ class ResultGUIFlag(ResultGUI, ResultFlag):
         self.gui_vals['desc'] = self.vals['desc']
         self.gui_vals['color'] = self.vals['color']
         self.gui_vals['gui_color'] = self.vals['color']
-
+        if self.vals['id'] in self.toggled_ids: self.gui_vals['gui_toggle'] = True
+        else: self.gui_vals['gui_toggle'] = False
 
 
 class ResultGUITerm(ResultGUI, ResultTerm):
@@ -577,26 +641,23 @@ class FeedexPlugin(ResultPlugin):
 
         command[i] = arg
 
-        debug(3, f'Running: {" ".join(command)}')
+        debug(6, f'Running: {" ".join(command)}')
         
         if is_cont:
-            tmp_file_in = os.path.join(self.MW.DB.cache_path, f"""{random_str(length=30)}.tmp""")
-            while os.path.isfile(tmp_file_in): tmp_file_in = os.path.join(self.MW.DB.cache_path, f"""{random_str(length=30)}.tmp""")    
-            if self.vals['type'] == FX_PLUGIN_RESULTS: err = save_json(tmp_file_in, self.MW.curr_upper.table.results)
-            else: err = save_json(tmp_file_in, item)
-            if err != 0: return err
-            run_env['FEEDEX_TMP_FILE'] = tmp_file_in
+            self.MW.DB.create_pipe(type=1)
+            run_env['FEEDEX_PIPE'] = fdx.out_pipe
+            if self.vals['type'] == FX_PLUGIN_RESULTS: err = save_json(fdx.out_pipe, self.MW.curr_upper.table.results)
+            else: err = save_json(fdx.out_pipe, item)
  
             # substitute tmp file string
             for i, arg in enumerate(command):
             
                 # Handle container-specific arguments
-                arg = arg.replace('%T', tmp_file_in)
+                arg = arg.replace('%p', fdx.out_pipe)
                 arg = arg.replace('%t', item.table)
                 arg = arg.replace(rstr, '%')
 
                 command[i] = arg   
-
 
         err = 0
         # Run command
@@ -608,8 +669,7 @@ class FeedexPlugin(ResultPlugin):
             err = msg(FX_ERROR_HANDLER, _("Error executing script: %a"), e)
         finally:
             if is_cont:
-                try: os.remove(tmp_file_in)
-                except (OSError, IOError,) as e: err = msg(FX_ERROR_IO, f"""{_('Error removing %a temp file!')} {e}""", tmp_file_in)
+                err = self.MW.DB.destroy_pipe(type=1)
 
         return err
 
@@ -644,6 +704,8 @@ class ResultGUIPlugin(ResultGUI, ResultPlugin):
         self.gui_vals['command'] = scast(self.vals['command'], str, '')
         self.gui_vals['desc'] = ellipsize(scast(self.vals['desc'], str, '').replace('\n',' ').replace('\r',' ').replace('\t',' '), 200)
 
+        #if self.vals['id'] in self.toggled_ids: self.gui_vals['gui_toggle'] = True
+        #else: self.gui_vals['gui_toggle'] = False
 
 
 
