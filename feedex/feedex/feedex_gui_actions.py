@@ -187,7 +187,7 @@ class FeedexGUIActions:
 
         DB = FeedexDatabase(connect=True)
         item.set_interface(DB)
-        err = item.add_from_url()
+        err = item.add_from_url(item.vals.copy())
         
         if DB.new_items > 0:
             self.MW.new_items = scast(self.MW.new_items, int, 0) + DB.new_items

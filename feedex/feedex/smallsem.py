@@ -644,10 +644,11 @@ class SmallSemTrainer:
 
 
 
-
     def learn_text(self, text:str):
         """ Indexes given text and adds terms to vocab """
         self.ke.raw_text = text
+        #sents = re.findall(self.ling.get('sentence_chunker', DEFAULT_SENTENCE_CHUNKER_RE), text)
+        
         self.ke.tokenize(text, writeable_xap=self.ix_db)
 
         for u in self.ke.units:
