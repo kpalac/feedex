@@ -349,7 +349,7 @@ RESULTS_SQL_TABLE_PRINT          = ENTRIES_SQL_TABLE_PRINT + (n_("Is Deleted?"),
                                                               n_("Deleted?"), n_("Note?"), n_("Read/Marked?"),n_("Snippets"), n_("Rank"), n_("Count"), n_("Node?"), n_("Number of Children"))
 
 LING_TEXT_LIST = ('title','desc','tags','category','text', 'author', 'publisher', 'contributors')
-REINDEX_LIST = LING_TEXT_LIST + ('adddate','pubdate','feed_id','flag','read','note','deleted','handler')
+REINDEX_LIST = LING_TEXT_LIST + ('lang','adddate','pubdate','feed_id','flag','read','note','deleted','handler')
 ENTRIES_TECH_LIST = ('sent_count','word_count','char_count','polysyl_count','com_word_count','numerals_count','caps_count','readability','weight', 'adddate','adddate_str','ix_id')
 REINDEX_LIST_RECALC = ('sent_count','word_count','char_count','polysyl_count','com_word_count','numerals_count','caps_count','readability', 'weight', 'ix_id',)
 

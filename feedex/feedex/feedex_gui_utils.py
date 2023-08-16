@@ -852,6 +852,18 @@ def f_lang_combo(**kargs):
             store.append( (l['names'][0], l['names'][0].upper()) )
     return f_dual_combo(store, types=(str, str,), **kargs)
 
+def f_lang_combo_edit(**kargs):
+    """ Lang combo for Entry Edit with default """
+    default = kargs.get('default')
+    store = []
+    found = False
+    for l in fdx.lings:
+        if l['names'][0] != 'heuristic':
+            store.append( (l['names'][0], l['names'][0].upper()) )
+            if default in l['names']: found = True
+    if not found and default is not None: store = [ (default, default) ] + store
+    return f_dual_combo(store, types=(str, str,), **kargs)
+
 
 def f_field_combo(**kargs):
     """ Build field combo """

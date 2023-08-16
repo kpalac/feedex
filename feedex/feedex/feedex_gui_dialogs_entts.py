@@ -227,6 +227,7 @@ It is a good idea to have categories exclusively for manually added entries for 
 <i>Every Entry needs to be assigned to a Category or a Channel</i>"""))
 
         self.note_combo = f_note_combo(search=False, tooltip=_("""How should this entry be classified?"""))
+        self.lang_combo = f_lang_combo_edit(default=self.entry.get('lang'), tooltip=_("""Choose indexing and feature extracting language model"""))
 
         self.image_button = f_image_button( os.path.join(self.parent.DB.img_path, f"""{self.entry['id']}.img"""), connect=self.on_change_image, tooltip=_("""Add local image to display with this Entry"""))
 
@@ -319,6 +320,7 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
         header_grid.set_row_homogeneous(True)
 
         header_grid.attach(self.cat_combo, 1,1, 11, 1)
+        header_grid.attach(self.lang_combo, 12,1, 2, 1)
         header_grid.attach(self.note_combo, 15,1, 3, 1)
         header_grid.attach(self.image_button, 1,2, 2, 2)
 
@@ -414,6 +416,7 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
     def get_data(self):
         idict = { 'feed_id': f_get_combo(self.cat_combo),
                     'notes': f_get_combo(self.note_combo),
+                    'lang' : f_get_combo(self.lang_combo),
                     'title': nullif(self.title_entry.get_text(),''), 
 
                     'author': nullif(self.author_entry.get_text(),''), 
@@ -443,6 +446,7 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
     def on_restore(self, *args):
         f_set_combo(self.cat_combo, self.entry.backup_vals.get('feed_id'))
         f_set_combo(self.note_combo, self.entry.backup_vals.get('note'))
+        f_set_combo(self.lang_combo, coalesce(self.entry.backup_vals.get('lang'), self.config.get('lang','en')) )
         self.title_entry.set_text(scast(self.entry.backup_vals.get('title'), str, ''))
 
         self.author_entry.set_text(scast(self.entry.backup_vals.get('author'), str, ''))

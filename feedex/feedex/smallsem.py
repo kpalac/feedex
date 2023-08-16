@@ -77,7 +77,6 @@ class SmallSem:
         self.raw_text = ''
 
         self.tokens = []
-        self.units = []
 
         # summarization stuff...
         self.ranked_sents = [] # List of tokenized and ranked sentences
@@ -226,12 +225,8 @@ class SmallSem:
 
     def tokenize(self, text, **kwargs):
         """ Tokenize with normalization and (if specified) stemming and dividing into units 
-                units:bool      should text be split into units?
                 stem:bool       should tokens be stemmed?
         """
-        
-        # Units are token lists that are indexed as documents. No real use for it yet...
-        units = kwargs.get('units', True)
         
         # Terms are stemmed
         stem = kwargs.get('stem',True)
@@ -242,19 +237,9 @@ class SmallSem:
         raw_tokens = self._simple_tokenize(text)        
 
         self.tokens = []
-        self.units = []
         
-        curr_unit = []
-
         for t in raw_tokens:
             
-            if units:
-                if t in self.divs:
-                    if len(curr_unit) > 1: 
-                        self.units.append(curr_unit.copy())
-                        curr_unit.clear()
-                    continue
-
             if t in self.punctation or t in self.divs: continue
             if self._isnum(t): continue # This is debatable but I decided to ignore numbers as features
 
@@ -270,12 +255,8 @@ class SmallSem:
             else:
                 stemmed = t
 
+            self.tokens.append(stemmed)
 
-            if units: curr_unit.append(stemmed)
-            else: self.tokens.append(stemmed)
-
-        if units:
-            if len(curr_unit) > 1: self.units.append(curr_unit.copy())
 
 
 
@@ -641,23 +622,37 @@ class SmallSemTrainer:
         self.ix_db = xapian.WritableDatabase(self.ke.index_path, xapian.DB_CREATE_OR_OPEN)
         self.ix_tg = xapian.TermGenerator()
 
+        # Counters
+        self.doc_counter = 0
+        self.sent_counter = 0
+
+        # Semantic Units for vectorization
+        self.units = []
 
 
 
-    def learn_text(self, text:str):
-        """ Indexes given text and adds terms to vocab """
+
+
+    def learn_text(self, text:str, doc_id, **kwargs):
+        """ Indexes given text and adds terms to vocab 
+            doc_id = int    Main document counter """
         self.ke.raw_text = text
-        #sents = re.findall(self.ling.get('sentence_chunker', DEFAULT_SENTENCE_CHUNKER_RE), text)
+        sents = re.findall(self.ling.get('sentence_chunker', DEFAULT_SENTENCE_CHUNKER_RE), text)
         
-        self.ke.tokenize(text, writeable_xap=self.ix_db)
+        self.units.clear()
+        for s in sents: self.units.append(self.ke.tokenize(s, writeable_xap=self.ix_db))
 
-        for u in self.ke.units:
+        for i,u in enumerate(self.units):
 
             doc_string = ''
             for t in u:
                 doc_string = f'{doc_string} {t}'
 
+            doc_id = f'{doc_id};{i}'
             doc = xapian.Document()
+            doc.add_boolean_term(f'DID {doc_id}')
+            doc.add_boolean_term(f'UID {i}')
+            doc.set_data(doc_id)
             self.ix_tg.set_document(doc)
             self.ix_tg.index_text_without_positions(doc_string)
             self.ix_db.add_document(doc)
@@ -666,7 +661,7 @@ class SmallSemTrainer:
 
     def learn_from_dir(self, directory:str):
         """ Loads all files from a folder and indexes them"""
-        for f in os.listdir(directory):
+        for i,f in enumerate(os.listdir(directory)):
             filename = os.path.join(directory, f)
             try:
                 # Detect encodng...
@@ -680,7 +675,7 @@ class SmallSemTrainer:
                 continue
             
             print(f'Indexing {filename} (encoding: {encoding})...')
-            self.learn_text(contents)
+            self.learn_text(contents, i)
             print(f'Done.')
 
 

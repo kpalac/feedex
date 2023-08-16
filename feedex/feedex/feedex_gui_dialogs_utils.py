@@ -732,6 +732,7 @@ This allows for adding entries, rules and feeds from external Feedex instances, 
 
     def on_save(self, *args):
         if self.validate_entries():
+            self.result.apply()
             err = self.result.save()
             if err == 0:
                 
