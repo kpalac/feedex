@@ -61,9 +61,9 @@ FEEDEX_GUI_SEARCH_ENGINES=(
 )
 
 
-FEEDEX_GUI_ICONS=('rss','www','script','mail','twitter','calendar','document','ok','edit','comment','warning','archive','bookmark',
+FEEDEX_GUI_ICONS=('rss','www','script','mail','twitter','calendar','document','ok','edit','comment','warning','archive','bookmark', 'folder',
                   'rss_doc', 'exec', 'font', 'curled', 'address', 'office', 'spreadsheet','presentation',
-                  'hand','heart','link', 'network',
+                  'hand','heart','link', 'network', 'human',
                   'money', 'violence', 'no_violence', 'community', 'terminal', 'dev', 'education', 'electronics','game','image','health','media', 'music', 'photos', 'video',
                   'science','utils','bug','toolkit','radio','google','player','audio','weather','notes','lightbulb', 'travel', 'sport','surprise', 'radar', 'playlist',
                   'markup', 'law', 'python', 'database', 'card', 'avatar', 'cert', 'shield', 'sun', 'night', 'voltage', 'clouds', 'rain', 'disk',

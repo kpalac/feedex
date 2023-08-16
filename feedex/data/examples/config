@@ -54,9 +54,6 @@ default_entry_weight = 2
 # Default New Rule Weight (<class 'int'>); ('ge', 0);
 default_rule_weight = 20
 
-# Weight to add during Simil. Query (<class 'int'>); ('ge', 0);
-default_similar_weight = 0
-
 # Default Limit for Simil. Query (<class 'int'>); ('ge', 0);
 default_similarity_limit = 50
 

@@ -376,18 +376,18 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
         # Update store ...
         # Places tree ...
         if not self.edit_mode:
-            new_row = self.feed_store_tmp.append(None, self._feed_store_item({'gui_action':1, 'name':_('New'), 'gui_icon':'new', 'id':FX_PLACE_LAST, 'gui_row_id':'P 1'}) )
-            nnew_row = self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Previous Update'), 'gui_icon':'calendar', 'handler':'0', 'id':FX_PLACE_PREV_LAST, 'gui_row_id':'FS'}) )
+            new_row = self.feed_store_tmp.append(None, self._feed_store_item({'gui_action':1, 'name':_('New'), 'gui_icon':'folder', 'id':FX_PLACE_LAST, 'gui_row_id':'P 1'}) )
+            nnew_row = self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Previous Update'), 'gui_icon':'rss', 'handler':'0', 'id':FX_PLACE_PREV_LAST, 'gui_row_id':'FS'}) )
             for f in fdx.fetches_cache:
                 self.feed_store_tmp.append(nnew_row, self._feed_store_item({'gui_action':1, 'name':f[FETCH_TABLE.index('date')], 'gui_icon':'rss', 'id':-f[FETCH_TABLE.index('ord')]}) )
             if self.MW.gui_cache.get('feeds_expanded',{}).get('FS',False): expanded.append(nnew_row)
 
-            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Last Hour'), 'gui_icon':'calendar', 'id':FX_PLACE_LAST_HOUR}) )
-            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Today'), 'gui_icon':'calendar', 'id':FX_PLACE_TODAY}) )
-            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('This Week'), 'gui_icon':'calendar', 'id':FX_PLACE_LAST_WEEK}) )
-            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('This Month'), 'gui_icon':'calendar', 'id':FX_PLACE_LAST_MONTH}) )
-            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('This Quarter'), 'gui_icon':'calendar', 'id':FX_PLACE_LAST_QUARTER}) )
-            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Last Six Month'), 'gui_icon':'calendar', 'id':FX_PLACE_LAST_SIX_MONTHS}) )
+            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Last Hour'), 'gui_icon':'new', 'id':FX_PLACE_LAST_HOUR}) )
+            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Today'), 'gui_icon':'new', 'id':FX_PLACE_TODAY}) )
+            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('This Week'), 'gui_icon':'new', 'id':FX_PLACE_LAST_WEEK}) )
+            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('This Month'), 'gui_icon':'new', 'id':FX_PLACE_LAST_MONTH}) )
+            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('This Quarter'), 'gui_icon':'new', 'id':FX_PLACE_LAST_QUARTER}) )
+            self.feed_store_tmp.append(new_row, self._feed_store_item({'gui_action':1, 'name':_('Last Six Month'), 'gui_icon':'new', 'id':FX_PLACE_LAST_SIX_MONTHS}) )
 
             if self.MW.gui_cache.get('feeds_expanded',{}).get('P 1',False): expanded.append(new_row)
 

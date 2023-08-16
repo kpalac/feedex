@@ -601,7 +601,6 @@ FEEDEX_CONFIG_LIST = (
 
 ('default_entry_weight',_('Default New Note Weight'),int, 2,   (('ge',0),) ),
 ('default_rule_weight', _('Default New Rule Weight'),int, 2,   (('ge',0),) ),
-('default_similar_weight',_('Weight to add during Simil. Query'),int, 0,   (('ge',0),) ),
 ('default_similarity_limit',_('Default Limit for Simil. Query'),int, 20,   (('ge',0),) ),
 ('default_depth',       _('Default Query Depth'),    int, 10,   (('gt',0),) ),
 ('default_page_len',    _('Default Page Length'),    int, 3000,   (('gt',0),) ),

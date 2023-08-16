@@ -745,6 +745,9 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Edit Entry'), self.act.on_edit_entry, args=(item,), icon='edit-symbolic') )
                 menu.append( f_menu_item(1, _('Delete'), self.act.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
 
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
+                menu.append( f_menu_item(1, _('Similar Entries...'), self.add_tab,  kargs={'type':FX_TAB_SIMILAR, 'top_entry':item, 'filters':{'...-...': True, 'depth':50}, 'do_search':True}, icon='emblem-shared-symbolic', tooltip=_("Find Entries similar to the one selected") ) )
+
             elif coalesce(item.get('is_deleted'),0) > 0:
                 menu.append( f_menu_item(1, _('Restore'), self.act.on_restore_entry, args=(item,), icon='edit-redo-rtl-symbolic') )
                 menu.append( f_menu_item(1, _('Delete permanently'), self.act.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
@@ -752,7 +755,6 @@ It will also take some time to perform""") ))
             menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             search_menu = Gtk.Menu()
-            search_menu.append( f_menu_item(1, _('Find Similar Entries...'), self.add_tab,  kargs={'type':FX_TAB_SIMILAR, 'top_entry':item, 'filters':{'...-...': True, 'depth':50}, 'do_search':True}, icon='emblem-shared-symbolic', tooltip=_("Find Entries similar to the one selected") ) )
             search_menu.append( f_menu_item(1, _('Show Time Relevance...'), self.add_tab, kargs={'type':FX_TAB_REL_TIME, 'filters': {'...-...':True, 'group':'monthly'}, 'top_entry': item}, icon='histogram-symbolic', tooltip=_("Search for this Entry's Keywords in time") ) )
 
             if item['author'] not in (None, ''):
@@ -763,7 +765,7 @@ It will also take some time to perform""") ))
                 author_menu.append( f_menu_item(1, _('Search WWW'), self._on_www_search_auth, args=(item['author'],), icon='www-symbolic', tooltip=_("Search WWW for this Author's info") ) )
                 search_menu.append( f_menu_item(3, _('Other by this Author...'), author_menu, icon='community-symbolic', tooltip=_("Search for this Author") ) )
 
-            menu.append( f_menu_item(3, _('Search...'), search_menu, icon='emblem-shared-symbolic') ) 
+            menu.append( f_menu_item(3, _('Search...'), search_menu, icon='edit-find-symbolic') ) 
             menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             plugin_filter.append(FX_PLUGIN_ENTRY)

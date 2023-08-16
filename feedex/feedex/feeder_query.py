@@ -475,10 +475,7 @@ class FeedexQuery(FeedexQueryInterface):
         else: terms = None
 
         if terms in (None, [], [None], (), (None,)):
-            if self.config.get('default_similar_weight', 2) > 0 and not kargs.get('no_weight',False):
-                err = entry.ling(index=False, rank=False, learn=True, save_terms=True)
-            else:
-                err = entry.ling(index=False, rank=False, learn=True, save_terms=False)
+            err = entry.ling(index=False, rank=False, learn=True, save_terms=False)
             if err != 0: 
                 self._empty(result=ResultEntry())
                 return -2
@@ -488,10 +485,6 @@ class FeedexQuery(FeedexQueryInterface):
             debug(5, "Nothing to find...")
             self._empty(result=ResultEntry())
             return 0
-
-        # Update entry as read (if so configured)
-        if self.config.get('default_similar_weight', 2) > 0 and not kargs.get('no_weight',False):
-            self.DB.run_sql_lock(f"update entries set read = coalesce(read,0) + {self.config.get('default_similar_weight', 2)}  where id = :id", {'id':id} )
 
         # Search for keywords in entries ...
         filters['lang'] = entry.get('lang','heuristic')
@@ -922,7 +915,7 @@ class FeedexQuery(FeedexQueryInterface):
                     node_count += 1
                     filters['fallback_sort'] = 'id'
                     matched_ids.append(r[id_ix])
-                    self.similar(r[id_ix], filters, no_weight=True)
+                    self.similar(r[id_ix], filters)
                     for t in self.results:
                         if t[id_ix] not in matched_ids and r[id_ix] != t[id_ix]: 
                             count += 1

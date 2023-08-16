@@ -203,10 +203,6 @@ If no grouping is selected, it will simply show top results"""))
         self.default_rule_weight_entry = Gtk.Entry()
         self.default_rule_weight_entry.set_tooltip_markup(_('Default weight assigned to manually added rule (if not provided)'))
 
-        default_similar_wieght_label = f_label(_('Weight for similarity search:'))
-        self.default_similar_weight_entry = Gtk.Entry()
-        self.default_similar_weight_entry.set_tooltip_markup(_('How much weight for ranking should items for which similar ones are searched for be given. Zero to disable'))
-        
         recom_algo_label = f_label(_('Recommendation algorithm:'))
         self.recom_algo_combo = f_recom_algo_combo()
 
@@ -419,10 +415,8 @@ This allows for adding entries, rules and feeds from external Feedex instances, 
         learn_grid.attach(self.default_entry_weight_entry, 4,8, 3,1)
         learn_grid.attach(default_rule_weight_label, 1, 9, 3,1)
         learn_grid.attach(self.default_rule_weight_entry, 4, 9, 3,1)
-        learn_grid.attach(default_similar_wieght_label, 1,10,4,1)
-        learn_grid.attach(self.default_similar_weight_entry, 5, 10, 3,1)
-        learn_grid.attach(recom_algo_label, 1,11,4,1)
-        learn_grid.attach(self.recom_algo_combo, 5, 11, 3,1)
+        learn_grid.attach(recom_algo_label, 1,10,4,1)
+        learn_grid.attach(self.recom_algo_combo, 5, 10, 3,1)
 
 
         system_grid = create_grid()
@@ -569,8 +563,6 @@ This allows for adding entries, rules and feeds from external Feedex instances, 
 
         self.default_rule_weight_entry.set_text(scast(self.config.get('default_rule_weight',2), str, _('<<ERROR>>')))
 
-        self.default_similar_weight_entry.set_text(scast(self.config.get('default_similar_weight',2), str, _('<<ERROR>>')))
-
         f_set_combo(self.recom_algo_combo, self.config.get('recom_algo',1))
 
         self.max_context_length_entry.set_text(scast(self.config.get('max_context_length',500), str, _('<<ERROR>>')))
@@ -664,8 +656,6 @@ This allows for adding entries, rules and feeds from external Feedex instances, 
         else: self.result['mark_deleted'] = False
 
         self.result['default_rule_weight'] = nullif(self.default_rule_weight_entry.get_text(),'')
-
-        self.result['default_similar_weight'] = nullif(self.default_similar_weight_entry.get_text(),'')
 
         self.result['recom_algo'] = f_get_combo(self.recom_algo_combo)
 
