@@ -121,11 +121,8 @@ class FeedexRequest:
 
 class FeedexPiper:
     """ Class for listeners on pipes etc."""
-    def __init__(self, **kargs) -> None:
+    def __init__(self, **kargs) -> None: pass
         
-        self.config = kargs.get('config', fdx.config)
-
-
 
     def send_local(self, pipe,  ent, act, body, **kargs):
         """ Send request to local pipe """

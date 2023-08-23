@@ -19,7 +19,6 @@ class FeedexClipper:
     """ Clipboard and Window support. Gets selection and window name."""
     def __init__(self, **kargs) -> None:
 
-        self.config = kargs.get('config', fdx.config)
         self.error = None
 
 
@@ -29,7 +28,7 @@ class FeedexClipper:
         cb = Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY)
         selection = cb.wait_for_text()
             
-        if selection in (None, ''): 
+        if selection in {None, '',}: 
             self.error = _('Empty selection!')
             msg(FX_ERROR, _('Empty selection!'))
 
@@ -37,7 +36,7 @@ class FeedexClipper:
         scr.force_update()
         window = scr.get_active_window().get_name()
         # Exclude phrases (to avoid littering database with browser headers etc...)...
-        exclude = scast(self.config.get('window_name_exclude'), str, '')
+        exclude = scast(fdx.config.get('window_name_exclude'), str, '')
         for excl in exclude.split(','): window = window.replace(excl,'')
 
         arg_list = []

@@ -22,9 +22,6 @@ class FeedexLP(SmallSem):
 
         self.models_path = FEEDEX_MODELS_PATH
 
-        # Utilities ...
-        self.config = kargs.get('config', fdx.config)
-
        # Initialize model headers...
         if fdx.lings is None:
             self.load_lings()
@@ -58,9 +55,11 @@ class FeedexLP(SmallSem):
         self.last_entry_id = 0  # ID of the last processed entry (for caching)
 
         # Misc
-        self.BOLD_MARKUP_BEG = self.config.get('bold_markup_beg', '<b>')
-        self.BOLD_MARKUP_END = self.config.get('bold_markup_beg', '<\b>')
+        self.BOLD_MARKUP_BEG = fdx.config.get('bold_markup_beg', '<b>')
+        self.BOLD_MARKUP_END = fdx.config.get('bold_markup_beg', '<\b>')
 
+        #Config
+        self.unknown_term_weight = 5
 
 
 
@@ -296,8 +295,8 @@ class FeedexLP(SmallSem):
     def validate_rules(self): 
         """ This routine lazily validates all rules once to ensure one does not have to do it every time later """
         # Ranking scheme
-        if self.config.get('ranking_scheme','simple') == 'simple': self.ranking_algo = 0
-        elif self.config.get('ranking_scheme','simple') == 'similarity': self.ranking_algo = 1
+        if fdx.config.get('ranking_scheme','simple') == 'simple': self.ranking_algo = 0
+        elif fdx.config.get('ranking_scheme','simple') == 'similarity': self.ranking_algo = 1
         else: self.ranking_algo = 0
 
         self.DB.connect_QP()
@@ -401,8 +400,8 @@ class FeedexLP(SmallSem):
             elif qtype == 1:
                 matched = ranking_token_str.count(string)
 
-            elif qtype in (0,2):
-                if field in (None, -1): field_lst = LING_TEXT_LIST
+            elif qtype in {0,2,}:
+                if field in {None, -1,}: field_lst = LING_TEXT_LIST
                 else: field_lst = (field,)
 
 
@@ -509,11 +508,11 @@ class FeedexLP(SmallSem):
         """ A crude routine to match patterns in a list of string """
         sm = []
         for s in string.split('*'):
-            if s in ('',None): 
+            if s in {'', None,}: 
                 sm.append(1)
                 continue
             for ss in s.split('*'):
-                if ss in ('',None): 
+                if ss in {'', None,}: 
                     sm.append(1)
                     continue
                 sm.append(ss)

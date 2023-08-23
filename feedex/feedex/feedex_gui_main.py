@@ -222,7 +222,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         self.add_tab({'type':FX_TAB_PLACES, 'query':FX_PLACE_LAST, 'filters': {}, 'do_search':True})
 
         for i, tb in enumerate(self.gui_cache.get('tabs',[])):
-            if tb in (None, (), []): continue
+            if isempty(tb): continue
             self.add_tab({'type':tb.get('type',FX_TAB_SEARCH), 'query':tb.get('phrase',''), 'filters':tb.get('filters',{}), 'title':tb.get('title')})
 
         self.upper_notebook.set_current_page(0)
@@ -243,18 +243,18 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
     def setup_layout(self, *args, **kargs):
         """ Sets up layout according to cache data """
 
-        if self.config.get('gui_layout',0) in (1,2):
+        if fdx.config.get('gui_layout',0) in {1,2,}:
             self.div_horiz = Gtk.VPaned()
             self.div_vert = Gtk.HPaned()
 
-            if self.config.get('gui_layout',1) == 1:
+            if fdx.config.get('gui_layout',1) == 1:
                 self.div_horiz.pack1(self.upper_notebook, resize=True, shrink=True)
                 self.div_horiz.pack2(self.preview_box, resize=True, shrink=True)
             else:
                 self.div_horiz.pack1(self.preview_box, resize=True, shrink=True)
                 self.div_horiz.pack2(self.upper_notebook, resize=True, shrink=True)
 
-            if self.config.get('gui_orientation',0) == 0:
+            if fdx.config.get('gui_orientation',0) == 0:
                 self.div_vert.pack1(self.feed_tab, resize=True, shrink=True)
                 self.div_vert.pack2(self.div_horiz, resize=True, shrink=True)
             else:
@@ -272,7 +272,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.div_vert2 = Gtk.HPaned()
             
 
-            if self.config.get('gui_orientation',0) == 0:
+            if fdx.config.get('gui_orientation',0) == 0:
 
                 self.div_vert2.pack1(self.upper_notebook, resize=True, shrink=True)
                 self.div_vert2.pack2(self.preview_box, resize=True, shrink=True)
@@ -314,7 +314,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
     def _on_close(self, *args):
         self._save_gui_cache()
         # Piping cleanup
-        if self.config.get('allow_pipe',False): self.stop_listen()
+        if fdx.config.get('allow_pipe',False): self.stop_listen()
         self.DB.clear_param('session_id')
         # Close DB
         self.DB.close()
@@ -365,7 +365,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
 
 
-    def _housekeeping(self): self.DB.clear_cache(self.config.get('gui_clear_cache',30)) 
+    def _housekeeping(self): self.DB.clear_cache(fdx.config.get('gui_clear_cache',30)) 
 
     def _time(self, *kargs):
         """ Action on changed minute/day (e.g. housekeeping, changed parameters used for date display """
@@ -403,7 +403,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             self.sec_counter = 0
             self.minute_counter += 1
             self._time()
-            if self.config.get('gui_fetch_periodically', False):
+            if fdx.config.get('gui_fetch_periodically', False):
                 self.on_load_news_background()
 
 
@@ -480,7 +480,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                         break
 
             elif code == FX_ACTION_HANDLE_REQUEST:
-                if self.config.get('allow_pipe', False) and self.child_windows == 0: 
+                if fdx.config.get('allow_pipe', False) and self.child_windows == 0: 
                     self.act.on_handle_req(fdx.req_pop())
 
             else:
@@ -504,12 +504,12 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         key_name = Gdk.keyval_name(key)
         state = event.state
         ctrl = (state & Gdk.ModifierType.CONTROL_MASK)        
-        if ctrl and key_name == self.config.get('gui_key_new_entry','n'): self.act.on_edit_entry(None)
-        elif ctrl and key_name == self.config.get('gui_key_new_rule','r'): self.act.on_edit_rule(None)
-        elif ctrl and key_name == self.config.get('gui_key_search','s'): 
+        if ctrl and key_name == fdx.config.get('gui_key_new_entry','n'): self.act.on_edit_entry(None)
+        elif ctrl and key_name == fdx.config.get('gui_key_new_rule','r'): self.act.on_edit_rule(None)
+        elif ctrl and key_name == fdx.config.get('gui_key_search','s'): 
             if hasattr(self.curr_upper, 'query_entry'): self.curr_upper.query_entry.grab_focus()
             elif hasattr(self.curr_upper, 'search_button'): self.curr_upper.on_query() 
-        elif ctrl and key_name in ('F2',): 
+        elif ctrl and key_name in {'F2',}: 
             event.button = 3
             self.main_alt_menu(event)
         
@@ -653,7 +653,7 @@ It will also take some time to perform""") ))
 
     def plugin_menu(self, event, tp, item, *args):
         """ Generate menu for running plugins according to given item """
-        if type(tp) not in (tuple, list): tp = (tp,)
+        if not isiter(tp): tp = (tp,)
         av_plugins = []
         for p in self.gui_plugins:
             if p[FX_PLUGIN_TABLE.index('type')] in tp: av_plugins.append(p)
@@ -684,15 +684,15 @@ It will also take some time to perform""") ))
         elif tab.type == FX_TAB_PLUGINS:
             menu = Gtk.Menu()
             menu.append( f_menu_item(1, _('Add Plugin'), self.act.on_edit_plugin, args=(None,), icon='list-add-symbolic') )
-        elif tab.type in (FX_TAB_CONTEXTS, FX_TAB_SEARCH, FX_TAB_NOTES, FX_TAB_TREE, FX_TAB_SIMILAR,) or (tab.type == FX_TAB_PLACES and self.curr_place != FX_PLACE_TRASH_BIN):
+        elif tab.type in {FX_TAB_CONTEXTS, FX_TAB_SEARCH, FX_TAB_NOTES, FX_TAB_TREE, FX_TAB_SIMILAR,} or (tab.type == FX_TAB_PLACES and self.curr_place != FX_PLACE_TRASH_BIN):
             menu = Gtk.Menu()
             menu.append( f_menu_item(1, _('Add Entry'), self.act.on_edit_entry, args=(None,), icon='list-add-symbolic') )
             if tab.table.result_no > 0: plugin_filter.append(FX_PLUGIN_RESULTS)
-        elif tab.type not in (FX_TAB_FEEDS,):
+        elif tab.type not in {FX_TAB_FEEDS,}:
             if tab.table.result_no > 0: plugin_filter.append(FX_PLUGIN_RESULTS)
 
 
-        if tab.type in (FX_TAB_FEEDS,):
+        if tab.type in {FX_TAB_FEEDS,}:
 
             if tab.edit_mode and len(tab.feed.toggled_ids) > 0:
                 if menu is None: menu = Gtk.Menu()
@@ -701,7 +701,7 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Delete selected...'), self.act.on_multi, args=(tab.feed, FX_ENT_ACT_DEL,), icon='edit-delete-symbolic') )
 
 
-        elif tab.type not in (FX_TAB_CATALOG,):
+        elif tab.type not in {FX_TAB_CATALOG,}:
             if tab.table.has_toggles and tab.table.toggle_visible and len(tab.table.result.toggled_ids) > 0:
                 if menu is None: menu = Gtk.Menu()
                 else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -734,8 +734,8 @@ It will also take some time to perform""") ))
                     fl_name = esc_mu(v[0])
                     fl_color = v[2]
                     fl_desc = esc_mu(v[1])
-                    if fl_color in (None, ''): fl_color = self.config.get('gui_default_flag_color','blue')
-                    if fl_name in (None, ''): fl_name = f'{_("Flag")} {fl}'
+                    if fl_color in {None, ''}: fl_color = fdx.config.get('gui_default_flag_color','blue')
+                    if fl_name in {None, ''}: fl_name = f'{_("Flag")} {fl}'
                     flag_menu.append( f_menu_item(1, fl_name, self.act.on_mark, args=(fl, item,), color=fl_color, icon='marker-symbolic', tooltip=fl_desc) )
                 flag_menu.append( f_menu_item(1, _('Unflag Entry'), self.act.on_mark, args=('unflag', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Remove Flags from Entry") ) )
                 flag_menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -757,7 +757,7 @@ It will also take some time to perform""") ))
             search_menu = Gtk.Menu()
             search_menu.append( f_menu_item(1, _('Show Time Relevance...'), self.add_tab, kargs={'type':FX_TAB_REL_TIME, 'filters': {'...-...':True, 'group':'monthly'}, 'top_entry': item}, icon='histogram-symbolic', tooltip=_("Search for this Entry's Keywords in time") ) )
 
-            if item['author'] not in (None, ''):
+            if item['author'] not in {None, '',}:
                 author_menu = Gtk.Menu()
                 author_menu.append( f_menu_item(1, _('Articles'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'filters': {'field':'author', '...-...':True, 'logic':'phrase'}, 'query': item['author']}, icon='edit-find-symbolic', tooltip=_("Search for other documents by this Author") ) )
                 author_menu.append( f_menu_item(1, _('Activity in Time'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters': {'field':'author', '...-...':True, 'logic':'phrase', 'group':'monthly'}, 'query': item['author']}, icon='histogram-symbolic', tooltip=_("Search for other documents by this Author in Time Series") ) )
@@ -800,7 +800,7 @@ It will also take some time to perform""") ))
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
-            if item['term'] not in (None, ''):
+            if item['term'] not in {None, '',}:
                 menu.append( f_menu_item(1, _('Search for this Term'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'query':item['term']}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Show this Term\'s Contexts'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS, 'query':item['term']}, icon='view-list-symbolic'))  
                 menu.append( f_menu_item(1, _('Show Terms related to this Term'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'query':item['term'], 'filters':{'...-...':True, 'logic':'phrase'}}, icon='emblem-shared-symbolic'))  
@@ -816,7 +816,7 @@ It will also take some time to perform""") ))
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
-            if item['time'] not in (None, ()):
+            if item['time'] not in (None, (), [],):
                 menu.append( f_menu_item(1, _('Search this Time Range'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'filters':{'date_from':item['from'], 'date_to':item['to']}}, icon='edit-find-symbolic'))  
             plugin_filter.append(FX_PLUGIN_RESULT)
 
@@ -859,7 +859,7 @@ It will also take some time to perform""") ))
 
 
 
-        elif isinstance(item, ResultFeed):
+        if isinstance(item, ResultFeed):
 
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -869,12 +869,22 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Show from newest (wide view)...'), self.add_tab, kargs={'type':FX_TAB_NOTES, 'do_search':True, 'filters':{'feed_or_cat':item['id'], '...-...':True, 'rank':FX_RANK_LATEST}}, icon='format-unordered-list-symbolic', tooltip=_("Show articles sorted from newest in an extended view") ) )
                 menu.append( f_menu_item(1, _('Summary...'), self.add_tab, kargs={'type':FX_TAB_TREE, 'do_search':True, 'filters':{'feed_or_cat':item['id'], 'last':True, 'group':'daily', 'rank':FX_RANK_TREND}}, icon='view-filter-symbolic', tooltip=_("Show item's Summary Tree ranked by Trends") ) )
 
-                if not fdx.db_fetch_lock and tab.type == FX_TAB_FEEDS:
-                    menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                    menu.append( f_menu_item(1, _('Add Channel'), self.act.on_feed_cat, args=('new_channel', None), icon='list-add-symbolic') )
-                    menu.append( f_menu_item(1, _('Add Category'), self.act.on_feed_cat, args=('new_category', None), icon='folder-new-symbolic') )
-                    
+
+        if tab.type == FX_TAB_FEEDS:
+            if menu is None: menu = Gtk.Menu()
+            else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
+
+            if not fdx.db_fetch_lock and tab.type == FX_TAB_FEEDS:
+                menu.append( f_menu_item(1, _('Add Channel'), self.act.on_feed_cat, args=('new_channel', None), icon='list-add-symbolic') )
+                menu.append( f_menu_item(1, _('Add Category'), self.act.on_feed_cat, args=('new_category', None), icon='folder-new-symbolic') )
+
+
+        if isinstance(item, ResultFeed):
+
+            if coalesce(item['deleted'],0) == 0:
                 if item['is_category'] != 1:
+                    
+                    menu.append( f_menu_item(0, 'SEPARATOR', None) )
                     menu.append( f_menu_item(1, _('Go to Channel\'s Homepage'), self.act.on_go_home, args=(item,), icon='user-home-symbolic') )
         
                     if not fdx.db_fetch_lock:
@@ -888,7 +898,7 @@ It will also take some time to perform""") ))
                         menu.append( f_menu_item(1, _('Mark Channel as healthy'), self.act.on_mark_healthy, args=(item,), icon='go-jump-rtl-symbolic', tooltip=_("This will nullify error count for this Channel so it will not be ommited on next fetching") ) )
                         menu.append( f_menu_item(0, 'SEPARATOR', None) )
                         menu.append( f_menu_item(1, _('Remove Channel'), self.act.on_del_feed, args=(item,), icon='edit-delete-symbolic') )
-                        if fdx.debug_level not in (0, None): 
+                        if fdx.debug_level not in {0, None,}: 
                             menu.append( f_menu_item(0, 'SEPARATOR', None) )
                             menu.append( f_menu_item(1, _('Technical details...'), self.act.on_show_detailed, args=('feed', item,), icon='zoom-in-symbolic', tooltip=_("Show all technical information about this Channel") ) )
 
@@ -931,7 +941,7 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Relearn All Keywords'), self.act.relearn_keywords, icon='applications-engineering-symbolic', tooltip=_('Relearn rules from all read/marked items') ) )
 
 
-            if tab.type not in (FX_TAB_FEEDS, FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS,) and tab.table.result_no > 0:
+            if tab.type not in {FX_TAB_FEEDS, FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS,} and tab.table.result_no > 0:
                 port_menu = Gtk.Menu()
                 port_menu.append( f_menu_item(1, _('Save results to CSV'), self.act.export_results, args=('csv',), icon='x-office-spreadsheet-symbolic', tooltip=_('Save results from current tab') ))  
                 port_menu.append( f_menu_item(1, _('Export results to JSON'), self.act.export_results, args=('json_dict',), icon='document-export-symbolic', tooltip=_('Export results from current tab') ))  
@@ -945,7 +955,7 @@ It will also take some time to perform""") ))
                 else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(3, _('Plugins...'), pl_menu, icon='extension-symbolic') )
 
-        if tab.type in (FX_TAB_FEEDS,):
+        if tab.type in {FX_TAB_FEEDS,}:
                 
             if tab.edit_mode:
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -965,7 +975,7 @@ Choose <b>Delete</b> to delete selected items""")) )
                 menu.append( f_menu_item(1, _('Expand all'), tab.table.expand_all, icon='expand-all-symbolic'))  
                 menu.append( f_menu_item(1, _('Collapse all'), tab.table.collapse_all, icon='collapse-all-symbolic'))  
                     
-        if  tab.type not in (FX_TAB_FEEDS,) and tab.table.has_toggles:
+        if  tab.type not in {FX_TAB_FEEDS,} and tab.table.has_toggles:
             if tab.type == FX_TAB_CATALOG:
                 menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Unselect all'), tab.table.untoggle_all, icon='list-remove-symbolic'))  
@@ -983,7 +993,7 @@ Toggle items to select and choose <b>Edit selected...</b> menu option to edit mu
 Choose <b>Delete</b> to delete selected items""")) )
 
 
-        if tab.type not in (FX_TAB_FEEDS,):
+        if tab.type not in {FX_TAB_FEEDS,}:
             if menu is None: menu = Gtk.Menu()
             else: menu.append( f_menu_item(0, 'SEPARATOR', None) )
             menu.append( f_menu_item(1, _('Save layout'), tab.table.save_layout, icon='view-column-symbolic', tooltip=_('Save column layout and sizing for current tab.\nIt will be used as default in the future') ) )
@@ -1016,7 +1026,7 @@ Choose <b>Delete</b> to delete selected items""")) )
         menu.append( f_menu_item(3, _('Summarize...'), summ_menu, icon='filter-symbolic')) 
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Show Details...'), self._on_show_details, icon='system-run-symbolic')) 
-        if fdx.debug_level not in (0, None):
+        if fdx.debug_level not in {0, None,}:
             entry = ResultEntry()
             entry.strict_merge(self.prev_entry) 
             menu.append( f_menu_item(0, 'SEPARATOR', None) )
@@ -1307,7 +1317,7 @@ Choose <b>Delete</b> to delete selected items""")) )
 
 
         # Hilight query using snippets
-        col = self.config.get('gui_hilight_color','blue')
+        col = fdx.config.get('gui_hilight_color','blue')
         snip_str = ''
         snips = scast(result.get('snippets'), tuple, ())
         if snips == (): snips = scast(result.get('context'), tuple, ())

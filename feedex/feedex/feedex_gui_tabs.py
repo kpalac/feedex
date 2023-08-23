@@ -18,7 +18,6 @@ class FeedexTab(Gtk.VBox):
 
         # Maint. stuff
         self.MW = parent
-        self.config = self.MW.config
 
         self.type = kargs.get('type', FX_TAB_SEARCH)
 
@@ -285,7 +284,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         self.prev_vadj_val = 0
 
         # Insert custom title
-        if self.title not in (None,''):
+        if self.title not in {None,'',}:
             self.header.set_markup(self.title)
 
         # Tab header
@@ -319,7 +318,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
 
 
-            if FEEDEX_FILTERS_PER_TABS[self.type].get('search') in ('combo','catalog_combo',):
+            if FEEDEX_FILTERS_PER_TABS[self.type].get('search') in {'combo','catalog_combo',}:
             
                 self.history = Gtk.ListStore(str)
                 self.reload_history()
@@ -388,7 +387,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
                     elif f == 'catalog_field':
                         curr_widget = self.catalog_field_combo = f_catalog_field_combo()
                     elif f == 'page':
-                        self.page_len_combo     = f_page_len_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_("Choose page length for query"), default=self.config.get('default_page_length',3000))
+                        self.page_len_combo     = f_page_len_combo(connect=self._on_filters_changed, ellipsize=False, tooltip=_("Choose page length for query"), default=fdx.config.get('default_page_length',3000))
                         self.page_no_label      = f_label('Page: <b>1</b>', markup=True, wrap=False, char_wrap=False)
                         self.page_prev_button   = f_button(None, 'previous', connect=self._on_page_prev)
                         self.page_next_button   = f_button(None, 'next', connect=self._on_page_next)
@@ -467,7 +466,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
     def _on_button_press_header(self, widget, event):
         """ Header right-click menu """
-        if event.button == 3 and self.type not in (FX_TAB_FEEDS,): 
+        if event.button == 3 and self.type not in {FX_TAB_FEEDS,}: 
             menu = None
             if hasattr(self, 'search_filter_box'):
                 if menu is None: menu = Gtk.Menu()
@@ -500,14 +499,14 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             elif isinstance(result, ResultFeed): self.MW.act.on_del_feed(result)
 
 
-        elif ctrl and key_name == self.config.get('gui_key_add','a'):
+        elif ctrl and key_name == fdx.config.get('gui_key_add','a'):
             if isinstance(self.table.result, (ResultEntry, ResultContext,)): self.MW.act.on_edit_entry(None)
             elif isinstance(self.table.result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.act.on_edit_rule(None)
             elif isinstance(self.table.result, ResultFlag): self.MW.act.on_edit_flag(None)
             elif isinstance(self.table.result, ResultPlugin): self.MW.act.on_edit_plugin(None)
             elif isinstance(result, ResultFeed): self.MW.act.on_add_from_url()
 
-        elif ctrl and key_name == self.config.get('gui_key_edit','e'):
+        elif ctrl and key_name == fdx.config.get('gui_key_edit','e'):
             result = self.table.get_selection()
             if isinstance(result, (ResultEntry, ResultContext,)): self.MW.act.on_edit_entry(result)
             elif isinstance(result, ResultRule) and self.type != FX_TAB_LEARNED: self.MW.act.on_edit_rule(result)
@@ -515,9 +514,9 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             elif isinstance(result, ResultPlugin): self.MW.act.on_edit_plugin(result)
             elif isinstance(result, ResultFeed): self.MW.act.on_feed_cat('edit', result)
 
-        elif ctrl and key_name in ('F2',): pass
+        elif ctrl and key_name in {'F2',}: pass
         
-        elif key_name in ('F2',):
+        elif key_name in {'F2',}:
             event.button = 3
             result = self.table.get_selection()
             self.MW.action_menu(result, self, event)
@@ -538,7 +537,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
             elif isinstance(sel, (ResultFeed,)) and sel.get('is_category',0) != 1: self.MW.load_preview_feed(sel)
             else: self.MW.startup_decor()
 
-        elif isinstance(self.table.result, ResultRule) and self.type in (FX_TAB_RULES, FX_TAB_LEARNED,): 
+        elif isinstance(self.table.result, ResultRule) and self.type in {FX_TAB_RULES, FX_TAB_LEARNED,}: 
             sel = self.table.get_selection()
             if sel is not None: self.MW.load_preview_rule(sel)
             else: self.MW.startup_decor()
@@ -587,7 +586,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
 
     def save_filters(self, *args, **kargs):
         """ Save current search filters as default for the future """
-        if self.type in (FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_TIME_SERIES, FX_TAB_REL_TIME, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDS):
+        if self.type in {FX_TAB_SEARCH, FX_TAB_CONTEXTS, FX_TAB_TIME_SERIES, FX_TAB_REL_TIME, FX_TAB_TREE, FX_TAB_NOTES, FX_TAB_TRENDS,}:
             self.get_search_filters()
             self.MW.default_search_filters = self.search_filters.copy()
             self.MW.gui_cache['default_search_filters'] = self.search_filters.copy()
@@ -719,7 +718,7 @@ Escape: \ (only if before wildcards and field markers)""") )
             self.search_filters['page_len'] = f_get_combo(self.page_len_combo)
             self.search_filters['page'] = self.page_no
         else:
-            self.search_filters['page_len'] = self.config.get('page_length',3000)
+            self.search_filters['page_len'] = fdx.config.get('page_length',3000)
             self.search_filters['page'] = 1
 
         if hasattr(self, 'catalog_field_combo'): self.search_filters['field'] = f_get_combo(self.catalog_field_combo)       
@@ -835,7 +834,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         if self.MW.curr_upper.uid == self.uid and self.table.feed_sums is not None:
             self.MW.feed_tab.redecorate(self.table.curr_feed_filters, self.table.feed_sums)
         
-        if self.type == FX_TAB_PLACES and self.MW.curr_place in (FX_PLACE_LAST, FX_PLACE_PREV_LAST,): 
+        if self.type == FX_TAB_PLACES and self.MW.curr_place in {FX_PLACE_LAST, FX_PLACE_PREV_LAST,}: 
             self.MW.new_items = 0
             self.MW.new_n = 0
             self.MW.feed_tab.redecorate_new()
@@ -855,10 +854,10 @@ Escape: \ (only if before wildcards and field markers)""") )
     def query_thr(self, qr, filters, **kargs):
         """ Wrapper for sending queries """
         # DB interface for queries
-        if self.type in (FX_TAB_PLUGINS,):
+        if self.type in {FX_TAB_PLUGINS,}:
             DB = None
             QP = FeedexQueryInterface()
-        elif self.type in (FX_TAB_CATALOG,):
+        elif self.type in {FX_TAB_CATALOG,}:
             DB = None
             QP = FeedexCatalogQuery()
         else:
@@ -876,7 +875,7 @@ Escape: \ (only if before wildcards and field markers)""") )
         err = 0
 
         # Do query ...
-        if self.type in (FX_TAB_SEARCH, FX_TAB_NOTES):
+        if self.type in {FX_TAB_SEARCH, FX_TAB_NOTES,}:
 
             feed_name = f_get_combo(self.cat_combo, name=True)
 
@@ -1045,8 +1044,8 @@ Escape: \ (only if before wildcards and field markers)""") )
         if self.busy: return -1
         self.busy = True
         
-        if self.type in (FX_TAB_TREE, FX_TAB_TRENDS): self.block_search(_("Generating summary...") )
-        elif self.type in (FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS, FX_TAB_LEARNED,): self.block_search(_("Getting data...") )
+        if self.type in {FX_TAB_TREE, FX_TAB_TRENDS,}: self.block_search(_("Generating summary...") )
+        elif self.type in {FX_TAB_RULES, FX_TAB_FLAGS, FX_TAB_PLUGINS, FX_TAB_LEARNED,}: self.block_search(_("Getting data...") )
         elif self.type == FX_TAB_CATALOG: self.block_search(_('Querying Feed Catalog...'))
         else: self.block_search(_("Searching...") )
 
@@ -1123,7 +1122,7 @@ Escape: \ (only if before wildcards and field markers)""") )
     def apply(self, action, items, **kargs):
         tp = type(items)
         if tp is dict: self._apply(action, items, **kargs)
-        elif tp in (list, tuple):
+        elif tp in (list, tuple,):
             for i in items: self._apply(action, i, **kargs)
 
 
@@ -1153,7 +1152,6 @@ class FeedexGUITable:
 
         self.parent = parent
         self.MW = self.parent.MW
-        self.config = self.MW.config
         self.icons = self.MW.icons
 
         self.lock = threading.Lock()
@@ -1355,7 +1353,7 @@ class FeedexGUITable:
         top = kargs.get('top', True)
         fill = kargs.get('fill', True)
         tp = type(item)
-        if tp in (list, tuple): self.result.populate(item)
+        if tp in (list, tuple,): self.result.populate(item)
         elif tp is dict: self.result.strict_merge(item)
         elif isinstance(item, SQLContainer): self.result.strict_merge(item.vals)
         else: return -1 
@@ -1482,14 +1480,14 @@ class FeedexGUITable:
             # If result is a node, process it accordingly ...
             if isinstance(self.result, ResultEntry) and self.result.get('id') is None:
                 
-                if self.result.get('feed_id') not in (0,'', None):
+                if self.result.get('feed_id') not in {0,'', None,}:
                     item = ResultFeed()
                     feed = fdx.load_parent(self.result.get('feed_id'))
                     if feed != -1:
                         item.populate(feed)
                         return item
                 
-                elif self.result.get('flag') not in (0,'', None):
+                elif self.result.get('flag') not in {0,'', None,}:
                     item = ResultFlag()
                     flag = fdx.flags_cache.get(self.result.get('flag', -1))
                     if flag != -1:
@@ -1497,7 +1495,7 @@ class FeedexGUITable:
                         item.populate(flag)
                         return item
 
-                elif self.result.get('pubdate_str') not in (0,'', None):
+                elif self.result.get('pubdate_str') not in {0,'', None,}:
                     item = ResultTimeSeries()
                     item['time'] = self.result.get('title')
                     item['from'] = self.result.get('pubdate_str')

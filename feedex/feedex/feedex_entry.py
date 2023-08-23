@@ -46,7 +46,7 @@ class FeedexEntry(SQLContainerEditable):
     def get_by_url(self, url:str):
         url = scast(url, str, -1)
         content = self.DB.qr_sql("select * from entries e where e.link = :url", {'url':url}, one=True )
-        if content in (None, (None,), ()):
+        if isempty(content):
             self.exists = False
             return msg(FX_ERROR_NOT_FOUND, f"""{_('Entry with url')} %a {_('not found!')}""", url)
         else:
@@ -57,7 +57,7 @@ class FeedexEntry(SQLContainerEditable):
     def get_by_ix_id(self, id:int):
         id = scast(id, int, -1)
         content = self.DB.qr_sql("select * from entries e where e.ix_id = :id", {'id':id}, one=True )
-        if content in (None, (None,), ()):
+        if isempty(content):
             self.exists = False
             return msg(FX_ERROR_NOT_FOUND, f"""{_('Entry')} indexed as %a {_('not found!')}""", id)
         else:
@@ -128,7 +128,7 @@ class FeedexEntry(SQLContainerEditable):
 
             if self.action == FX_ENT_ACT_ADD: 
                 self.vals['id'] = None
-                self.vals['read'] = coalesce(self.vals.get('read'), self.config.get('default_entry_weight',2))
+                self.vals['read'] = coalesce(self.vals.get('read'), fdx.config.get('default_entry_weight',2))
 
             if self.vals.get('feed_id') is not None: pass
             elif self.vals.get('feed') is not None: self.vals['feed_id'] = scast(self.vals['feed'], int, -1)
@@ -152,14 +152,14 @@ class FeedexEntry(SQLContainerEditable):
                 self.feed.populate(feed)
                 self.vals['feed_id'] = self.feed['id']            
             
-            if self.vals['flag'] not in (0, None):
+            if self.vals['flag'] not in {0, None,}:
                 if not fdx.is_flag(self.vals['flag']): return FX_ERROR_VAL, _('Flag not found!')
 
             if self.vals.get('link') is not None and not check_url(self.vals.get('link')):
                 return FX_ERROR_VAL, _('Not a valid url! (%a)'), self.vals.get('link', '<???>')
 
-            if self.vals['deleted'] not in (None, 0, 1): return FX_ERROR_VAL, _('Deleted flag must be 0 or 1!')
-            if self.vals['note'] not in (None, 0,1): return FX_ERROR_VAL, _('Note marker must be 0 or 1!')
+            if self.vals['deleted'] not in {None, 0, 1,}: return FX_ERROR_VAL, _('Deleted flag must be 0 or 1!')
+            if self.vals['note'] not in {None, 0,1,}: return FX_ERROR_VAL, _('Note marker must be 0 or 1!')
             if coalesce(self.vals['read'],0) < 0: return FX_ERROR_VAL, _('Read marker must be >= 0!')
 
             self.vals['importance'] = coalesce(self.vals.get('importance'),0)
@@ -189,7 +189,7 @@ class FeedexEntry(SQLContainerEditable):
                 self.vals['id'] = None
                 self.vals['adddate_str'] = now
                 self.vals['pubdate_str'] = coalesce(self.vals.get('pubdate_str', None), now)
-                self.vals['read'] = coalesce(self.vals.get('read'), self.vals['weight'], self.config.get('default_entry_weight',2))
+                self.vals['read'] = coalesce(self.vals.get('read'), self.vals['weight'], fdx.config.get('default_entry_weight',2))
                 self.vals['weight'] = None
                 self.vals['note'] = coalesce(self.vals['note'],1)
                 return 0
@@ -203,10 +203,10 @@ class FeedexEntry(SQLContainerEditable):
 
                 read = scast(self.vals['read'], int, 0)
 
-                if self.config.get('use_keyword_learning', True): 
+                if fdx.config.get('use_keyword_learning', True): 
                     if read > 0: self.learn = True
 
-                if self.vals.get('flag') not in (None, 0) or self.vals.get('importance') not in (None,0): self.rank = False
+                if self.vals.get('flag') not in {None, 0,} or self.vals.get('importance') not in {None,0,}: self.rank = False
                 else: self.rank = True
 
                 err = self.ling(index=True, rank=self.rank, learn=self.learn, counter=kargs.get('counter',0))
@@ -248,7 +248,7 @@ class FeedexEntry(SQLContainerEditable):
                 old_read = coalesce(self.backup_vals['read'],0)
                 if read != old_read: self.sd_add(self.vals['feed_id'], read - old_read)
 
-                if self.config.get('use_keyword_learning', True):
+                if fdx.config.get('use_keyword_learning', True):
                     if read > 0:
                         for f in self.to_update:
                             if f in LING_TEXT_LIST:
@@ -356,7 +356,7 @@ class FeedexEntry(SQLContainerEditable):
                     
                     if self.action == FX_ENT_ACT_ADD:
 
-                        if cid_len == 1 and self.act_singleton and self.last_id not in (0,None,): # For singleton operation we simply update cached terms with last inserted id
+                        if cid_len == 1 and self.act_singleton and self.last_id not in {0,None,}: # For singleton operation we simply update cached terms with last inserted id
                             cid = self.context_ids[0]
                             for t in self.terms_oper_q:
                                 if t == cid: t['context_id'] = self.last_id
@@ -380,7 +380,7 @@ class FeedexEntry(SQLContainerEditable):
                     # ... and save new keyword set to database
                     if len(self.terms_oper_q) > 0:
                         msg(_('Saving learned keywords...'))
-                        if fdx.debug_level in (1,4): 
+                        if fdx.debug_level in {1,4,}: 
                             for r in self.terms: print(r)
             
                         err = self.DB.run_sql_lock(self.term.insert_sql(all=True), self.terms_oper_q)
@@ -418,13 +418,13 @@ class FeedexEntry(SQLContainerEditable):
             return _('Entry %a marked as read'), self.vals['id']
         elif field == 'read' and self.vals.get(field, 0) < 0: 
             return _('Entry %a marked as read'), self.vals['id']
-        elif field == 'read' and self.vals.get(field) in (0, None): 
+        elif field == 'read' and self.vals.get(field) in {0, None,}: 
             return _('Entry %a marked as unread'), self.vals['id']
-        elif field == 'flag' and self.vals.get(field) in (0,None): 
+        elif field == 'flag' and self.vals.get(field) in {0,None,}: 
             return _('Entry %a unflagged'), self.vals['id']
-        elif field == 'flag' and self.vals.get(field) not in (0, None):
+        elif field == 'flag' and self.vals.get(field) not in {0, None,}:
             return _('Entry %a flagged as %b'), self.vals['id'], fdx.get_flag_name(self.vals.get(field))       
-        elif field == 'note' and self.vals.get(field) in (0, None): 
+        elif field == 'note' and self.vals.get(field) in {0, None,}: 
             return _('Entry %a marked as news item'), self.vals['id']
         elif field == 'note' and self.vals.get(field) == 1: 
             return _("""Entry %a marked as a user's note"""), self.vals['id']
@@ -432,9 +432,9 @@ class FeedexEntry(SQLContainerEditable):
             return _("Entry %a assigned to %b"), self.vals['id'], self.feed.name(with_id=True)
         elif field == 'images':
             return _("Updated image(s) for entry %a"), self.vals['id']
-        elif field == 'node_id' and self.vals.get(field) in (0, None): 
+        elif field == 'node_id' and self.vals.get(field) in {0, None,}: 
             return _('Entry %a unassigned from node')
-        elif field == 'node_id' and self.vals.get(field) not in (0, None): 
+        elif field == 'node_id' and self.vals.get(field) not in {0, None,}: 
             return _('Entry %a assigned to entry %b'),self.vals["id"], self.vals['node_id']
         else: return f"""{self.ent_name} %a {_('updated: %b changed to %c')}""", self.vals['id'], self.get_col_name(field), self.vals.get(field,_("<NONE>"))
 
@@ -521,7 +521,7 @@ class FeedexEntry(SQLContainerEditable):
                 ix_doc = xapian.Document()
                 uuid = None
                     
-            if uuid in (None, ''):
+            if uuid in {None, ''}:
                 # Generating UUID... A desperate fight against coincidence
                 ts = datetime.now()
                 uuid = f"""{int(round(ts.timestamp()))}{counter}{random_str(length=10)}{len(scast(self.vals['title'], str, 'a'))}"""
@@ -584,7 +584,7 @@ class FeedexEntry(SQLContainerEditable):
 
             self.DB.lastxapdocid = self.vals['ix_id']
 
-            if self.action in (FX_ENT_ACT_UPD, FX_ENT_ACT_RES, FX_ENT_ACT_REINDEX,):
+            if self.action in {FX_ENT_ACT_UPD, FX_ENT_ACT_RES, FX_ENT_ACT_REINDEX,}:
                 self.reindex_oper_q.append(self.filter_cast(self.vals, REINDEX_LIST_RECALC + ('id',)))
 
 
@@ -601,7 +601,7 @@ class FeedexEntry(SQLContainerEditable):
             model = self.DB.LP.get_model()
 
             self.terms.clear()
-            if self.action in (FX_ENT_ACT_ADD,):
+            if self.action in {FX_ENT_ACT_ADD,}:
                 context_id = self.vals['ix_id']
                 self.context_ids.append(context_id)
             else:

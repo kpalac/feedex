@@ -494,7 +494,9 @@ Query is defined by by <b>parameters</b>:
                                                     
     --type=         type of qery
                         'fts' - full text (default)
-                        'string' - simple string matching    --lang=         language used in query for tokenizing and stemming
+                        'string' - simple string matching 
+                    
+    --lang=         language used in query for tokenizing and stemming
     
     --case_ins      query is case insensitive
     --case_sens     query is case sensitive

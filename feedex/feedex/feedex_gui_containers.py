@@ -11,10 +11,6 @@ class ResultGUI:
     """ Template for GUI result"""
     def __init__(self, **kargs) -> None:
         self.MW = kargs.get('main_win', None)
-        self.config = kargs.get('config')
-        if self.config is None:
-            if self.MW is None: self.config = fdx.config
-            else: self.config = self.MW.config
         self.gui_fields = ()
         self.gui_types = ()
         self.gui_vals = {}
@@ -81,7 +77,7 @@ class ResultGUIEntry(ResultGUI, ResultEntry):
         self.gui_vals.clear()
         self.gui_vals['gui_ix'] = ix
         self.gui_vals['id'] = self.vals['id']
-        if self.vals['pubdate_short'] not in (None, ''):
+        if self.vals['pubdate_short'] not in {None, '',}:
             self.gui_vals['pubdate_short'] = humanize_date(self.vals['pubdate_short'], self.MW.today, self.MW.yesterday, self.MW.year)
         self.gui_vals['pubdate'] = self.vals['pubdate']
         self.gui_vals['title'] = self.vals['title']
@@ -115,9 +111,9 @@ class ResultGUIEntry(ResultGUI, ResultEntry):
         if coalesce(self.vals['read'],0) > 0: self.gui_vals['gui_bold'] = 700
         else: self.gui_vals['gui_bold'] = 400
 
-        if kargs.get('new_col',False): self.gui_vals['gui_color'] = self.config.get('gui_new_color','#0FDACA')
+        if kargs.get('new_col',False): self.gui_vals['gui_color'] = fdx.config.get('gui_new_color','#0FDACA')
         elif coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-            self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
+            self.gui_vals['gui_color'] = fdx.config.get('gui_deleted_color','grey')
         elif coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
 
 
@@ -165,9 +161,9 @@ class ResultGUITree(ResultGUIEntry):
                 if coalesce(self.vals['read'],0) > 0: self.gui_vals['gui_bold'] = 700
                 else: self.gui_vals['gui_bold'] = 400
 
-                if kargs.get('new_col',False): self.gui_vals['gui_color'] = self.config.get('gui_new_color','#0FDACA')
+                if kargs.get('new_col',False): self.gui_vals['gui_color'] = fdx.config.get('gui_new_color','#0FDACA')
                 elif coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-                    self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
+                    self.gui_vals['gui_color'] = fdx.config.get('gui_deleted_color','grey')
                 elif coalesce(self.vals['flag'],0) > 0: self.gui_vals['gui_color'] = fdx.get_flag_color(self.vals['flag'])
 
 
@@ -212,7 +208,7 @@ class ResultGUINote(ResultGUIEntry):
 {esc_mu(desc)}"""
 
         if coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-            self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
+            self.gui_vals['gui_color'] = fdx.config.get('gui_deleted_color','grey')
 
 
 
@@ -241,7 +237,7 @@ class ResultGUIContext(ResultGUI, ResultContext):
         self.gui_vals['gui_ix'] = ix
         self.gui_vals['gui_icon'] = self.MW.icons.get(self.vals["feed_id"], self.MW.icons['default'])
         self.gui_vals['id'] = self.vals['id']
-        if self.vals['pubdate_short'] not in (None, ''):
+        if self.vals['pubdate_short'] not in {None, ''}:
             self.gui_vals['pubdate_short'] = humanize_date(self.vals['pubdate_short'], self.MW.today, self.MW.yesterday, self.MW.year)
         self.gui_vals['pubdate'] = self.vals['pubdate']
         self.gui_vals['context'] = f"""{esc_mu(self.vals['context'][0][0])}<b>{esc_mu(self.vals['context'][0][1])}</b>{esc_mu(self.vals['context'][0][2])}"""
@@ -265,7 +261,7 @@ class ResultGUIContext(ResultGUI, ResultContext):
         self.gui_vals['link'] = self.vals['link']
 
         if coalesce(self.vals['deleted'],0) > 0 or coalesce(self.vals['is_deleted'],0) > 0: 
-            self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
+            self.gui_vals['gui_color'] = fdx.config.get('gui_deleted_color','grey')
         elif coalesce(self.vals['flag'],0) > 0: 
             flag_col = fdx.get_flag_color(self.vals['flag'])
             self.gui_vals['flag_name'] = f"""<span foreground="{flag_col}">{esc_mu(self.gui_vals['flag_name'])}</span>"""
@@ -304,7 +300,7 @@ class ResultGUIFeedTree(ResultGUI, ResultFeed):
         elif self.gui_vals['id'] is not None and self.gui_vals['id'] in self.toggled_ids: self.gui_vals['gui_toggle'] = True
         else: self.gui_vals['gui_toggle'] = False
 
-        if scast(self.vals['deleted'], int, 0) == 1: self.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
+        if scast(self.vals['deleted'], int, 0) == 1: self.gui_vals['gui_color'] = fdx.config.get('gui_deleted_color','grey')
 
         self.gui_vals['is_category'] = self.vals['is_category']
         self.gui_vals['parent_id'] = self.vals['parent_id']
@@ -420,7 +416,7 @@ class ResultGUIKwTerm(ResultGUI, ResultKwTermShort):
         self.gui_vals['weight'] = self.vals['weight']
         self.gui_vals['model'] = self.vals['model']
         self.gui_vals['form'] = self.vals['form']
-        if ix <= self.config.get('recom_limit',0): self.gui_vals['gui_bold'] = 700
+        if ix <= fdx.config.get('recom_limit',0): self.gui_vals['gui_bold'] = 700
         else: self.gui_vals['gui_bold'] = 400
 
 
@@ -444,7 +440,7 @@ class ResultGUITimeSeries(ResultGUI, ResultTimeSeries):
         self.gui_vals['to'] = self.vals['to']
         self.gui_vals['freq'] = self.vals['freq']
         
-        color = self.config.get('gui_hilight_color','blue')
+        color = fdx.config.get('gui_hilight_color','blue')
         unit = dezeroe(self.TB.result_max,1)/200
         length = int(self.vals.get('freq',0)/unit)
         magn = ""
@@ -522,7 +518,7 @@ class FeedexPlugin(ResultPlugin):
             if self.vals[field] is not None and type(self.vals[field]) is not t: return FX_ERROR_VAL, _('Invalid type for %a field'), self.fields[i]
         
         if scast(self.vals['name'], str, '').strip() == '': return FX_ERROR_VAL, _('Name cannot be empty!')
-        if self.vals['type'] not in (FX_PLUGIN_SELECTION, FX_PLUGIN_RESULTS, FX_PLUGIN_CATEGORY, FX_PLUGIN_FEED, FX_PLUGIN_ENTRY, FX_PLUGIN_RESULT, FX_PLUGIN_RESULTS,): 
+        if self.vals['type'] not in {FX_PLUGIN_SELECTION, FX_PLUGIN_RESULTS, FX_PLUGIN_CATEGORY, FX_PLUGIN_FEED, FX_PLUGIN_ENTRY, FX_PLUGIN_RESULT, FX_PLUGIN_RESULTS,}: 
             return FX_ERROR_VAL, _('Invalid plugin type!')
         if scast(self.vals['command'], str, '').strip() == '': return FX_ERROR_VAL, _('Command cannot be empty!')
         return 0

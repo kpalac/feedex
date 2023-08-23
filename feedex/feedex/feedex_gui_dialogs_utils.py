@@ -25,7 +25,7 @@ class BasicDialog(Gtk.Dialog):
 
 
         justify = kargs.get('justify', FX_ATTR_JUS_CENTER)
-        if justify in (FX_ATTR_JUS_CENTER, FX_ATTR_JUS_FILL,): xalign = 0.5
+        if justify in {FX_ATTR_JUS_CENTER, FX_ATTR_JUS_FILL,}: xalign = 0.5
         elif justify == FX_ATTR_JUS_LEFT: xalign = 0
         elif justify == FX_ATTR_JUS_RIGHT: xalign = 1
         else: xalign = 0.5
@@ -153,7 +153,6 @@ class PreferencesDialog(Gtk.Dialog):
     def __init__(self, parent, **kargs):
 
         self.parent = parent
-        self.config = self.parent.config
 
         Gtk.Dialog.__init__(self, title=_('FEEDEX Preferences'), transient_for=parent, flags=0)
         box = self.get_content_area()
@@ -163,7 +162,7 @@ class PreferencesDialog(Gtk.Dialog):
         self.set_position(Gtk.WindowPosition.CENTER)
 
 
-        self.result = self.config.clone()
+        self.result = fdx.config.clone()
         self.response = 0
 
 
@@ -207,19 +206,19 @@ If no grouping is selected, it will simply show top results"""))
         self.recom_algo_combo = f_recom_algo_combo()
 
         new_color_label = f_label(_('Added entry color:'))
-        new_color = Gdk.color_parse(self.config.get('gui_new_color','#0FDACA'))
+        new_color = Gdk.color_parse(fdx.config.get('gui_new_color','#0FDACA'))
         self.new_color_button = Gtk.ColorButton(color=new_color)
 
         del_color_label = f_label(_('Deleted color:'))
-        del_color = Gdk.color_parse(self.config.get('gui_deleted_color','grey'))
+        del_color = Gdk.color_parse(fdx.config.get('gui_deleted_color','grey'))
         self.del_color_button = Gtk.ColorButton(color=del_color)
 
         hl_color_label = f_label(_('Search hilight color:'))
-        hl_color = Gdk.color_parse(self.config.get('gui_deleted_color','grey'))
+        hl_color = Gdk.color_parse(fdx.config.get('gui_deleted_color','grey'))
         self.hl_color_button = Gtk.ColorButton(color=hl_color)
 
         def_flag_color_label = f_label(_('Default flag color:'))
-        def_flag_color = Gdk.color_parse(self.config.get('gui_default_flag_color','blue'))
+        def_flag_color = Gdk.color_parse(fdx.config.get('gui_default_flag_color','blue'))
         self.def_flag_color_button = Gtk.ColorButton(color=def_flag_color)
 
 
@@ -490,11 +489,11 @@ This allows for adding entries, rules and feeds from external Feedex instances, 
 
 
     def on_file_choose_db(self, *args): 
-        filename = f_chooser(self, self.parent, action='open_dir', start_dir=os.path.dirname(self.config.get('db_path')), header=_('Choose Database...'))
+        filename = f_chooser(self, self.parent, action='open_dir', start_dir=os.path.dirname(fdx.config.get('db_path')), header=_('Choose Database...'))
         if filename is not False: self.db_entry.set_text(filename)       
 
     def on_file_choose_log(self, *args):
-        filename = f_chooser(self, self.parent, action='open_file', start_dir=os.path.dirname(self.config.get('log')), header=_('Choose Log File...'))
+        filename = f_chooser(self, self.parent, action='open_file', start_dir=os.path.dirname(fdx.config.get('log')), header=_('Choose Log File...'))
         if filename is not False: self.log_entry.set_text(filename)       
 
 
@@ -531,91 +530,91 @@ This allows for adding entries, rules and feeds from external Feedex instances, 
 
     def on_restore(self, *args):
 
-        self.profile_name_entry.set_text(scast(self.config.get('profile_name'), str, ''))
+        self.profile_name_entry.set_text(scast(fdx.config.get('profile_name'), str, ''))
 
-        if self.config.get('use_keyword_learning', True): self.learn_button.set_active(True)
+        if fdx.config.get('use_keyword_learning', True): self.learn_button.set_active(True)
         else: self.learn_button.set_active(False)
 
-        self.recom_limit_entry.set_text(scast(self.config.get('recom_limit', 250), str, _('<<ERROR>>')))
+        self.recom_limit_entry.set_text(scast(fdx.config.get('recom_limit', 250), str, _('<<ERROR>>')))
 
-        if self.config.get('gui_desktop_notify',True): self.desktop_notify_button.set_active(True)
+        if fdx.config.get('gui_desktop_notify',True): self.desktop_notify_button.set_active(True)
         else: self.desktop_notify_button.set_active(False)
 
-        f_set_combo(self.notify_group_combo, self.config.get('gui_notify_group','feed'))
-        f_set_combo(self.notify_depth_combo, self.config.get('gui_notify_depth',5))
+        f_set_combo(self.notify_group_combo, fdx.config.get('gui_notify_group','feed'))
+        f_set_combo(self.notify_depth_combo, fdx.config.get('gui_notify_depth',5))
 
-        if self.config.get('gui_fetch_periodically',False): self.fetch_in_background_button.set_active(True)
+        if fdx.config.get('gui_fetch_periodically',False): self.fetch_in_background_button.set_active(True)
         else: self.fetch_in_background_button.set_active(False)
 
-        if self.config.get('do_redirects', False): self.do_redirects_button.set_active(True)
+        if fdx.config.get('do_redirects', False): self.do_redirects_button.set_active(True)
         else: self.do_redirects_button.set_active(False)
 
-        if self.config.get('save_perm_redirects', False): self.save_redirects_button.set_active(True)
+        if fdx.config.get('save_perm_redirects', False): self.save_redirects_button.set_active(True)
         else: self.save_redirects_button.set_active(False)
 
-        if self.config.get('mark_deleted', False): self.mark_deleted_button.set_active(True)
+        if fdx.config.get('mark_deleted', False): self.mark_deleted_button.set_active(True)
         else: self.mark_deleted_button.set_active(False)
 
 
-        self.default_interval_entry.set_text(scast(self.config.get('default_interval',45), str, _('<<ERROR>>')))
+        self.default_interval_entry.set_text(scast(fdx.config.get('default_interval',45), str, _('<<ERROR>>')))
 
-        self.default_entry_weight_entry.set_text(scast(self.config.get('default_entry_weight',2), str, _('<<ERROR>>')))
+        self.default_entry_weight_entry.set_text(scast(fdx.config.get('default_entry_weight',2), str, _('<<ERROR>>')))
 
-        self.default_rule_weight_entry.set_text(scast(self.config.get('default_rule_weight',2), str, _('<<ERROR>>')))
+        self.default_rule_weight_entry.set_text(scast(fdx.config.get('default_rule_weight',2), str, _('<<ERROR>>')))
 
-        f_set_combo(self.recom_algo_combo, self.config.get('recom_algo',1))
+        f_set_combo(self.recom_algo_combo, fdx.config.get('recom_algo',1))
 
-        self.max_context_length_entry.set_text(scast(self.config.get('max_context_length',500), str, _('<<ERROR>>')))
-        self.default_depth_entry.set_text(scast(self.config.get('default_depth',5), str, _('<<ERROR>>')))
+        self.max_context_length_entry.set_text(scast(fdx.config.get('max_context_length',500), str, _('<<ERROR>>')))
+        self.default_depth_entry.set_text(scast(fdx.config.get('default_depth',5), str, _('<<ERROR>>')))
 
 
-        new_color = Gdk.color_parse(self.config.get('gui_new_color','#0FDACA'))
+        new_color = Gdk.color_parse(fdx.config.get('gui_new_color','#0FDACA'))
         self.new_color_button.set_color(new_color)
-        del_color = Gdk.color_parse(self.config.get('gui_deleted_color','grey'))
+        del_color = Gdk.color_parse(fdx.config.get('gui_deleted_color','grey'))
         self.del_color_button.set_color(del_color)
-        hl_color = Gdk.color_parse(self.config.get('gui_hilight_color','blue'))
+        hl_color = Gdk.color_parse(fdx.config.get('gui_hilight_color','blue'))
         self.hl_color_button.set_color(hl_color)
-        def_flag_color = Gdk.color_parse(self.config.get('gui_default_flag_color','blue'))
+        def_flag_color = Gdk.color_parse(fdx.config.get('gui_default_flag_color','blue'))
         self.def_flag_color_button.set_color(def_flag_color)
 
-        f_set_combo(self.layout_combo, self.config.get('gui_layout',0))        
-        f_set_combo(self.orientation_combo, self.config.get('gui_orientation',0))        
-        f_set_combo(self.lang_combo, self.config.get('lang'))
+        f_set_combo(self.layout_combo, fdx.config.get('gui_layout',0))        
+        f_set_combo(self.orientation_combo, fdx.config.get('gui_orientation',0))        
+        f_set_combo(self.lang_combo, fdx.config.get('lang'))
 
-        self.key_new_entry_entry.set_text(coalesce(self.config.get('gui_key_new_entry','n'), ''))
-        self.key_new_rule_entry.set_text(coalesce(self.config.get('gui_key_new_rule','r'), ''))
-        self.key_add_entry.set_text(coalesce(self.config.get('gui_key_add','a'), ''))
-        self.key_edit_entry.set_text(coalesce(self.config.get('gui_key_edit','e'), ''))
-        self.key_search_entry.set_text(coalesce(self.config.get('gui_key_search','e'), ''))
+        self.key_new_entry_entry.set_text(coalesce(fdx.config.get('gui_key_new_entry','n'), ''))
+        self.key_new_rule_entry.set_text(coalesce(fdx.config.get('gui_key_new_rule','r'), ''))
+        self.key_add_entry.set_text(coalesce(fdx.config.get('gui_key_add','a'), ''))
+        self.key_edit_entry.set_text(coalesce(fdx.config.get('gui_key_edit','e'), ''))
+        self.key_search_entry.set_text(coalesce(fdx.config.get('gui_key_search','e'), ''))
 
-        self.browser_entry.set_text(coalesce(self.config.get('browser',''),''))
-        self.external_iv_entry.set_text(coalesce(self.config.get('image_viewer',''),''))
-        self.search_engine_entry.set_text(coalesce(self.config.get('search_engine',''),''))
+        self.browser_entry.set_text(coalesce(fdx.config.get('browser',''),''))
+        self.external_iv_entry.set_text(coalesce(fdx.config.get('image_viewer',''),''))
+        self.search_engine_entry.set_text(coalesce(fdx.config.get('search_engine',''),''))
 
-        self.similarity_limit_entry.set_text(scast(self.config.get('default_similarity_limit',''),str,_('<<ERROR>>')))
+        self.similarity_limit_entry.set_text(scast(fdx.config.get('default_similarity_limit',''),str,_('<<ERROR>>')))
 
-        self.error_threshold_entry.set_text(scast(self.config.get('error_threshold',''), str,_('<<ERROR>>')))
+        self.error_threshold_entry.set_text(scast(fdx.config.get('error_threshold',''), str,_('<<ERROR>>')))
 
-        self.clear_cache_entry.set_text(scast(self.config.get('gui_clear_cache',30),str,_('<<ERROR>>')))
+        self.clear_cache_entry.set_text(scast(fdx.config.get('gui_clear_cache',30),str,_('<<ERROR>>')))
 
-        if self.config.get('ignore_modified',True): self.ignore_modified_button.set_active(True)
+        if fdx.config.get('ignore_modified',True): self.ignore_modified_button.set_active(True)
         else: self.ignore_modified_button.set_active(False)
 
-        self.db_entry.set_text(scast(self.config.get('db_path',''), str, _('<<ERROR>>')))
-        self.db_timeout_entry.set_text(scast(self.config.get('timeout',''), str, _('<<ERROR>>')))
+        self.db_entry.set_text(scast(fdx.config.get('db_path',''), str, _('<<ERROR>>')))
+        self.db_timeout_entry.set_text(scast(fdx.config.get('timeout',''), str, _('<<ERROR>>')))
 
-        self.log_entry.set_text(scast(self.config.get('log',''), str, _('<<ERROR>>')))
+        self.log_entry.set_text(scast(fdx.config.get('log',''), str, _('<<ERROR>>')))
 
-        self.user_agent_entry.set_text(scast(self.config.get('user_agent'), str, FEEDEX_USER_AGENT))
-        self.fetch_timeout_entry.set_text(scast(self.config.get('fetch_timeout'), str, '0'))
+        self.user_agent_entry.set_text(scast(fdx.config.get('user_agent'), str, FEEDEX_USER_AGENT))
+        self.fetch_timeout_entry.set_text(scast(fdx.config.get('fetch_timeout'), str, '0'))
 
-        if self.config.get('no_history', False): self.no_history_button.set_active(True)
+        if fdx.config.get('no_history', False): self.no_history_button.set_active(True)
         else: self.no_history_button.set_active(False)
         
-        if self.config.get('allow_pipe', False): self.allow_pipe_button.set_active(True)
+        if fdx.config.get('allow_pipe', False): self.allow_pipe_button.set_active(True)
         else: self.allow_pipe_button.set_active(False)
         
-        self.win_name_excl_entry.set_text(coalesce(self.config.get('window_name_exclude'),'Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird'))
+        self.win_name_excl_entry.set_text(coalesce(fdx.config.get('window_name_exclude'),'Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird'))
 
         self.on_changed()
 
@@ -729,27 +728,27 @@ This allows for adding entries, rules and feeds from external Feedex instances, 
                 self.response = 1
                 self.close()
 
-                if self.result.get('db_path') !=  self.config.get('db_path'): self.response = 2 
+                if self.result.get('db_path') !=  fdx.config.get('db_path'): self.response = 2 
 
-                elif  self.result.get('use_keyword_learning') !=  self.config.get('use_keyword_learning') or\
-                        self.result.get('recom_limit') !=  self.config.get('recom_limit') or\
-                        self.result.get('recom_algo') !=  self.config.get('recom_algo'):
+                elif  self.result.get('use_keyword_learning') !=  fdx.config.get('use_keyword_learning') or\
+                        self.result.get('recom_limit') !=  fdx.config.get('recom_limit') or\
+                        self.result.get('recom_algo') !=  fdx.config.get('recom_algo'):
                     self.parent.DB.load_terms()
                 
                 if not self.result.get('allow_pipe',False) and fdx.listen: self.parent.stop_listen()
                 elif self.result.get('allow_pipe',False) and not fdx.listen: self.parent.start_listen()
                 
-                if  self.result.get('gui_layout') !=  self.config.get('gui_layout') or \
-                    self.result.get('gui_orientation') !=  self.config.get('gui_orientation'): 
+                if  self.result.get('gui_layout') !=  fdx.config.get('gui_layout') or \
+                    self.result.get('gui_orientation') !=  fdx.config.get('gui_orientation'): 
                     self.response = 2
 
-                if self.result.get('profile_name') !=  self.config.get('profile_name'): 
+                if self.result.get('profile_name') !=  fdx.config.get('profile_name'): 
                     self.parent.set_profile()
                     self.parent.win_decor()
 
-                if self.result.get('lang') !=  self.config.get('lang'): 
-                    if self.config.get('lang') not in (None,'en'):
-                        lang = gettext.translation('feedex', languages=[self.config.get('lang')])
+                if self.result.get('lang') !=  fdx.config.get('lang'): 
+                    if fdx.config.get('lang') not in {None,'en',}:
+                        lang = gettext.translation('feedex', languages=[self.result.get('lang')])
                         lang.install(FEEDEX_LOCALE_PATH)
                     self.response = 2
                 
@@ -939,25 +938,25 @@ class MassEditItem(Gtk.HBox):
     def get_val(self, *args):
         if not self.toggled: return -2
         else:
-            if self.widget_type in ('feeds','cats','feeds_rule','flags','notes','fields','query_type','color_cli','langs','no_yes','handler',): 
+            if self.widget_type in {'feeds','cats','feeds_rule','flags','notes','fields','query_type','color_cli','langs','no_yes','handler',}: 
                 return f_get_combo(self.cwidget)
-            elif self.widget_type in ('user_agent'):
+            elif self.widget_type in {'user_agent',}:
                 return scast(self.user_agent_entry.get_text(), str, '')
-            elif self.widget_type in ('text_entry',):
+            elif self.widget_type in {'text_entry',}:
                 return scast(self.cwidget.get_text(), str, '')
-            elif self.widget_type in ('num_entry_int',): 
+            elif self.widget_type in {'num_entry_int',}: 
                 val = scast(self.cwidget.get_text(), int, None)
                 if val is not None: return val
                 else: 
                     self.error = f"""{self.label} {_('must be an integer')}"""
                     return -3
-            elif self.widget_type in ('num_entry_float',): 
+            elif self.widget_type in {'num_entry_float',}: 
                 val = scast(self.cwidget.get_text(), float, None)
                 if val is not None: return val
                 else: 
                     self.error = f"""{self.label} {_('must be a decimal number')}"""
                     return -3
-            elif self.widget_type in ('color',): 
+            elif self.widget_type in {'color',}: 
                 color = self.cwidget.get_color()
                 return color.to_string()
 

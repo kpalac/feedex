@@ -61,7 +61,7 @@ class NewFromURL(Gtk.Dialog):
 
     def on_changed(self, *args):
         handler = f_get_combo(self.handler_combo)
-        if handler in ('rss', 'html'): self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
+        if handler in {'rss', 'html',}: self.url_entry.set_tooltip_markup(_("Enter Channel's <b>URL</b> here"))
 
     def get_data(self, *args):
         """ Populate result from form contents """
@@ -204,8 +204,6 @@ class EditEntry(Gtk.Dialog):
         else: 
             title = _('Edit Entry')
             restore_label = _('Restore')
-
-        self.config = self.parent.config
 
         Gtk.Dialog.__init__(self, title=title, transient_for=par_win, flags=0)
         self.set_default_size(kargs.get('width',800), kargs.get('height',700))
@@ -392,7 +390,7 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
 
     def on_change_image(self, *args, **kargs):
         """ Image change dialog """
-        if self.new_image not in (-1, None): start_dir = os.path.dirname(self.new_image)
+        if self.new_image not in {-1, None,}: start_dir = os.path.dirname(self.new_image)
         elif self.curr_image is not None: start_dir = os.path.dirname(self.curr_image)
         else: start_dir = None
 
@@ -446,7 +444,7 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
     def on_restore(self, *args):
         f_set_combo(self.cat_combo, self.entry.backup_vals.get('feed_id'))
         f_set_combo(self.note_combo, self.entry.backup_vals.get('note'))
-        f_set_combo(self.lang_combo, coalesce(self.entry.backup_vals.get('lang'), self.config.get('lang','en')) )
+        f_set_combo(self.lang_combo, coalesce(self.entry.backup_vals.get('lang'), fdx.config.get('lang','en')) )
         self.title_entry.set_text(scast(self.entry.backup_vals.get('title'), str, ''))
 
         self.author_entry.set_text(scast(self.entry.backup_vals.get('author'), str, ''))
@@ -465,7 +463,7 @@ Rules are also learned automatically when any Entry/Article is opened in Browser
 
         f_set_combo(self.flag_combo, self.entry.backup_vals.get('flag'))
         if self.new:
-            self.read_entry.set_text(scast(self.config.get('default_entry_weight',2), str, '0'))            
+            self.read_entry.set_text(scast(fdx.config.get('default_entry_weight',2), str, '0'))            
         else:
             self.read_entry.set_text(scast(self.entry.backup_vals.get('read'), str, '0'))
 
@@ -534,7 +532,6 @@ class EditFlag(Gtk.Dialog):
         else: title = _('Edit Flag')
 
         self.parent = parent
-        self.config = self.parent.config
         
         self.flag = flag
 
@@ -559,7 +556,7 @@ class EditFlag(Gtk.Dialog):
         self.desc_entry = Gtk.Entry()
 
         color_label = f_label(_('Color:'), xalign=1)
-        color = Gdk.color_parse( coalesce( fdx.get_flag_color(self.flag['id']), self.config.get('gui_default_flag_color','blue') )  )
+        color = Gdk.color_parse( coalesce( fdx.get_flag_color(self.flag['id']), fdx.config.get('gui_default_flag_color','blue') )  )
         self.color_button = Gtk.ColorButton(color=color)
 
         color_cli_label = f_label(_('Color (CLI):'), xalign=1)
@@ -622,7 +619,7 @@ class EditFlag(Gtk.Dialog):
         self.name_entry.set_text(coalesce(self.flag.backup_vals.get('name',''),''))
         self.desc_entry.set_text(coalesce(self.flag.backup_vals.get('desc',''),''))
         f_set_combo(self.color_cli_combo, self.flag.backup_vals.get('color_cli'))
-        color = Gdk.color_parse( coalesce(self.flag.backup_vals.get('color'), self.config.get('gui_default_flag_color','blue')))
+        color = Gdk.color_parse( coalesce(self.flag.backup_vals.get('color'), fdx.config.get('gui_default_flag_color','blue')))
         self.color_button.set_color(color)
         self.id_entry.set_text( scast(coalesce(self.flag.backup_vals.get('id',''),''), str, ''))
 
@@ -677,7 +674,6 @@ class EditPlugin(Gtk.Dialog):
         else: title = _('Edit Plugin')
 
         self.parent = parent
-        self.config = self.parent.config
         
         self.plugin = plugin
 
@@ -813,7 +809,6 @@ class EditRule(Gtk.Dialog):
         else: title = _('Edit Rule')
 
         self.parent = parent
-        self.config = self.parent.config
        
         self.rule = rule
 
@@ -922,7 +917,7 @@ However, a rule can simply increase importance by its <b>weight</b> without flag
         f_set_combo(self.lang_combo, self.rule.backup_vals.get('lang'), null_val=None)
         f_set_combo(self.case_combo, self.rule.backup_vals.get('case_insensitive'))
 
-        self.weight_entry.set_text( scast( scast(self.rule.backup_vals.get('weight', None), float, self.config.get('default_rule_weight',2)), str, '2'  ))
+        self.weight_entry.set_text( scast( scast(self.rule.backup_vals.get('weight', None), float, fdx.config.get('default_rule_weight',2)), str, '2'  ))
         
         f_set_combo(self.flag_combo, self.rule.backup_vals.get('flag',-1))
 
@@ -931,7 +926,7 @@ However, a rule can simply increase importance by its <b>weight</b> without flag
         
 
     def on_changed(self, *args):
-        if f_get_combo(self.type_combo) in (1,2): self.lang_combo.set_sensitive(True)
+        if f_get_combo(self.type_combo) in {1,}: self.lang_combo.set_sensitive(True)
         else: self.lang_combo.set_sensitive(False)
         
 
@@ -951,7 +946,7 @@ However, a rule can simply increase importance by its <b>weight</b> without flag
                         'feed_id': nullif(f_get_combo(self.feed_combo), 0), 
                         'lang': f_get_combo(self.lang_combo),
                         'case_insensitive': f_get_combo(self.case_combo),
-                        'weight' : scast(self.weight_entry.get_text(), float, self.config.get('default_rule_weight',2)),
+                        'weight' : scast(self.weight_entry.get_text(), float, fdx.config.get('default_rule_weight',2)),
                         'flag' : f_get_combo(self.flag_combo)
                     }
 
@@ -1179,7 +1174,7 @@ Parsing will be done match by match with each REGEX below""" ))
 
 
     def on_test_regex(self, *args, **kargs):
-        if self.ifeed.get('url') in ('',None):
+        if self.ifeed.get('url') in {'',None,}:
             self.err_label.set_markup(gui_msg(-1, _('Link URL is empty. Cannot download resource') ) )
             return -1
 
@@ -1230,7 +1225,7 @@ Parsing will be done match by match with each REGEX below""" ))
                 for c in content:
                     txt, im, ls = fdx.strip_markup(c.get('value'), html=True, rx_images=rx_images, rx_links=rx_links, test=True)
                     feed_prev_str = f"""{feed_prev_str}\n\n{esc_mu(txt)}\n"""
-                    if txt not in (None, ''):
+                    if txt not in {None, ''}:
                         for i in im:
                             if i is not None and i != '': prev_str = f"""{prev_str}{_('Image:')} <b>{esc_mu(i)}</b>\n"""
                         for l in ls:
@@ -1406,7 +1401,6 @@ class EditFeed(Gtk.Dialog):
         self.new = kargs.get('new',True)
 
         self.parent = parent
-        self.config = self.parent.config
 
         self.feed = feed
         self.regexes = {}
@@ -1642,7 +1636,7 @@ Categories are useful for bulk-filtering and general organizing""") )
         elif handler == 'html':
             self.url_entry.set_tooltip_markup(_("""Valid <b>URL</b> to WWW page to be parsed. 
 For HTML parsing it is good to use Webpages with as little JavaScript as possible""") )
-        elif handler in ('local', 'script'):
+        elif handler in {'local', 'script',}:
             self.url_entry.set_tooltip_markup(_("""For <b>local</b> and <b>script</b> feeds this can be any string, as it is not used
 Local feeds are updated only by scripts or CLI (<i>--add-entry</i>, <i>--add-entries-from-file</i>, or <i>--add-entries-from-pipe</i> options)
 Scripted feeds are updated by script defined below during fetching""") )
@@ -1655,11 +1649,11 @@ Scripted feeds are updated by script defined below during fetching""") )
             self.script_button.set_sensitive(False)
 
 
-        if handler in ('html','rss',): self.regex_button.set_sensitive(True)
+        if handler in {'html','rss',}: self.regex_button.set_sensitive(True)
         else: self.regex_button.set_sensitive(False)
 
         auth = f_get_combo(self.auth_combo)
-        if auth is None or handler not in ('rss','html'):
+        if auth is None or handler not in {'rss','html',}:
             self.domain_entry.set_sensitive(False)
             self.login_entry.set_sensitive(False)
             self.password_entry.set_sensitive(False)
@@ -1687,7 +1681,7 @@ Scripted feeds are updated by script defined below during fetching""") )
         else: self.autoupdate_button.set_active(False)
         if self.feed.backup_vals.get('fetch',0) == 1: self.fetch_button.set_active(True)
         else: self.fetch_button.set_active(False)
-        self.interval_entry.set_text(scast(self.feed.backup_vals.get('interval', self.config.get('default_interval',45)), str, ''))        
+        self.interval_entry.set_text(scast(self.feed.backup_vals.get('interval', fdx.config.get('default_interval',45)), str, ''))        
         self.author_entry.set_text(coalesce(self.feed.backup_vals.get('author',''),''))
         self.author_contact_entry.set_text(coalesce(self.feed.backup_vals.get('author_contact',''),''))
         self.publisher_entry.set_text(coalesce(self.feed.backup_vals.get('publisher',''),''))

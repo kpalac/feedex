@@ -53,50 +53,50 @@ def main():
 
             if i == 0: continue
 
-            if arg in ('-h', '--help', '--usage'):
+            if arg in {'-h', '--help', '--usage',}:
                 from feedex_docs import FEEDEX_SHORT_HELP
                 mu_print(FEEDEX_SHORT_HELP)
                 return 0
-            elif arg in ('-hh', '--help-long'):
+            elif arg in {'-hh', '--help-long',}:
                 from feedex_docs import FEEDEX_LONG_HELP
                 mu_print(FEEDEX_LONG_HELP)
                 return 0
-            elif arg == ('--help-feeds'):
+            elif arg == '--help-feeds':
                 from feedex_docs import FEEDEX_HELP_FEEDS
                 mu_print(FEEDEX_HELP_FEEDS)
                 return 0
-            elif arg == ('--help-query'):
+            elif arg == '--help-query':
                 from feedex_docs import FEEDEX_HELP_QUERY
                 mu_print(FEEDEX_HELP_QUERY)
                 return 0
-            elif arg == ('--help-categories'):
+            elif arg == '--help-categories':
                 from feedex_docs import FEEDEX_HELP_FEEDS
                 mu_print(FEEDEX_HELP_FEEDS)
                 return 0
-            elif arg == ('--help-entries'):
+            elif arg == '--help-entries':
                 from feedex_docs import FEEDEX_HELP_ENTRIES
                 mu_print(FEEDEX_HELP_ENTRIES)
                 return 0
-            elif arg == ('--help-rules'):
+            elif arg == '--help-rules':
                 from feedex_docs import FEEDEX_HELP_RULES
                 mu_print(FEEDEX_HELP_RULES)
                 return 0
-            elif arg == ('--help-scripting'):
+            elif arg == '--help-scripting':
                 from feedex_docs import FEEDEX_HELP_SCRIPTING, FEEDEX_HELP_JSON_QUERY
                 mu_print(FEEDEX_HELP_SCRIPTING)
                 mu_print(FEEDEX_HELP_JSON_QUERY)
                 return 0
-            elif arg == ('--help-examples'):
+            elif arg == '--help-examples':
                 from feedex_docs import FEEDEX_HELP_EXAMPLES
                 mu_print(FEEDEX_HELP_EXAMPLES)
                 return 0
                 
 
-            elif arg in ('-v', '--version'):
+            elif arg in {'-v', '--version',}:
                 print(f"{FEEDEX_VERSION}")
                 return 0
 
-            elif arg in ('--about',):
+            elif arg == '--about':
                 mu_print(FEEDEX_HELP_ABOUT)
                 return 0
 
@@ -149,15 +149,15 @@ def main():
 
 
 	        #NEWS		
-            elif arg in ('-g','--get-news'):        action, argument = 'get_news', slist(sys.argv, i+1, None)
-            elif arg in ('-c','--check'):           action, argument = 'check', slist(sys.argv, i+1, None)
-            elif arg in ('-o','--open-in-browser'): action, argument = 'open', slist(sys.argv, i+1, None) 
+            elif arg in {'-g','--get-news',}:        action, argument = 'get_news', slist(sys.argv, i+1, None)
+            elif arg in {'-c','--check',}:           action, argument = 'check', slist(sys.argv, i+1, None)
+            elif arg in {'-o','--open-in-browser',}: action, argument = 'open', slist(sys.argv, i+1, None) 
 
             #QUERIES
-            elif arg in ('-q','--query'):           action, argument, query = 'query', slist(sys.argv, i+1, None), True
-            elif arg in ('-S','--find-similar'):    action, argument, query = 'similar', slist(sys.argv, i+1, None), True
+            elif arg in {'-q','--query',}:           action, argument, query = 'query', slist(sys.argv, i+1, None), True
+            elif arg in {'-S','--find-similar',}:    action, argument, query = 'similar', slist(sys.argv, i+1, None), True
             elif arg == '--trending':               action, argument, query = 'trending', slist(sys.argv, i+1, None), True
-            elif arg in ('-R', '--recommend',):     action, query = 'recom', True
+            elif arg in {'-R', '--recommend',}:     action, query = 'recom', True
 
             elif arg == '--term-net':       action, argument, query = 'term_net', slist(sys.argv, i+1, None), True
             elif arg == '--context':        action, argument, query = 'context', slist(sys.argv, i+1, None), True
@@ -165,14 +165,14 @@ def main():
             elif arg == '--trends':         action, argument, query = 'trends', slist(sys.argv, i+1, None), True
             elif arg == '--rel-in-time':    action, argument, query = 'rel_in_time', slist(sys.argv, i+1, None), True
 
-            elif arg in ('-F','--read-feed'):       action, argument, query = 'read_feed', slist(sys.argv, i+1, None), True
-            elif arg in ('-C','--read-category'):   action, argument, query = 'read_category', slist(sys.argv, i+1, None), True
+            elif arg in {'-F','--read-feed',}:       action, argument, query = 'read_feed', slist(sys.argv, i+1, None), True
+            elif arg in {'-C','--read-category',}:   action, argument, query = 'read_category', slist(sys.argv, i+1, None), True
 
 
             # META QUERIES 
             elif arg == '--list-feeds-cats':    action, query = 'list_feeds_cats', True
             elif arg == '--list-categories':    action, query = 'list_categories', True
-            elif arg in ('-L','--list-feeds'):  action, query = 'list_feeds', True
+            elif arg in {'-L','--list-feeds',}:  action, query = 'list_feeds', True
 
             elif arg == '--list-rules':         action, query = 'list_rules', True
             elif arg == '--list-flags':         action, query = 'list_flags', True
@@ -192,11 +192,11 @@ def main():
 
 
             #FEEDS
-            elif arg in ('-u', '--update-feeds'): action, argument = 'update_feeds', slist(sys.argv, i+1, None)
+            elif arg in {'-u', '--update-feeds',}: action, argument = 'update_feeds', slist(sys.argv, i+1, None)
 
-            elif arg in ('-a','--add-feed'): action, argument = 'add_url', slist(sys.argv, i+1, None)
+            elif arg in {'-a','--add-feed',}: action, argument = 'add_url', slist(sys.argv, i+1, None)
             elif arg == '--edit-feed': action, argument, argument2, argument3 = 'edit_feed', slist(sys.argv, i+1, None), slist(sys.argv, i+2, None), slist(sys.argv, i+3, None)
-            elif arg in ('-D','--delete-feed'): action, argument = 'del_feed', slist(sys.argv, i+1, None)
+            elif arg in {'-D','--delete-feed',}: action, argument = 'del_feed', slist(sys.argv, i+1, None)
             elif arg == '--restore-feed': action, argument = 'restore_feed', slist(sys.argv, i+1, None)
 
             elif arg == '--examine-feed': action, argument = 'examine_feed', slist(sys.argv, i+1, None)
@@ -204,14 +204,14 @@ def main():
 
 
             #ENTRIES			
-            elif arg in ('-r','--read-entry'): action, argument = 'read_entry', slist(sys.argv, i+1, None)
+            elif arg in {'-r','--read-entry',}: action, argument = 'read_entry', slist(sys.argv, i+1, None)
             
             elif arg == '--mark': action, argument, argument2 = 'mark', slist(sys.argv, i+1, None), slist(sys.argv, i+2, None)
             elif arg == '--unmark': action, argument, argument2 = 'mark', slist(sys.argv, i+1, None), 0
             elif arg == '--flag': action, argument, argument2 = 'flag', slist(sys.argv, i+1, None), slist(sys.argv, i+2, None)
             elif arg == '--edit-entry': action, argument, argument2, argument3 = 'edit_entry', slist(sys.argv, i+1, None), slist(sys.argv, i+2, None), slist(sys.argv, i+3, None)
 
-            elif arg in ('--add-entry','-N'): action, argument, argument2 = 'add_entry', slist(sys.argv, i+1, None), slist(sys.argv, i+2, None)
+            elif arg in {'--add-entry', '-N',}: action, argument, argument2 = 'add_entry', slist(sys.argv, i+1, None), slist(sys.argv, i+2, None)
             elif arg == '--delete-entry': action, argument = 'del_entry', slist(sys.argv, i+1, None)
             elif arg == '--restore-entry': action, argument = 'restore_entry', slist(sys.argv, i+1, None)
                 
@@ -257,7 +257,7 @@ def main():
 
             # FEED CATALOG 
             elif arg == '--download-catalog': action, argument = 'download_catalog', slist(sys.argv, i+1, None)
-            elif arg in ('-qc', '--query-catalog'): action, argument = 'query_catalog', slist(sys.argv, i+1, None)
+            elif arg in {'-qc', '--query-catalog',}: action, argument = 'query_catalog', slist(sys.argv, i+1, None)
             elif arg == '--import-from-catalog': action, argument = 'import_from_catalog', slist(sys.argv, i+1, None)
 
             #DATABASE
@@ -351,10 +351,10 @@ def main():
             elif arg == '--gui-add-entry': action, argument, argument2 = 'gui_add_entry', slist(sys.argv, i+1, None), slist(sys.argv, i+2, None)
 
 
-            elif arg in ('--gui','--GUI'): action = 'gui'
+            elif arg in {'--gui','--GUI',}: action = 'gui'
 
-            elif arg in ('--sql'): action, argument = 'execute_SQL', slist(sys.argv, i+1, None)
-            elif arg in ('--sql-script'): action, argument = 'execute_file_SQL', slist(sys.argv, i+1, None)
+            elif arg == '--sql': action, argument = 'execute_SQL', slist(sys.argv, i+1, None)
+            elif arg == '--sql-script': action, argument = 'execute_file_SQL', slist(sys.argv, i+1, None)
 
             elif arg == '--test': action = 'test'
 
@@ -393,13 +393,13 @@ Make sure that:
     fdx.config['timeout'] = coalesce(params.get('timeout'), fdx.config.get('timeout'), 0)
 
     # Validate configuration
-    if action in ('gui', 'gui_add_entry',): fdx.config.validate(default=True)
+    if action in {'gui', 'gui_add_entry',}: fdx.config.validate(default=True)
     else:
         err = fdx.config.validate(default=False)
         if err != 0: return msg(*err)
 
     # Install locale
-    if fdx.config.get('lang') not in (None,'en'):
+    if fdx.config.get('lang') not in {None,'en',}:
         lang = gettext.translation('feedex', languages=[fdx.config.get('lang')])
         lang.install(FEEDEX_LOCALE_PATH)
 
@@ -417,7 +417,7 @@ Make sure that:
     if action == 'gui':
 
         # GUI display ... 
-        if fdx.debug_level in (None,0): fdx.cli = False
+        if fdx.debug_level in {None,0,}: fdx.cli = False
         fdx.single_run = False
         
         from feedex_gui_main import feedex_run_main_win, FeedexMainWin
@@ -425,9 +425,9 @@ Make sure that:
         return 0
 
 
-    elif desktop and action in ('add_entry', 'add_url',    'add_rule', 'add_regex', 'add_stemmed',):
+    elif desktop and action in {'add_entry', 'add_url',    'add_rule', 'add_regex', 'add_stemmed',}:
         
-        if fdx.debug_level in (None,0): fdx.cli = False
+        if fdx.debug_level in {None, 0,}: fdx.cli = False
         fdx.single_run = True
 
         from feedex_gui_main import feedex_run_aux_win
@@ -517,7 +517,7 @@ Make sure that:
 
     # Wrappers for notifications
     def new_notify():
-        if feedex.new_items > 0 and params.get('output') in ('desktop', 'headlines',):
+        if feedex.new_items > 0 and params.get('output') in {'desktop', 'headlines',}:
             params['last'] = True
             feedex.connect_QP()
             err = feedex.Q.query('', params, rank=True, snippets=False, allow_group=True)
@@ -692,11 +692,11 @@ Make sure that:
 
 
     elif action == 'list_categories':
-        if params.get('output') in ('cli',None,): params['output'] = 'notes'
+        if params.get('output') in {'cli',None,}: params['output'] = 'notes'
         err = feedex.Q.list_feeds(cats_only=True)
         if err == 0: cprint(feedex.Q)
     elif action == 'list_feeds_cats':
-        if params.get('output') in ('cli',None,): params['output'] = 'headlines'
+        if params.get('output') in {'cli',None,}: params['output'] = 'headlines'
         err = feedex.Q.feed_tree()
         if err == 0: cprint(feedex.Q)    
     
@@ -787,13 +787,13 @@ Make sure that:
     elif action == 'db_stats': cprint(feedex.stats())
 
 
-    elif action == 'execute_SQL' and fdx.debug_level not in (None, 0):
+    elif action == 'execute_SQL' and fdx.debug_level not in {None, 0,}:
         print(_('Executing SQL statement...'))
         feedex.curs.execute(argument)
         feedex.conn.commit()
         print(_('Done.'))
 
-    elif action == 'execute_file_SQL' and fdx.debug_level not in (None, 0):
+    elif action == 'execute_file_SQL' and fdx.debug_level not in {None, 0,}:
         print(_('Executing SQL script...'))
         with open( argument, 'r') as sql: sql = sql.read()
         with feedex.conn: feedex.curs.executescript(sql)
@@ -802,7 +802,7 @@ Make sure that:
 
 
 
-    elif action == 'test' and fdx.debug_level not in (None,0):
+    elif action == 'test' and fdx.debug_level not in {None, 0,}:
         pass
 
 

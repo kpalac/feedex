@@ -199,24 +199,32 @@ def ids_cs_string(ids:list, **kargs):
     return id_str
 
 
+def isempty(res, **kargs):
+    if res in ([], (), None, [None], (None,),): return True
+    return False
+
+def isiter(res, **kargs):
+    if type(res) in (tuple, list,): return True
+    return False
+
 
 def check_url(string:str):
     """ Check if a string is a valid URL or IP """
     if type(string) is not str:
         return False
     matches = re.findall(URL_VALIDATE_RE, string)
-    if matches not in (None, (), []): return True
+    if not isempty(matches): return True
     matches = re.findall(URL_VALIDATE_RE, f'http://{string}')
-    if matches not in (None, (), []):
+    if not isempty(matches):
         return True
     matches = re.findall(URL_VALIDATE_RE, f'https://{string}')
-    if matches not in (None, (), []):
+    if not isempty(matches):
         return True
     matches = re.findall(IP4_VALIDATE_RE, string)
-    if matches not in (None, (), []):
+    if not isempty(matches):
         return True
     matches = re.findall(IP6_VALIDATE_RE, string)
-    if matches not in (None, (), []):
+    if not isempty(matches):
         return True
 
     return False
@@ -410,13 +418,13 @@ class FeedexMainBus:
         if self.CLPR is None: self.reconnect_CLPR(**kargs)
     def reconnect_CLPR(self, **kargs):
         from feedex_clipper import FeedexClipper
-        self.CLPR = FeedexClipper(config=self.config)
+        self.CLPR = FeedexClipper()
 
     def connect_IPC(self, **kargs):
         if self.IPC is None: self.reconnect_IPC(**kargs)
     def reconnect_IPC(self, **kargs):
         from feedex_piper import FeedexRequest, FeedexPiper
-        self.IPC = FeedexPiper(config=self.config)
+        self.IPC = FeedexPiper()
     
 
     # Send notification to desktop
@@ -602,7 +610,7 @@ class FeedexMainBus:
 
     def debug(self, *args):
         """ Display debug message """
-        if self.debug_level in (None,0): return
+        if self.debug_level in {None,0}: return
         
         if type(args[0]) is int: 
             args = list(args)
@@ -690,7 +698,7 @@ class FeedexMainBus:
         with_id = kargs.get('with_id', False)
         if id not in self.flags_cache.keys(): return '<???>'
         name = self.flags_cache.get(id, (None,))[0]
-        if name in (None, ''): return f'{id}'
+        if name in {None, ''}: return f'{id}'
         else: 
             name = ellipsize(name, 200)            
             if with_id: name = f"{name} ({id})"
@@ -699,19 +707,19 @@ class FeedexMainBus:
     def get_flag_desc(self, id:int, **kargs):
         if id not in self.flags_cache.keys(): return ''
         desc = self.flags_cache.get(id, (None,None,''))[1]
-        if desc in (None, ''): return ''
+        if desc in {None, ''}: return ''
         else: return desc
 
     def get_flag_color(self, id:int, **kargs):
         if id not in self.flags_cache.keys(): return None
         color = self.flags_cache.get(id, (None,None,self.config.get('gui_default_flag_color',None)))[2]
-        if color in (None, ''): return None
+        if color in {None, ''}: return None
         else: return color
 
     def get_flag_color_cli(self, id:int, **kargs):
         if id not in self.flags_cache.keys(): return ''
         color = self.flags_cache.get(id, (None,None,None,self.config.get('emph_color', TERM_EMPH)))[3]
-        if color in (None, ''): return self.config.get('emph_color', TERM_EMPH)
+        if color in {None, ''}: return self.config.get('emph_color', TERM_EMPH)
         else: return color
 
     def get_feed_name(self, id:int, **kargs):
@@ -726,7 +734,7 @@ class FeedexMainBus:
                 f[FEEDS_SQL_TABLE.index('url')]
                 )
 
-                if name in ('',None): name = f"""{id}"""
+                if name in {'',None}: name = f"""{id}"""
                 else:
                     name = ellipsize(name, 200)
                     if with_id: name = f"""{name} ({id})"""
@@ -803,21 +811,27 @@ class FeedexMainBus:
         if val in PREFIXES.keys(): return val
         return -1
 
+    def res_rule_type(self, rtype, **kargs):
+        """ Resolve rule type from int or string into int """
+        if rtype is None: return None
+        if scast(rtype, int, -1) in {0,1,2,}: return rtype
+        
+        rtype = scast(rtype, str, '').lower()
+        if rtype in {'string','str','string_matching',}: return 0
+        elif rtype in {'stemmed','fts','full',}: return 1
+        elif rtype in {'regex','rx',}: return 2
+        return None
 
-    def res_qtype(self, qtype, **kargs):
+
+    def res_query_type(self, qtype, **kargs):
         """ Resolve query type from string to int """
-        rule = kargs.get('rule', False)
-        if qtype is None and not rule: return 1
+        if qtype is None: return 1
+        if scast(qtype, int, -1) in {0,1,}: return qtype
         
-        if type(qtype) is int:
-            if rule and qtype in (0,1,2,): return qtype
-            elif qtype in (0,1,): return qtype
-        
-        qtype = scast(qtype, str, '').strip().lower()
-        if qtype in ('string','str','string_matching','sm'): return 0
-        elif qtype in ('full', 'fts', 'full-text','fulltext',): return 1
-        elif rule and qtype in ('regex',): return 2 
-        return -1
+        qtype = scast(qtype, str, '').lower()
+        if qtype in {'string','str','string_matching',}: return 0
+        elif qtype in {'stemmed','fts','full','full_text',}: return 1
+        return 1
 
 
 
@@ -852,7 +866,7 @@ class FeedexMainBus:
             request = urllib.request.Request(url, None, headers)
             response = urllib.request.urlopen(request)
 
-            if response.status in (200, 201, 202, 203, 204, 205, 206):
+            if response.status in {200, 201, 202, 203, 204, 205, 206}:
                 content_type = slist(scast(response.info().get('Content-Type'), str, '').split(';'), 0, '')
                 if content_type not in mimetypes: 
                     self.add_error(url)
@@ -1075,7 +1089,7 @@ class FeedexConfig:
         self.file = file
         self.vals = {}
         self.vals['cli_cols'] = {}
-        self.import_list(kargs.get('list', FEEDEX_CONFIG_LIST))
+        if not kargs.get('no_import', False): self.import_list(kargs.get('list', FEEDEX_CONFIG_LIST))
 
 
     # Utils to preseve interface compatibility with dict
@@ -1088,7 +1102,7 @@ class FeedexConfig:
 
 
     def clone(self):
-        n = FeedexConfig(self.file)
+        n = FeedexConfig(self.file, no_import=True)
         n.vals = self.vals.copy()
         n.fields, n.names, n.types, n.defaults, n.conds = self.fields, self.names, self.types, self.defaults, self.conds
         return n
@@ -1220,8 +1234,8 @@ class FeedexConfig:
 
             if value.isdigit(): value = scast(value, int, 0)
             elif vfloat is not None: value = vfloat
-            elif value in ('True','true','Yes','yes','YES'): value = True
-            elif value in ('False','false','No','no','NO'): value = False
+            elif value in {'True','true','Yes','yes','YES'}: value = True
+            elif value in {'False','false','No','no','NO'}: value = False
             else:
                 if value.startswith('"') and value.endswith('"'):
                     value = value[1:]
@@ -1251,14 +1265,14 @@ class FeedexConfig:
         
         contents = ''
         for k,v in self.vals.items():
-            if k in ('cli_cols',): continue
+            if k in {'cli_cols',}: continue
             ix = self.fields.index(k)
             name = self.names[ix]
             tp = self.types[ix]
             conds = self.conds[ix]
             cond_str = ''
             for c in conds: cond_str = f'{cond_str}{c};'
-            if v in (None,''): v = ''
+            if v in {None,''}: v = ''
             elif v is True: v = 'True'
             elif v is False: v = 'False'
             else: v = scast(v, str, '')

@@ -103,11 +103,10 @@ model = {
 
 # Morphology type and -fixes
 'morphology' : 1,
-'prefixes' : ('bez','nie','dys','niedo','anty','pro'),
+'prefixes' : (),
 'suffixes' : (),
 'name_suffixes' : (),
 'infixes' : (),
-
 
 
 

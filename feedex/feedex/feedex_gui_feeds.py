@@ -25,7 +25,6 @@ class FeedexFeedTab(Gtk.ScrolledWindow):
 
         # Maint. stuff
         self.MW = parent
-        self.config = self.MW.config
 
         self.type = FX_TAB_FEEDS
 
@@ -109,15 +108,15 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
                 self.MW.act.on_del_feed(item)
 
 
-        elif ctrl and key_name == self.config.get('gui_key_edit','e'):
+        elif ctrl and key_name == fdx.config.get('gui_key_edit','e'):
             item = self.get_selection()
             if item is not None and item.gget('gui_action') == 0: 
                 item.populate(fdx.load_parent(item.gget('id')))
                 self.MW.act.on_feed_cat('edit', item)
         
-        elif ctrl and key_name in ('F2',): pass
+        elif ctrl and key_name in {'F2',}: pass
         
-        elif key_name in ('F2',):
+        elif key_name in {'F2',}:
             event.button = 3
             item = self.get_selection()
             if item is not None and item.gget('gui_action') == 0: 
@@ -136,7 +135,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
             if item is not None and item.gget('gui_action') == 0: 
                 item.populate(fdx.load_parent(item.gget('id')))
                 self.MW.action_menu(item, self, event)
-
+            else: self.MW.action_menu(None, self, event)
 
 
 
@@ -227,7 +226,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
     def _feed_store_item(self, item):
         """ Generates a list of feed fields """
         tp = type(item)
-        if tp in (list, tuple):
+        if tp in (list, tuple,):
             self.feed.clear()
             self.feed.gclear()
             self.feed.populate(item)
@@ -242,7 +241,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
         else: return None
 
         
-        if self.feed.gget('gui_action') in (0, None):
+        if self.feed.gget('gui_action') in {0, None,}:
             
             self.feed.gui_vals['id'] = self.feed['id']
 
@@ -250,7 +249,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
             self.feed.gui_vals['name'] = esc_mu(self.feed.name())
             self.feed.gui_vals['name_mu'] = self.feed.gui_vals['name']
 
-            if coalesce(self.feed.get('error'),0) >= self.config.get('error_threshold',5):
+            if coalesce(self.feed.get('error'),0) >= fdx.config.get('error_threshold',5):
                 self.feed.gui_vals['gui_icon'] = self.MW.icons.get('error', None)
                 self.feed.gui_vals['gui_color'] = 'red'
 
@@ -259,7 +258,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
                     self.feed.gui_vals['gui_icon'] = self.MW.icons.get(self.feed["id"], self.MW.icons.get('doc',None))
                 else:
                     self.feed.gui_vals['gui_icon'] = self.MW.icons.get(self.feed["id"], self.MW.icons.get('default',None))
-                self.feed.gui_vals['gui_color'] = self.config.get('gui_deleted_color','grey')
+                self.feed.gui_vals['gui_color'] = fdx.config.get('gui_deleted_color','grey')
 
             else:
                 self.feed.gui_vals['gui_icon'] = self.MW.icons.get(self.feed["id"], self.MW.icons.get('default',None))
@@ -276,7 +275,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
         else:
             self.feed.gui_vals['name'] = esc_mu(self.feed.gui_vals['name'])
             self.feed.gui_vals['name_mu'] = self.feed.gui_vals['name']
-            if self.feed.gui_vals.get('gui_icon') not in (None, ''): self.feed.gui_vals['gui_icon'] = self.MW.icons.get(self.feed.gui_vals["gui_icon"], self.MW.icons.get('default',None))
+            if self.feed.gui_vals.get('gui_icon') not in {None, '',}: self.feed.gui_vals['gui_icon'] = self.MW.icons.get(self.feed.gui_vals["gui_icon"], self.MW.icons.get('default',None))
             self.feed.gui_vals['gui_color'] = None
             self.feed['gui_toggle'] = False
         
@@ -496,7 +495,7 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu""") )
     def _on_toggled(self, widget, path, *args):
         """ Handle toggled signal and pass results to nodes if needed """
         row = self.feed_store[path]
-        if row[self.feed.gindex('gui_action')] not in (0,2,): return 0
+        if row[self.feed.gindex('gui_action')] not in {0,2,}: return 0
         
         iter = self.feed_store.get_iter(path)
         btog = scast(slist(args, -1, None), bool, None)

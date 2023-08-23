@@ -24,7 +24,7 @@ class DesktopNotifier:
         self.entry = ResultEntry()
         self.notif_list = []
         self.parent = kargs.get('parent')
-        self.icons = kargs.get('icons',{})
+        self.icons = kargs.get('icons', fdx.icons_cache)
 
     def show(self):
         """ Show all queued notifications """

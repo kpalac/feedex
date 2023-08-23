@@ -81,6 +81,8 @@ class SmallSem:
         # summarization stuff...
         self.ranked_sents = [] # List of tokenized and ranked sentences
 
+        # Configuration
+        self.unknown_term_weight = 5 # Weight for terms not present in vocab. Should be lower for models traines on larger corpuses
         
 
 
@@ -247,15 +249,17 @@ class SmallSem:
             
             if stem:
                 variant = t.lower()
-                stemmed = self.stemmer.stemWord(t)
+                stemmed = self.stemmer.stemWord(variant)
                 if stemmed in self.stops or variant in self.stops: continue
+                tokl = len(stemmed)
                 # Unstemmed variants are added as xapian synonyms (might be useful later on ...)
-                if writeable_xap is not None: # ... but do it only when writable xapian is provided
+                if writeable_xap is not None and tokl < 150 and len(variant) < 150: # ... but do it only when writable xapian is provided
                     writeable_xap.add_synonym(stemmed, variant)
             else:
                 stemmed = t
+                tokl = len(stemmed)
 
-            self.tokens.append(stemmed)
+            if tokl < 150: self.tokens.append(stemmed)
 
 
 
@@ -270,7 +274,7 @@ class SmallSem:
         tmp = tmp.replace(',','')
         if tmp.isnumeric(): return True
         if len(tmp) > 1 and tmp.startswith('-') and tmp[1:].isnumeric(): return True
-        if len(tmp) > 0 and self.writing_system in (1,2) and tmp[0] in self.numerals: return True
+        if len(tmp) > 0 and self.writing_system in {1,2,} and tmp[0] in self.numerals: return True
         if self.writing_system == 3 and tmp in self.numerals: return True
         return False
 
@@ -294,7 +298,7 @@ class SmallSem:
 
 
 
-    def get_contexts(self, string, depth=100):
+    def get_related(self, string, depth=100):
         """ List terms with similar contexts to given terms """
 
         if self.get_model() is None: self.set_model('en') # Load english model as default
@@ -389,7 +393,7 @@ class SmallSem:
                 fr = self.ix_db.get_termfreq(term)
                 if fr == 0:
                     fr = 1
-                    v = v * 10 # I decided to boost unknown vocab. To be seen if this works ...
+                    v = v * self.unknown_term_weight # I decided to boost unknown vocab. To be seen if this works ...
                 
                 # Boost upper cases for bicameral models
                 case = self._case(k)
@@ -636,31 +640,38 @@ class SmallSemTrainer:
     def learn_text(self, text:str, doc_id, **kwargs):
         """ Indexes given text and adds terms to vocab 
             doc_id = int    Main document counter """
+        weight = kwargs.get('weight', 1)
         self.ke.raw_text = text
-        sents = re.findall(self.ling.get('sentence_chunker', DEFAULT_SENTENCE_CHUNKER_RE), text)
+        sents = re.findall(self.ke.ling.get('sentence_chunker', DEFAULT_SENTENCE_CHUNKER_RE), text)
         
         self.units.clear()
-        for s in sents: self.units.append(self.ke.tokenize(s, writeable_xap=self.ix_db))
+        for s in sents: 
+            self.ke.tokenize(s, writeable_xap=self.ix_db)
+            self.units.append(self.ke.tokens.copy())
+
 
         for i,u in enumerate(self.units):
 
             doc_string = ''
-            for t in u:
-                doc_string = f'{doc_string} {t}'
+            for t in u: doc_string = f'{doc_string} {t}'
 
-            doc_id = f'{doc_id};{i}'
+            #did = f'{doc_id};{i}'
+            #doc.add_boolean_term(f'DID {did}')
+            #doc.add_boolean_term(f'UID {i}')
+            #doc.set_data(did)
             doc = xapian.Document()
-            doc.add_boolean_term(f'DID {doc_id}')
-            doc.add_boolean_term(f'UID {i}')
-            doc.set_data(doc_id)
             self.ix_tg.set_document(doc)
-            self.ix_tg.index_text_without_positions(doc_string)
+            self.ix_tg.index_text_without_positions(doc_string, weight)
             self.ix_db.add_document(doc)
 
 
 
-    def learn_from_dir(self, directory:str):
+
+
+
+    def learn_from_dir(self, directory:str, **kwargs):
         """ Loads all files from a folder and indexes them"""
+        weight = kwargs.get('weight', 1)
         for i,f in enumerate(os.listdir(directory)):
             filename = os.path.join(directory, f)
             try:
@@ -670,12 +681,12 @@ class SmallSemTrainer:
                     encoding = chardet.detect(contents)['encoding']
                 with open(filename, 'r', encoding=encoding) as file:
                     contents = file.read()
-            except OSError as e:
+            except (OSError, UnicodeDecodeError,) as e:
                 print(f'Error loading {filename} file: {e}')
                 continue
             
             print(f'Indexing {filename} (encoding: {encoding})...')
-            self.learn_text(contents, i)
+            self.learn_text(contents, i, weight=weight)
             print(f'Done.')
 
 
@@ -702,7 +713,7 @@ HELP_STRING="""
 Extracts keywords from text file based on pretrained vocabulary
 Options:
 
-    --models_path=PATH      Folders with stored language models (if not provided - current directory will be used)
+    --models-path=PATH      Folders with stored language models (if not provided - current directory will be used)
     --lang=LANG             Which anguage to use?      
 
     --keywords FILE         Extract keyword list from a given text file
@@ -711,10 +722,12 @@ Options:
     --summarize FILE        Summarize file
     --level=1..100          Summarization level
 
-    --term_context TERM     Show n (--depth) best context words for a term
+    --related TERM          Show n (--depth) best context words for a term
+    --freq TERM             Term's freqiency in a model
     
-    --index_dir DIR         Learn vocab and train on all text files in a folder
-
+    --learn-from-dir DIR    Learn vocab and train on all text files in a folder
+    --weight=INT            Dir's weight/significance in model                
+    
     --help, -h              Show this message
 
 
@@ -737,6 +750,7 @@ if __name__ == '__main__':
     action = None
     depth = 10
     level = 50
+    weight = 1
     separator = ''
     file = None
     models_path = ''
@@ -748,25 +762,25 @@ if __name__ == '__main__':
 
             if i == 0: continue
 
-            if arg == '--index_dir' and par_len > i:
+            if arg == '--learn-from-dir' and par_len > i:
                 index_dir = sys.argv[i+1]      
-                action = 'index_dir'
+                action = 'learn_from_dir'
                 break
 
 
-            elif arg == '--term_freq' and par_len > i:
+            elif arg == '--freq' and par_len > i:
                 term = sys.argv[i+1]      
-                action = 'term_freq'
+                action = 'freq'
                 break
 
-            elif arg == '--term_context' and par_len > i:
+            elif arg == '--related' and par_len > i:
                 term = sys.argv[i+1]      
-                action = 'term_context'
+                action = 'related'
                 break
 
             elif arg == '--keywords' and par_len > i:
                 file = sys.argv[i+1]      
-                action = 'kw_from_file'
+                action = 'keywords'
                 break
 
             elif arg == '--summarize' and par_len > i:
@@ -784,6 +798,9 @@ if __name__ == '__main__':
             elif arg.startswith('--depth=') and arg != '--depth=':
                 depth = arg.split('=')[1]
 
+            elif arg.startswith('--weight=') and arg != '--weight=':
+                weight = int(arg.split('=')[1])
+
             elif arg.startswith('--level=') and arg != '--level=':
                 level = arg.split('=')[1]
 
@@ -792,30 +809,30 @@ if __name__ == '__main__':
 
 
 
-            elif arg in ('-h','-help','--help'):
+            elif arg in {'-h','-help','--help',}:
                 print(HELP_STRING)
                 sys.exit(0)
 
 
 
 
-    if action in ('index_dir', 'term_freq','build','term_context','kw_from_file', 'summarize'):
+    if action in {'learn_from_dir', 'freq', 'related', 'keywords', 'summarize',}:
         
-        if action == 'index_dir': 
+        if action == 'learn_from_dir': 
             kl = SmallSemTrainer(lang, models_path)
-            kl.learn_from_dir(index_dir)
+            kl.learn_from_dir(index_dir, weight=weight)
 
-        elif action == 'term_freq':
+        elif action == 'freq':
             lp = SmallSem(models_path, ling=lang)
             term = lp.stemmer.stemWord(term.lower())
             print(f'Stemmed form: {term}')
             print(f'Collection frequency: {lp.ix_db.get_termfreq(term)}')
 
-        elif action == 'term_context':
+        elif action == 'related':
             lp = SmallSem(models_path, ling=lang)
-            for c in lp.get_contexts(term, depth): print(c)
+            for c in lp.get_related(term, depth): print(c)
 
-        elif action == 'kw_from_file':
+        elif action == 'keywords':
             lp = SmallSem(models_path, ling=lang)
             try:
                 # Detect encodng...

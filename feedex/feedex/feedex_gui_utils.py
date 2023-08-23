@@ -379,7 +379,7 @@ def f_list_store(store, **kargs):
         types = []
 
         sample_type = type(sample)
-        if sample_type in (list, tuple):
+        if sample_type in (list, tuple,):
             for f in sample: types.append(type(f))
         else:
             types = []
@@ -816,7 +816,7 @@ def f_query_logic_combo(**kargs):
 
 
 def f_query_type_filter_combo(**kargs):
-    store = ( (1,_('Full Text Search')), (0,_('String matching')) )
+    store = ( (1,_('Full Text Search')), (0,_('String matching')), )
     tooltip = kargs.get('tooltip', _("""Set query type:
 <b>Full Text Search:</b> stemmed and tokenized (use capitalized terms for exact/unstemmed match)
 <b>String matching</b>: simple string comparison"""))
@@ -879,7 +879,7 @@ def f_field_combo(**kargs):
 def f_page_len_combo(**kargs):
     """ Construct combo for query page length """
     default = kargs.get('default',0)
-    if default != 0 and default not in (500,1000,1500,2000,3000,5000): 
+    if default != 0 and default not in {500,1000,1500,2000,3000,5000,}: 
         store = ( (default, str(default))
     (500,_('500') ),
     (1000,_('1000') ),
@@ -1112,7 +1112,7 @@ def f_col(title:str, ctype:int,  model_col:int, **kargs):
     yalign = kargs.get('yalign')
     connect = kargs.get('connect')
 
-    if ctype in (0,1):
+    if ctype in {0,1,}:
         renderer = Gtk.CellRendererText()
         if ctype == 0: col = Gtk.TreeViewColumn( title, renderer, text=model_col)
         elif ctype == 1: col = Gtk.TreeViewColumn( title, renderer, markup=model_col)
@@ -1176,7 +1176,7 @@ def f_menu_item(item_type:int, label:str, connect, **kargs):
         item = Gtk.SeparatorMenuItem()
         return item
 
-    if icon in (None,'') and color in (None,''):
+    if icon in {None,'',} and color in {None,'',}:
         item = Gtk.MenuItem(label)
     else:
         item = Gtk.MenuItem()
@@ -1290,7 +1290,7 @@ def f_chooser(parent, main_win, *args, **kargs):
     else: filename = False
     dialog.destroy()
 
-    if action == 'save' and filename not in ('',None,False,):
+    if action == 'save' and filename not in {'', None, False,}:
         if os.path.isdir(filename):
             msg(FX_ERROR_IO, _('Target %a is a directory!'), filename)
             filename = False
@@ -1305,7 +1305,7 @@ def f_chooser(parent, main_win, *args, **kargs):
                     filename = False
             else: filename == False
 
-    if filename in ('',None,False,): filename = False
+    if filename in {'', None, False,}: filename = False
     elif filename != -1: main_win.gui_cache['last_dir'] = os.path.dirname(filename)
 
     return filename
@@ -1475,8 +1475,6 @@ class FeedexGUISession:
     """ GUI session skeleton class """
 
     def __init__(self, *args, **kargs) -> None:
-
-        self.config = kargs.get('config', fdx.config)        
         
         # Child window counter
         self.child_windows = 0
@@ -1492,7 +1490,7 @@ class FeedexGUISession:
         pipe_on_lock = kargs.get('pipe_on_lock', False)
         unlock = kargs.get('unlock', False)
 
-        db_path = kargs.get('db_path', self.config.get('db_path'))
+        db_path = kargs.get('db_path', fdx.config.get('db_path'))
         self.DB = FeedexDatabase(db_path=db_path, allow_create=True, main_conn=kargs.get('main_conn', True))
 
         try:
@@ -1548,7 +1546,7 @@ class FeedexGUISession:
 
     def set_profile(self, *args):
         """ Setup path to caches, plugins etc. """
-        self.profile_name = self.config.get('profile_name','')
+        self.profile_name = fdx.config.get('profile_name','')
         if self.profile_name == '': 
             self.gui_cache_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex_gui_cache.json')
             self.gui_plugins_path = os.path.join(FEEDEX_SHARED_PATH, 'feedex_plugins.json')
@@ -1605,13 +1603,13 @@ class FeedexGUISession:
             new_gui_attrs['layouts'] = FX_DEF_LAYOUTS.copy()
     
         for k,v in new_gui_attrs['layouts'].items():
-            if type(v) not in (tuple, list) or len(v) == 0:
+            if not isiter(v) or len(v) == 0:
                 msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
                 new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
                 continue
 
             for i,c in enumerate(v):
-                if type(c) not in (tuple, list): 
+                if not isiter(c): 
                     msg(FX_ERROR_VAL, _('Invald %a layout. Defaulting...'), k)
                     new_gui_attrs['layouts'][k] = FX_DEF_LAYOUTS[k]
                     break
@@ -1687,7 +1685,7 @@ class FeedexGUISession:
         plugin = FeedexPlugin()
         plugin_len = len(plugin.fields)
         for p in gui_plugins:
-            if type(p) not in (list, tuple): 
+            if not isiter(p): 
                 msg(FX_ERROR_VAL, _('Plugin item %a not a valid list! Ommiting'), p)
                 continue
             if len(p) != plugin_len:
@@ -1703,7 +1701,7 @@ class FeedexGUISession:
 
     def start_listen(self, **kargs):
         err = self.DB.set_session_id(type=0)
-        if err == 0 and self.config.get('allow_pipe', False):
+        if err == 0 and fdx.config.get('allow_pipe', False):
             err = self.DB.create_pipe(type=0)
             if err == 0:
                 fdx.connect_IPC()

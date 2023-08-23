@@ -185,7 +185,7 @@ class SQLContainer:
         nullif(self.vals.get('url'),''),
         nullif(self.vals.get('string'),''),
         )
-        if name in ('',None): name = str(self.vals.get('id','<???>'))
+        if name in {'', None,}: name = str(self.vals.get('id','<???>'))
         else:
             name = ellipsize(name, 200)
             if with_id: name = f"""{name} ({self.vals.get('id','<???>')})"""
@@ -255,11 +255,11 @@ class SQLContainerEditable(SQLContainer):
         self.sql_multi_getter = None # SQL query to get by id list that replaces %i string
 
         self.immutable = ('id',)
-        self.locks = ()
+        self.locks = {}
 
         if self.entity == FX_ENT_ENTRY:
             SQLContainer.__init__(self, 'entries', ENTRIES_SQL_TABLE, col_names=ENTRIES_SQL_TABLE_PRINT, types=ENTRIES_SQL_TYPES, entity=self.entity)
-            self.locks = (FX_LOCK_ENTRY,)
+            self.locks = {FX_LOCK_ENTRY,}
             self.immutable = tuple(['id', 'deleted'] + list(ENTRIES_TECH_LIST))
             self.ent_name = _('Entry')
             self.DB.cache_feeds()
@@ -269,14 +269,14 @@ class SQLContainerEditable(SQLContainer):
         
         elif self.entity == FX_ENT_FEED:
             SQLContainer.__init__(self, 'feeds', FEEDS_SQL_TABLE, col_names=FEEDS_SQL_TABLE_PRINT, types=FEEDS_SQL_TYPES, entity=self.entity)
-            self.locks = (FX_LOCK_FETCH, FX_LOCK_FEED,)
+            self.locks = {FX_LOCK_FETCH, FX_LOCK_FEED,}
             self.ent_name = _('Feed')
             self.immutable = ('id', 'deleted',)
             self.DB.cache_feeds()
         
         elif self.entity == FX_ENT_RULE:
             SQLContainer.__init__(self, 'rules', RULES_SQL_TABLE, col_names=RULES_SQL_TABLE_PRINT, types=RULES_SQL_TYPES, entity=self.entity)
-            self.locks = (FX_LOCK_FETCH, FX_LOCK_RULE,)
+            self.locks = {FX_LOCK_FETCH, FX_LOCK_RULE,}
             self.ent_name = _('Rule')
             self.DB.cache_rules()
             self.DB.cache_feeds()
@@ -284,7 +284,7 @@ class SQLContainerEditable(SQLContainer):
 
         elif self.entity == FX_ENT_FLAG:
             SQLContainer.__init__(self, 'flags', FLAGS_SQL_TABLE, col_names=FLAGS_SQL_TABLE_PRINT, types=FLAGS_SQL_TYPES, entity=self.entity)
-            self.locks = (FX_LOCK_FETCH, FX_LOCK_FLAG,)
+            self.locks = {FX_LOCK_FETCH, FX_LOCK_FLAG,}
             self.ent_name = _('Flag')
             self.immutable = ()
             self.DB.cache_flags()
@@ -388,14 +388,13 @@ class SQLContainerEditable(SQLContainer):
 
     def set_interface(self, interface): 
         self.DB = interface
-        self.config = self.DB.config
 
 
     def get_by_id(self, id):
         """ Basic method for getting item by id from assigned sql table - will be often oveloaded with caches etc."""
         id = scast(id, int, -1)
         content = self.DB.qr_sql(self.sql_getter, {'id':id}, one=True )
-        if content in (None, (None,), ()):
+        if isempty(content):
             self.exists = False
             return msg(FX_ERROR_NOT_FOUND, f"""{self.ent_name} %a {_('not found!')}""", id)
         else:
@@ -458,7 +457,7 @@ class SQLContainerEditable(SQLContainer):
         """ Check dictionary for compatibility with update oper """
         tpi = type(item)
         if tpi is dict: chkl = item.keys()
-        elif tpi in (list, tuple): chkl = item
+        elif tpi in (list, tuple,): chkl = item
         else: return msg(FX_ERROR_VAL, _('Invalid update input format'))
 
         self.to_update = []
@@ -518,7 +517,7 @@ class SQLContainerEditable(SQLContainer):
         if tpn is dict:
             self.clear()
             self.merge(idict)
-        elif tpn in (list, tuple): self.populate(idict)
+        elif tpn in (list, tuple,): self.populate(idict)
         elif idict is not None: return msg(FX_ERROR_VAL, _('Invalid new item format (must be list or dict)!'))
 
         if kargs.get('no_commit', False): return self._oper(FX_ENT_ACT_ADD, *args, **kargs)
@@ -606,7 +605,7 @@ class SQLContainerEditable(SQLContainer):
         err = self._hook(FX_ENT_STAGE_INIT_OPER, **kargs)
         if err != 0: return err
 
-        if self.action in (FX_ENT_ACT_ADD, FX_ENT_ACT_UPD,):
+        if self.action in {FX_ENT_ACT_ADD, FX_ENT_ACT_UPD,}:
             if kargs.get('validate', True):
                 err = self.validate(**kargs)
                 if err != 0: return msg(*err)
@@ -767,7 +766,7 @@ class SQLContainerEditable(SQLContainer):
         for ii,i in enumerate(ilist):
 
             tpi = type(i)
-            if tpi in (list, tuple): self.populate(i)
+            if tpi in (list, tuple,): self.populate(i)
             elif tpi is dict:
                 self.clear()
                 self.merge(i)
@@ -780,7 +779,7 @@ class SQLContainerEditable(SQLContainer):
                 for c in conditions:
                     k, op, v = c[0], c[1], c[2]
                     val = self.vals.get(k)
-                    if op in ('gt','lt','ge','le'): cst_val = scast(val, type(k), 0)
+                    if op in {'gt','lt','ge','le',}: cst_val = scast(val, type(k), 0)
                     stop = False
                     if op == 'eq' and not val == v: stop = True
                     elif op == 'ne' and not val != v: stop = True
@@ -942,8 +941,8 @@ class FeedexRule(SQLContainerEditable):
             elif self.vals.get('flag') is not None:
                 if type(self.vals['flag']) is str: self.vals['flag'] = fdx.res_flag_name(self.vals['flag'])
 
-            self.vals['type'] = fdx.res_qtype(self.vals['type'], rule=True)
-            self.vals['weight'] = coalesce(self.vals.get('weight'), self.config.get('default_rule_weight', 20))
+            self.vals['type'] = fdx.res_rule_type(self.vals['type'])
+            self.vals['weight'] = coalesce(self.vals.get('weight'), fdx.config.get('default_rule_weight', 20))
 
         elif stage == FX_ENT_STAGE_POST_VAL:
 
@@ -954,12 +953,12 @@ class FeedexRule(SQLContainerEditable):
                     self.feed.populate(feed)
                     self.vals['feed_id'] = self.feed['id']
 
-            if self.vals['flag'] not in (None,0):
+            if self.vals['flag'] not in {None,0}:
                 if not fdx.is_flag(self.vals['flag']): return FX_ERROR_VAL, _('Flag not found!')
 
             if self.vals['string'] is None or self.vals['string'] == '': return FX_ERROR_VAL, _('Search string cannot be empty!')
 
-            if self.vals['type'] not in (0,1,2): return FX_ERROR_VAL, _('Invalid query type! Must be string(0), full-text (1), or regex (2)')
+            if self.vals['type'] not in {0,1,2}: return FX_ERROR_VAL, _('Invalid query type! Must be string(0), full-text (1), or regex (2)')
             if self.vals['type'] == 2 and not check_if_regex(self.vals['string']): return FX_ERROR_VAL, _('Not a valid regex string!')
         
             if self.vals.get('field') is not None:
@@ -968,7 +967,7 @@ class FeedexRule(SQLContainerEditable):
                 else: self.vals['field'] = field
 
             self.vals['case_insensitive'] = coalesce(self.vals.get('case_insensitive'), 1)
-            if self.vals.get('case_insensitive') not in (0,1): return FX_ERROR_VAL, _('Case insensitivity must be 0 or 1!')    
+            if self.vals.get('case_insensitive') not in {0,1,}: return FX_ERROR_VAL, _('Case insensitivity must be 0 or 1!')    
 
         return 0
 
@@ -1078,7 +1077,7 @@ class ResultRule(SQLContainer):
         self.vals['field_name'] = PREFIXES.get(self.vals['field'],{}).get('name',_('-- All Fields --'))
 
         feed_id = self.vals['feed_id']
-        if feed_id in (None,-1): self.vals['feed_name'] = _('-- All Channels/Catgs. --')
+        if feed_id in {None, -1,}: self.vals['feed_name'] = _('-- All Channels/Catgs. --')
         else: self.vals['feed_name'] = fdx.get_feed_name(self.vals['feed_id'], with_id=True)
 
     def fill(self): pass
@@ -1141,7 +1140,6 @@ class FeedexHistoryItem(SQLContainer):
         SQLContainer.__init__(self, 'search_history', HISTORY_SQL_TABLE, types=HISTORY_SQL_TYPES, col_names = HISTORY_SQL_TABLE_PRINT, **kargs)
         self.entity = FX_ENT_HISTORY
         self.DB = db
-        self.config = self.DB.config
         self.DB.cache_history()
         self.DB.cache_feeds()
     
@@ -1151,13 +1149,13 @@ class FeedexHistoryItem(SQLContainer):
         if err_fld != 0: return -7, _('Invalid type for field %a'), err_fld
 
         if self.vals['feed_id'] is not None:
-            if fdx.is_cat_feed(self.vals.get('feed_id')) not in (1,2,): return -7, _('Channel/Category %a not found!'), self.vals.get('feed_id')
+            if fdx.is_cat_feed(self.vals.get('feed_id')) not in {1,2,}: return -7, _('Channel/Category %a not found!'), self.vals.get('feed_id')
         return 0
 
 
     def add(self, phrase:dict, feed:int, **kargs):
         """ Wrapper for adding item to search history """
-        if self.config.get('no_history', False): return 0
+        if fdx.config.get('no_history', False): return 0
         
         self.vals['id'] = None
 

@@ -19,8 +19,6 @@ class FeedexGUIActions:
     def __init__(self, parent, **kargs) -> None:
         self.MW = parent
         self.DB = self.MW.DB
-        self.config = self.MW.config
-
 
 
     def start_thread(self, **kargs):
@@ -97,11 +95,11 @@ class FeedexGUIActions:
         if item is None:
             feed_id=None
             ignore_interval = True
-            ignore_modified = self.config.get('ignore_modified',True)
+            ignore_modified = fdx.config.get('ignore_modified',True)
         elif item == 0:
             feed_id=None
             ignore_interval = False
-            ignore_modified = self.config.get('ignore_modified',True)
+            ignore_modified = fdx.config.get('ignore_modified',True)
         elif isinstance(item, SQLContainer):
             if item['is_category'] != 1:
                 feed_id = item['id']
@@ -123,15 +121,15 @@ class FeedexGUIActions:
             self.MW.new_n = scast(self.MW.new_n, int, 0) + 1
             self.MW.feed_tab.redecorate_new()
 
-            if self.config.get('gui_desktop_notify', True):
+            if fdx.config.get('gui_desktop_notify', True):
                 DB.connect_QP()
-                if self.config.get('gui_notify_group','feed') == 'number':
+                if fdx.config.get('gui_notify_group','feed') == 'number':
                     fdx.DN.notify(f'{DB.new_items} {_("new articles fetched...")}', None, -3)
                 else:
 
                     filters = {'last':True,
-                    'group':self.config.get('gui_notify_group','feed'), 
-                    'depth':self.config.get('gui_notify_depth',5)
+                    'group':fdx.config.get('gui_notify_group','feed'), 
+                    'depth':fdx.config.get('gui_notify_depth',5)
                     }
                     DB.Q.query('', filters , rev=False, print=False, allow_group=True)
                     fdx.DN.load(DB.Q.results)
@@ -596,7 +594,7 @@ class FeedexGUIActions:
 
 
         if oper == FX_ENT_ACT_DEL: 
-            if ent in (FX_ENT_ENTRY, FX_ENT_FEED,): err = item.delete_many(ids)
+            if ent in {FX_ENT_ENTRY, FX_ENT_FEED,}: err = item.delete_many(ids)
             else: err = item.delete_perm_many(ids, perm=True)
         elif oper == FX_ENT_ACT_DEL_PERM: err = item.delete_perm_many(ids, perm=True)
         elif oper == FX_ENT_ACT_RES: err = item.restore_many(ids)
@@ -616,7 +614,7 @@ class FeedexGUIActions:
                     doper['id'] = id 
                     deltas.append(doper)
 
-            if oper in (FX_ENT_ACT_DEL, FX_ENT_ACT_DEL_PERM,): fdx.bus_append( (FX_ACTION_DELETE, deltas, compat) )
+            if oper in {FX_ENT_ACT_DEL, FX_ENT_ACT_DEL_PERM,}: fdx.bus_append( (FX_ACTION_DELETE, deltas, compat) )
             elif type(oper) is dict: fdx.bus_append( (FX_ACTION_EDIT, deltas, compat) )
 
         DB.close()
@@ -816,9 +814,9 @@ class FeedexGUIActions:
         """ Shows dialog for reviewing log """
         log_str = ''
         try:        
-            with open(self.config.get('log',''), 'r') as f: log_str = f.read()
+            with open(fdx.config.get('log',''), 'r') as f: log_str = f.read()
         except OSError as e:
-            return msg(FX_ERROR_IO, f'{_("Error reading log file (%a)")} {e}', self.config.get('log',''))
+            return msg(FX_ERROR_IO, f'{_("Error reading log file (%a)")} {e}', fdx.config.get('log',''))
 
         self.MW._run_dialog( BasicDialog(self.MW, _('Main Log'), log_str, width=600, height=500, justify=FX_ATTR_JUS_LEFT, selectable=True, scrolled=True, markup=False) )
 
@@ -1076,7 +1074,7 @@ class FeedexGUIActions:
 
     def export_results(self, *args, **kargs):
         """ Export results from current tab to JSON for later import """
-        if self.MW.curr_upper.type in (FX_TAB_RULES, FX_TAB_FLAGS): return 0
+        if self.MW.curr_upper.type in {FX_TAB_RULES, FX_TAB_FLAGS,}: return 0
         format = args[-1]
 
         if not isinstance(self.MW.curr_upper.table.result, (ResultEntry, ResultContext, ResultTerm, ResultTimeSeries,)): return -1
@@ -1101,7 +1099,7 @@ class FeedexGUIActions:
         else:
             filename = kargs.get('filename')
         
-        if filename in (False,None): return 0
+        if filename in {False, None,}: return 0
 
         fdx.connect_CLP()
         fdx.CLP.output = format

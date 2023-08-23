@@ -66,9 +66,6 @@ class FeedexQuery(FeedexQueryInterface):
         self.DB.cache_flags()
         self.DB.cache_history()
         self.LP = self.DB.LP
-        # Config
-        self.config = kargs.get('config', self.DB.config)
-
 
         # Query parser for Xapian
         self.ix_qp = xapian.QueryParser()
@@ -131,7 +128,7 @@ class FeedexQuery(FeedexQueryInterface):
         snippets = kargs.get('snippets',True)
         recom = kargs.get('recom', False)
         
-        max_context_length = self.config.get('max_context_length', 500)
+        max_context_length = fdx.config.get('max_context_length', 500)
 
         # Construct phrase if needed
         if kargs.get('phrase') is None:
@@ -464,24 +461,24 @@ class FeedexQuery(FeedexQueryInterface):
             self._empty(result=ResultEntry())
             return FX_ERROR_NOT_FOUND
 
-        depth = filters.get('depth',self.config.get('default_similarity_limit',30)) # Limit results
+        depth = filters.get('depth',fdx.config.get('default_similarity_limit',30)) # Limit results
 
         # Get or generate rules
-        if self.config.get('use_keyword_learning', True):
+        if fdx.config.get('use_keyword_learning', True):
             terms = self.DB.qr_sql("select * from terms where context_id=:id order by weight desc", {'id':id} , all=True)
             if self.DB.status != 0: 
                 self._empty(result=ResultEntry())
                 return FX_ERROR_DB
         else: terms = None
 
-        if terms in (None, [], [None], (), (None,)):
+        if isempty(terms):
             err = entry.ling(index=False, rank=False, learn=True, save_terms=False)
             if err != 0: 
                 self._empty(result=ResultEntry())
                 return -2
             terms = entry.terms.copy()
 
-        if terms in (None, [], [None], ()):
+        if isempty(terms):
             debug(5, "Nothing to find...")
             self._empty(result=ResultEntry())
             return 0
@@ -500,7 +497,7 @@ class FeedexQuery(FeedexQueryInterface):
         for i,r in enumerate(terms):
             if i >= depth: break
             
-            if type(r) in (list, tuple): term.populate(r)
+            if type(r) in (list, tuple,): term.populate(r)
             elif type(r) is dict:
                 term.clear()
                 term.merge(r)
@@ -798,14 +795,14 @@ class FeedexQuery(FeedexQueryInterface):
     def group(self, **kargs):
         """ Creates and prints a tree with results grouped by a column """
         group_by = kargs.get('group','category')
-        depth = kargs.get('depth',self.config.get('default_depth',5))
+        depth = kargs.get('depth',fdx.config.get('default_depth',5))
 
         results_tmp = []
         node_tmp = []
         count = 0
 
 
-        if group_by in ('category','feed'):
+        if group_by in {'category','feed',}:
             feed = ResultFeed()
             feeds = fdx.feeds_cache.copy()
             feeds.sort(key=lambda x: coalesce(x[feed.get_index('display_order')],0), reverse=False)
@@ -931,7 +928,7 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-        elif group_by in ('hourly', 'daily', 'monthly'):
+        elif group_by in {'hourly', 'daily', 'monthly',}:
 
             pubdate_ix = self.result.get_index('pubdate')
             timetable = []
@@ -1177,13 +1174,13 @@ class FeedexQuery(FeedexQueryInterface):
     def _validate_filters(self, string:str, filters:dict, **kargs):
         """ Validate and process query filters into single standard """
        
-        qtype = fdx.res_qtype(filters.get('qtype'))
+        qtype = fdx.res_query_type(filters.get('qtype'))
         if qtype == -1: return msg(FX_ERROR_QUERY, _('Invalid query type!'))
         filters['qtype'] = qtype
         
         lang = coalesce( filters.get('lang'), 'heuristic' )
 
-        if qtype in (1,): self.LP.set_model(lang)
+        if qtype in {1,2,}: self.LP.set_model(lang)
 
         if filters.get('field') is not None:
             filters['field'] = fdx.res_field(filters.get('field'))
@@ -1308,7 +1305,7 @@ class FeedexQuery(FeedexQueryInterface):
             if date > 0: filters['raw_pubdate_from'] = date
 
         # Resolve pages
-        page_len = scast(filters.get('page_len'), int, self.config.get('page_length',3000))
+        page_len = scast(filters.get('page_len'), int, fdx.config.get('page_length',3000))
         page = scast(filters.get('page'), int, 1)
         if page <= 1: page = 1
         if page_len <= 1: page_len = 3000
@@ -1316,7 +1313,7 @@ class FeedexQuery(FeedexQueryInterface):
         filters['page_len'] = page_len
 
         if filters.get('group') is not None: 
-            if filters.get('group') not in ('category', 'feed', 'flag', 'hourly', 'daily', 'monthly', 'similar'): 
+            if filters.get('group') not in {'category', 'feed', 'flag', 'hourly', 'daily', 'monthly', 'similar',}: 
                 return msg(FX_ERROR_QUERY, _('Invalid grouping! Must be: %a'), 'category, feed, flag, similar, hourly, daily or monthly')
 
         if filters.get('depth') is not None:
@@ -1465,7 +1462,7 @@ class FeedexQuery(FeedexQueryInterface):
 
         ext_filter = False
         # This one is risky, so we have to be very careful every ID is a valis integer
-        if filters.get('FEED_ID_list') is not None and type(filters.get('FEED_ID_list')) in (list,tuple) and len(filters.get('FEED_ID_list',[])) > 0:
+        if filters.get('FEED_ID_list') is not None and isiter(filters.get('FEED_ID_list')) and len(filters.get('FEED_ID_list',[])) > 0:
             ids = ''
             for i in filters.get('FEED_ID_list',[]):
                 i = scast(i, int, None)
@@ -1475,7 +1472,7 @@ class FeedexQuery(FeedexQueryInterface):
             query = f"{query}\nand f.id in ({ids})"
             ext_filter = True
 
-        if filters.get('ID_list') is not None and type(filters.get('ID_list')) in (list,tuple) and len(filters.get('ID_list',[])) > 0:
+        if filters.get('ID_list') is not None and isiter(filters.get('ID_list')) and len(filters.get('ID_list',[])) > 0:
             ids = ''
             for i in filters.get('ID_list',[]):
                 i = scast(i, int, None)
@@ -1486,7 +1483,7 @@ class FeedexQuery(FeedexQueryInterface):
             ext_filter = True
 
         # Build SQL comma-separated list for Xapian results. This may be very long
-        if filters.get('IX_ID_list') is not None and type(filters.get('IX_ID_list')) in (list,tuple) and len(filters.get('IX_ID_list',[])) > 0:
+        if filters.get('IX_ID_list') is not None and isiter(filters.get('IX_ID_list')) and len(filters.get('IX_ID_list',[])) > 0:
             ids = ''
             for i in filters.get('IX_ID_list',[]):
                 i = scast(i, int, None)
@@ -1501,14 +1498,14 @@ class FeedexQuery(FeedexQueryInterface):
             query = f"{query}\n and e.id <> {scast(filters.get('exclude_id'), int, -1)}"
 
         # Sorting options
-        if filters.get('sort') not in (None, (), []):
+        if not isempty(filters.get('sort')):
             sort_fields = filters['sort']
             query = f"{query}\nORDER BY"
             for sf in sort_fields: query = f'{query} {sf}, '
             query = f'{query} e.id DESC'
 
         elif phrase.get('empty',False):
-            if filters.get('fallback_sort') not in (None, (), []):
+            if not isempty(filters.get('fallback_sort')):
                 sort_fields = filters['fallback_sort']
                 query = f"{query}\nORDER BY"
                 for sf in sort_fields: query = f'{query} {sf}, '
@@ -1522,7 +1519,7 @@ class FeedexQuery(FeedexQueryInterface):
         if not ext_filter:            
             query = f"{query}\nLIMIT :page_len OFFSET :start_n"
             vals['start_n'] = scast(filters.get('start_n'), int, 0)
-            vals['page_len'] = scast(filters.get('page_len', self.config.get('page_length',3000)), int, 3000)
+            vals['page_len'] = scast(filters.get('page_len', fdx.config.get('page_length',3000)), int, 3000)
         
         debug(5,f"Query: {query}\n{vals}\nPhrase: {self.phrase}")
         
@@ -1560,7 +1557,7 @@ class FeedexQuery(FeedexQueryInterface):
                 if f[FEEDS_SQL_TABLE.index('parent_id')] == cat_id: feed_str = f"""{feed_str} OR FEED_ID:{f[FEEDS_SQL_TABLE.index('id')]}"""
             filter_qr = f"""{filter_qr} AND ({feed_str})"""
 
-        if filters.get('FEED_ID_list') is not None and type(filters.get('FEED_ID_list')) in (list,tuple) and len(filters.get('FEED_ID_list',[])) > 0:
+        if filters.get('FEED_ID_list') is not None and isiter(filters.get('FEED_ID_list')) and len(filters.get('FEED_ID_list',[])) > 0:
             feed_ids = 'FEED_ID:-1'
             for i in filters.get('FEED_ID_list',[]):
                 i = scast(i, int, None)
@@ -1711,13 +1708,14 @@ class FeedexQuery(FeedexQueryInterface):
 
         # Tokenize and prefix for Xapian
         elif kargs.get('fts',True):
+
             if field is not None: fprefix = PREFIXES[field]['prefix']
             else: fprefix = ''
 
             toks = ''
             empty = True
             for t in re.findall(self.REGEX_xap_query, string):
-                if t in ('AND','OR','NEAR','(',')','~','NOT'): pass
+                if t in {'AND','OR','NEAR','(',')','~','NOT',}: pass
                 elif t.startswith('~') and t.replace('~','').isdigit(): pass
                 elif t.startswith('<') and t.endswith('>'):
                     tt = t.replace('<','').replace('>','')
@@ -1746,7 +1744,6 @@ class FeedexQuery(FeedexQueryInterface):
 
 
 
-
 #######################################################################
 #
 #           UTILITIES
@@ -1767,7 +1764,7 @@ class FeedexQuery(FeedexQueryInterface):
         return ids
 
     def _res_flag(self, flag:str):
-        if flag in (None,'','all'): return None
+        if flag in {None, '', 'all',}: return None
         elif flag == 'all_flags': return 0
         elif flag == 'no': return -1
         else: 
@@ -1867,7 +1864,7 @@ class FeedexCatalogQuery(FeedexQueryInterface):
     def query(self, qr, filters, **kargs):
         """ Query Catalog """
         fdx.load_catalog()
-        if fdx.catalog in (None, (), []): 
+        if isempty(fdx.catalog): 
             self._empty()
             return 0
 
@@ -1877,7 +1874,7 @@ class FeedexCatalogQuery(FeedexQueryInterface):
 
         # Resolve field
         field = filters.get('field')
-        if field not in (None, 'name', 'desc', 'tags', 'location'): 
+        if field not in {None, 'name', 'desc', 'tags', 'location',}: 
             self._empty()
             return msg(FX_ERROR_VAL, _('Invalid search field! Must be name, desc, tags or location.'))
 

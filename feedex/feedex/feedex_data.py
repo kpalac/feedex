@@ -606,7 +606,6 @@ FEEDEX_CONFIG_LIST = (
 ('default_page_len',    _('Default Page Length'),    int, 3000,   (('gt',0),) ),
 ('max_context_length',  _('Max Context Length'),     int, 70,   (('gt',0),) ),
 
-
 ('do_redirects',        _('Follow Link Redirects?'),  bool, True,  None ),
 ('save_perm_redirects', _('Save Perm. Link Redirects?'),   bool, False,  None ),
 ('mark_deleted',        _('Mark unhealthy Feeds as deleted?'),   bool, False,  None ),

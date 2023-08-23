@@ -22,11 +22,9 @@ class FeedexCLI:
 
     def __init__(self, **kargs) -> None:
         
-        self.config = kargs.get('config', fdx.config)
-
         # Output flags
         self.output = kargs.get('output','cli')
-        if self.output not in ('long','headlines','notes','csv','json','json_dict','cli','desktop',): self.output = 'cli'
+        if self.output not in {'long','headlines','notes','csv','json','json_dict','cli','desktop',}: self.output = 'cli'
         self.plot = kargs.get('plot', False)
 
         # CLI display options
@@ -38,19 +36,19 @@ class FeedexCLI:
         self.trunc          = scast(kargs.get('trunc'), int ,200)
         self.term_width     = scast(kargs.get('term_width'), int ,150)
 
-        self.read_marker = scast(kargs.get('read_marker', self.config.get('read_marker')), str, '=>  ')
-        self.note_marker = scast(kargs.get('note_marker', self.config.get('note_marker')), str, '(*)  ')
+        self.read_marker = scast(kargs.get('read_marker', fdx.config.get('read_marker')), str, '=>  ')
+        self.note_marker = scast(kargs.get('note_marker', fdx.config.get('note_marker')), str, '(*)  ')
 
 
-        self.snip_beg = scast(kargs.get('bold_beg', self.config.get('bold_markup_beg')), str, '<b>')
-        self.snip_end = scast(kargs.get('bold_end', self.config.get('bold_markup_end')), str, '</b>')
+        self.snip_beg = scast(kargs.get('bold_beg', fdx.config.get('bold_markup_beg')), str, '<b>')
+        self.snip_end = scast(kargs.get('bold_end', fdx.config.get('bold_markup_end')), str, '</b>')
         self.SBOLD_MARKUP_BEG = self.snip_beg
         self.SBOLD_MARKUP_END = self.snip_end
 
         # Terminal colors
-        self.STERM_NORMAL = self.config['cli_cols'].get('normal_color', TERM_NORMAL)
-        self.STERM_DELETED = self.config['cli_cols'].get('deleted_color', TERM_ERR)
-        self.STERM_SNIPPET_HIGHLIGHT = self.config['cli_cols'].get('snipp_hilight_color', TERM_BOLD)
+        self.STERM_NORMAL = fdx.config['cli_cols'].get('normal_color', TERM_NORMAL)
+        self.STERM_DELETED = fdx.config['cli_cols'].get('deleted_color', TERM_ERR)
+        self.STERM_SNIPPET_HIGHLIGHT = fdx.config['cli_cols'].get('snipp_hilight_color', TERM_BOLD)
 
         # Date strings
         self.today = date.today()
@@ -120,7 +118,7 @@ Available column names for this query: %b"""), c, fld_list)
 
         cont.populate(result)
 
-        if self.output not in ('csv',):
+        if self.output != 'csv':
 
             if interline: intline = "\n\n\n"
             else: intline = ''
@@ -154,18 +152,18 @@ Available column names for this query: %b"""), c, fld_list)
             v = cont.vals[f]
             tp = type(v)
             
-            if f in ('snippets','context',) and tp in (list, tuple):
+            if f in {'snippets','context',} and tp in (list, tuple,):
                 tstr = ''
                 for vv in v:
                     if type(vv) is str: tstr = f"""{tstr}{self.delim2}{vv}"""
-                    elif type(vv) in (list, tuple) and len(vv) == 3: 
-                        if self.output not in ('csv',): tstr = f'{tstr}{snip_delim}{vv[0]}{self.STERM_SNIPPET_HIGHLIGHT}{vv[1]}{self.STERM_NORMAL}{line_beg}{vv[2]}'
+                    elif type(vv) in (list, tuple,) and len(vv) == 3: 
+                        if self.output != 'csv': tstr = f'{tstr}{snip_delim}{vv[0]}{self.STERM_SNIPPET_HIGHLIGHT}{vv[1]}{self.STERM_NORMAL}{line_beg}{vv[2]}'
                         else: tstr = f'{tstr}{self.delim2}{vv[0]}{self.SBOLD_MARKUP_BEG}{vv[1]}{self.SBOLD_MARKUP_END}{vv[2]}'
-                if self.output not in ('csv',): v = f"""{tstr}{snip_delim2}"""
+                if self.output != 'csv': v = f"""{tstr}{snip_delim2}"""
                 else: v = tstr
-            elif f in ('pubdate_short',) and tp is str:
+            elif f == 'pubdate_short' and tp is str:
                 v = humanize_date(v, self.today, self.yesterday, self.year)
-            elif f in ('passwd',) and tp is str and v.strip() != '' and not self.output in ('csv',): 
+            elif f == 'passwd' and tp is str and v.strip() != '' and self.output != 'csv': 
                 v = '*********'
             elif v is None:
                 v = '<N/A>'
@@ -207,7 +205,7 @@ Available column names for this query: %b"""), c, fld_list)
         snip_delim = ''
         
 
-        if self.output in ('cli', 'long', 'headlines','notes', 'csv',):
+        if self.output in {'cli', 'long', 'headlines','notes', 'csv',}:
             
             if isinstance(table, ResultEntry):
                 footer = f"""{result_no} {_('results')}"""
@@ -228,7 +226,7 @@ Available column names for this query: %b"""), c, fld_list)
                 elif self.output == 'notes':
                     line = True
                     mask = NOTES_PRINT
-                elif self.output not in ('csv',): line = True
+                elif self.output != 'csv': line = True
 
             elif isinstance(table, ResultContext):
                 footer = f"""{result_no} {_('contexts out of ')} {result_no2} {_('entries')}"""
@@ -239,7 +237,7 @@ Available column names for this query: %b"""), c, fld_list)
                 elif self.output == 'long':
                     mask = CONTEXTS_TABLE
                     line = True
-                elif self.output not in ('csv',):
+                elif self.output != 'csv':
                     mask = CONTEXTS_SHORT_PRINT
                     line = True
 
@@ -250,8 +248,8 @@ Available column names for this query: %b"""), c, fld_list)
                     if err != 0: return err
                     mask = self.display_cols
                 elif self.output == 'long': mask = FEEDS_SQL_TABLE
-                elif self.output in ('headlines','notes'): mask = CATEGORIES_PRINT
-                elif self.output not in ('csv',): mask = FEEDS_SHORT_PRINT
+                elif self.output in {'headlines','notes',}: mask = CATEGORIES_PRINT
+                elif self.output != 'csv': mask = FEEDS_SHORT_PRINT
 
             elif isinstance(table, ResultFlag):
                 footer = f"""{result_no} {_('flags')}"""
@@ -266,7 +264,7 @@ Available column names for this query: %b"""), c, fld_list)
                     err = self._resolve_display_cols(self.display_cols, table)
                     if err != 0: return err
                     mask = self.display_cols
-                elif self.output in ('long','csv'): mask = RULES_SQL_TABLE_RES
+                elif self.output in {'long','csv',}: mask = RULES_SQL_TABLE_RES
                 else: mask = PRINT_RULES_SHORT
 
             elif isinstance(table, ResultTerm):
@@ -276,7 +274,7 @@ Available column names for this query: %b"""), c, fld_list)
                     err = self._resolve_display_cols(self.display_cols, table)
                     if err != 0: return err
                     mask = self.display_cols
-                elif self.output in ('long', 'csv'): mask = TERMS_TABLE
+                elif self.output in {'long', 'csv',}: mask = TERMS_TABLE
                 else: mask = TERMS_TABLE_SHORT
 
             elif isinstance(table, ResultTimeSeries):
@@ -287,7 +285,7 @@ Available column names for this query: %b"""), c, fld_list)
                     err = self._resolve_display_cols(self.display_cols, table)
                     if err != 0: return err
                     mask = self.display_cols
-                elif self.output in ('long', 'csv'): mask = TS_TABLE
+                elif self.output in {'long', 'csv',}: mask = TS_TABLE
                 else: mask = TS_TABLE_SHORT
 
             elif isinstance(table, ResultHistoryItem):
@@ -301,7 +299,7 @@ Available column names for this query: %b"""), c, fld_list)
 
             elif isinstance(table, ResultFetch):
                 footer = f"""{result_no} {_('recent fetches')}"""
-                if self.output in ('long', 'csv'): mask = FETCH_TABLE
+                if self.output in {'long', 'csv',}: mask = FETCH_TABLE
                 else: mask = FETCH_TABLE_SHORT
 
             elif isinstance(table, ResultCatItem):
@@ -311,7 +309,7 @@ Available column names for this query: %b"""), c, fld_list)
                     err = self._resolve_display_cols(self.display_cols, table)
                     if err != 0: return err
                     mask = self.display_cols
-                elif self.output in ('long', 'csv'): mask = FEEDEX_CATALOG_TABLE
+                elif self.output in {'long', 'csv',}: mask = FEEDEX_CATALOG_TABLE
                 else: mask = FEEDEX_CATALOG_TABLE_SHORT
 
             else: footer = f"""{result_no} {_('results')}"""
@@ -323,7 +321,7 @@ Available column names for this query: %b"""), c, fld_list)
                 header = f"""{header}{self.delim} {cname} """
             header = f"""{header}{self.delim}"""
 
-            if self.output not in ('csv',):
+            if self.output != 'csv':
                 if sfooter is not None: footer = f"""{footer}
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 {sfooter}"""
@@ -446,7 +444,7 @@ Available column names for this query: %b"""), c, fld_list)
         if not entry.exists: return ''
 
         do_print = kargs.get('do_print',True)
-        if fdx.debug_level not in (0, None): 
+        if fdx.debug_level not in {0, None,}: 
             if do_print: print(entry)
             return entry.__str__()
 
@@ -556,7 +554,7 @@ Available column names for this query: %b"""), c, fld_list)
 
         do_print = kargs.get('do_print', True)
 
-        if fdx.debug_level not in (0, None):
+        if fdx.debug_level not in {0, None,}:
             if do_print: print(feed)
             return feed.__str__()
 

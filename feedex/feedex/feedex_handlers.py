@@ -23,7 +23,6 @@ class FeedexRSSHandler:
     
         # Init db connection
         self.DB = db
-        self.config = self.DB.config
         
         # Containers for entry and field processing
         self.entry  = {}
@@ -45,8 +44,8 @@ class FeedexRSSHandler:
         self.status = None
         self.modified = None
         self.etag = None
-        self.agent = self.config.get('user_agent', FEEDEX_USER_AGENT)
-        self.fallback_agent = self.config.get('fallback_user_agent')
+        self.agent = fdx.config.get('user_agent', FEEDEX_USER_AGENT)
+        self.fallback_agent = fdx.config.get('fallback_user_agent')
 
         self.images = []
 
@@ -76,7 +75,7 @@ class FeedexRSSHandler:
         if self.ifeed.get('auth') is not None and self.ifeed.get('login') is not None and self.ifeed.get('password') is not None:
             debug(3, 'Setting up authentication...')
             auth = urllib.request.HTTPDigestAuthHandler()
-            if self.ifeed.get('auth') in ('digest', 'detect'):
+            if self.ifeed.get('auth') in {'digest', 'detect',}:
                 auth.add_password('DigestTest', self.ifeed.get('domain'), self.ifeed.get('login'), self.ifeed.get('password'))
             elif self.ifeed['auth'] == 'basic':
                 auth.add_password('BasicTest', self.ifeed.get('domain'), self.ifeed.get('login'), self.ifeed.get('password'))
@@ -88,7 +87,7 @@ class FeedexRSSHandler:
         # Consolidate headers' dict
         self.http_headers = {}
         for k, v in headers.items():
-            if v not in (None, [], '',[None]): self.http_headers[k] = v
+            if v not in (None, [], (), '',[None],): self.http_headers[k] = v
 
 
 
@@ -98,7 +97,7 @@ class FeedexRSSHandler:
     def _do_download(self, url:str, **kargs):
         """ Method for downloading specifically - to be overwritten for child classes/ different HTTP-based protocols"""
         try:
-            timeout = scast(self.config.get('fetch_timeout'), int, 0)
+            timeout = scast(fdx.config.get('fetch_timeout'), int, 0)
             if timeout != 0:
                 old_timeout = socket.getdefaulttimeout()
                 socket.setdefaulttimeout(timeout)
@@ -123,7 +122,7 @@ class FeedexRSSHandler:
         self.error = False
         
         url = kargs.get('url', self.ifeed['url'])
-        do_redirects = kargs.get('do_redirects', self.config.get('do_redirects',True))
+        do_redirects = kargs.get('do_redirects', fdx.config.get('do_redirects',True))
         self.feed_raw = {}
 
         # This parameter forces download without providing etags or modified date
@@ -145,11 +144,11 @@ class FeedexRSSHandler:
             self.changed = False
             return 0
 
-        elif self.status in (301, 302) and not self.redirected:
+        elif self.status in {301, 302,} and not self.redirected:
             if not do_redirects: return msg(FX_ERROR_HANDLER, _("Feed %a moved to new location!"), url)
             else:
                 new_url = feed_raw.get('href',None)
-                if new_url not in (None,''):
+                if new_url not in {None,'',}:
                     # Watch out for endless redirect loops!!!
                     self.redirected = True
                     ret = self.download(url=url, do_redirects=False, force=force, redirected=True)
@@ -163,7 +162,7 @@ class FeedexRSSHandler:
             return msg(FX_ERROR_HANDLER, _("Feed %a removed permanently (410)!"), url)
 
 
-        elif (self.status not in (200, 201, 202, 203, 204, 205, 206)) and not (self.status in (301,302) and self.redirected):
+        elif (self.status not in {200, 201, 202, 203, 204, 205, 206,} ) and not (self.status in {301,302,} and self.redirected):
             debug(3, f"""{scast(self.status, str, '')} {scast(feed_raw.get('debug_message'), str, _(' Feed error'))}""")
             self.error = True
             return msg(FX_ERROR_HANDLER, _("Invalid HTTP return code for %a"), f'{url} ({self.status})')
@@ -183,7 +182,7 @@ class FeedexRSSHandler:
         if self.error: self.feed_delta['error'] = scast(self.feed_delta.get('error'), int, 0) + 1
         
         # Mark deleted as unhealthy to avoid unnecessary fetching
-        if self.status == 410 and self.config.get('mark_deleted',False): self.feed_delta['error'] = self.config.get('error_threshold',5)
+        if self.status == 410 and fdx.config.get('mark_deleted',False): self.feed_delta['error'] = fdx.config.get('error_threshold',5)
         
         return 0
 
@@ -221,14 +220,14 @@ class FeedexRSSHandler:
         
         # Save permanent redirects to DB
         if self.feed_raw.get('href',None) != self.ifeed['url'] and self.status == 301:
-                if self.config.get('save_perm_redirects', False): self.feed_delta['url'] = self.feed_raw.get('href',None)
+                if fdx.config.get('save_perm_redirects', False): self.feed_delta['url'] = self.feed_raw.get('href',None)
 
 
 
         pub_date_raw = self.feed_raw['feed'].get('updated')
         pub_date = scast(convert_timestamp(pub_date_raw), int, 0)
 
-        if pub_date <= last_read and pub_date_raw not in (None,''): return msg(_('Feed unchanged (Published Date)'))
+        if pub_date <= last_read and pub_date_raw not in {None,'',}: return msg(_('Feed unchanged (Published Date)'))
         self.feed_delta['lastread'] = now_last
 
         if nullif(self.ifeed['rx_images'],'') is not None and self.ifeed['handler'] != 'html': rx_images = re.compile(scast(self.ifeed['rx_images'], str,''), re.DOTALL)
@@ -252,8 +251,8 @@ class FeedexRSSHandler:
             # Go on if nothing change
             if pub_date_entry <= last_read: continue
             # Check for duplicates in saved entries by complaring to previously compiled lists
-            if (entry.get('guid'),) in pguids and entry.get('guid') not in ('',None): continue
-            if (entry.get('link'),) in plinks and entry.get('link') not in ('',None): continue
+            if (entry.get('guid'),) in pguids and entry.get('guid') not in {'',None,}: continue
+            if (entry.get('link'),) in plinks and entry.get('link') not in {'',None,}: continue
 
             self.entry = {}
 
@@ -263,7 +262,7 @@ class FeedexRSSHandler:
             
             authors = entry.get('author')
             authors_str = ''
-            if type(authors) in (list, tuple):
+            if isiter(authors):
                 for a in authors:
                    a = scast(a.get('name'), str, '').strip() 
                    if a != '': authors_str = f"""{authors_str}{a}; """
@@ -272,7 +271,7 @@ class FeedexRSSHandler:
             self.entry['author_contact']          = nullif( f"""{entry.get('author_detail',{}).get('email','')}; {entry.get('author_detail',{}).get('href','')}""", '; ')
             
             contribs = ''
-            if type(entry.get('contributors',())) in (list, tuple):
+            if isiter(entry.get('contributors',())):
                 for c in entry.get('contributors',()): 
                     if c.get('name','') != '': contribs = f"""{contribs}{c.get('name','')}; """
 
@@ -317,7 +316,7 @@ class FeedexRSSHandler:
             if content is not None:
                 for c in content:
                     txt, im, ls = fdx.strip_markup(c.get('value'), html=True, rx_images=rx_images, rx_links=rx_links)
-                    if txt not in (None, ''):
+                    if txt not in {None, '',}:
                         text = f"""\n\n{txt.replace(self.entry['desc'],'')}"""
                         for i in im:
                             if i is not None and i != '': images = f"""{images}{i}\n"""
@@ -359,7 +358,7 @@ class FeedexRSSHandler:
             href = scast( slist(i, 2, None), str, '')
             feed_id = scast( slist(i, 0, 0), str, '0')
             icon = os.path.join(self.DB.icon_path, f'feed_{feed_id}.ico' )
-            if href not in (None, 0):
+            if href not in {None, 0,}:
                 debug(3, f'Downloading image for feed {feed_id} from {href}...')                
                 fdx.download_res(href, ofile=icon, user_agent=self.agent)
             
@@ -412,7 +411,7 @@ class FeedexRSSHandler:
         self.feed_meta_delta['generator']                = self.feed_raw['feed'].get('generator')
 
         authors = self.ifeed.get('author','')
-        if authors == '' and type(self.ifeed.get('authors',())) in (list, tuple):
+        if authors == '' and isiter(self.ifeed.get('authors',())):
             for a in self.ifeed.get('authors',()): 
                 if a.get('name','') != '': authors = f"""{authors}{a.get('name','')}; """
         
@@ -422,7 +421,7 @@ class FeedexRSSHandler:
         self.feed_meta_delta['publisher_contact']        = nullif( self.feed_raw['feed'].get('publisher_detail',{}).get('email','') + "; " + self.feed_raw['feed'].get('publisher_detail',{}).get('href',''), '; ')
 
         contribs = ''
-        if type(self.ifeed.get('contributors',())) in (list, tuple):
+        if isiter(self.ifeed.get('contributors',())):
             for c in self.ifeed.get('contributors',()): 
                 if c.get('name','') != '': contribs = f"""{contribs}{c.get('name','')}; """
 
@@ -449,8 +448,8 @@ class FeedexRSSHandler:
 
     def set_agent(self, agent):
         """ Set custom user agent """
-        if agent is None: self.agent = self.config.get('user_agent', FEEDEX_USER_AGENT)
-        else: self.agent = coalesce( nullif(scast(agent, str, '').strip(), ''), self.config.get('user_agent', FEEDEX_USER_AGENT) )
+        if agent is None: self.agent = fdx.config.get('user_agent', FEEDEX_USER_AGENT)
+        else: self.agent = coalesce( nullif(scast(agent, str, '').strip(), ''), fdx.config.get('user_agent', FEEDEX_USER_AGENT) )
 
 
 
@@ -505,7 +504,7 @@ class FeedexHTMLHandler(FeedexRSSHandler):
         entries_str = re.findall(regexes['rx_entries'], html)
         entries = []
         entry_sample = ''
-        if type(entries_str) in (tuple,list) and len(entries_str) > 0:
+        if isiter(entries_str) and len(entries_str) > 0:
             if entry_sample == '': entry_sample = entries_str[0]
             links = [] # List to avoid duplicates
             for e in entries_str:
@@ -514,7 +513,7 @@ class FeedexHTMLHandler(FeedexRSSHandler):
                 
                 title = re.findall(regexes['rx_title'], e)
                 entry['title'] = slist(title, 0, None)
-                if entry['title'] in (None, ''): continue
+                if entry['title'] in {None, '',}: continue
 
                 link = slist(re.findall(regexes['rx_link'], e), 0, None)
                 if link in links: continue

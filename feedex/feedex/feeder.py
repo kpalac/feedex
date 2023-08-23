@@ -48,13 +48,9 @@ class FeedexDatabase:
     """ Database interface for Feedex with additional maintenance and utilities """
     
     def __init__(self, **kargs):
-        """ """
-
-        # Main configuration
-        self.config = kargs.get('config', fdx.config)
         
         # Path to database
-        self.db_path = os.path.abspath(kargs.get('db_path', self.config.get('db_path')))
+        self.db_path = os.path.abspath(kargs.get('db_path', fdx.config.get('db_path')))
 
         # Paths to resources
         self.cache_path = os.path.join(self.db_path, 'cache')
@@ -92,7 +88,7 @@ class FeedexDatabase:
         # Flag if this connection created a new DB
         self.created = False
 
-        self.timeout = self.config.get('timeout', 120) # Wait time if DB is locked
+        self.timeout = fdx.config.get('timeout', 120) # Wait time if DB is locked
         
 
         # Define SQLite interfaces
@@ -493,30 +489,32 @@ class FeedexDatabase:
 
     def run_locked(self, locks, func, *args, **kargs):
         """ Wrapper to run functions within fetching lock """
-        if type(locks) not in (list,tuple,): locks = (locks,) 
-        if FX_LOCK_FETCH in locks or FX_LOCK_ALL in locks:
+        if locks == FX_LOCK_ALL: locks = {FX_LOCK_FETCH, FX_LOCK_ENTRY, FX_LOCK_FEED, FX_LOCK_RULE, FX_LOCK_FLAG,}
+        elif type(locks) is not set: locks = {locks,}
+
+        if FX_LOCK_FETCH in locks:
             if fdx.db_fetch_lock: return msg(FX_ERROR_LOCK, _('DB locked for fetching!'))
             fdx.db_fetch_lock = True
-        if FX_LOCK_ENTRY in locks or FX_LOCK_ALL in locks:
+        if FX_LOCK_ENTRY in locks:
             if fdx.db_entry_lock: return msg(FX_ERROR_LOCK, _('Entry edit locked!'))
             fdx.db_entry_lock = True
-        if FX_LOCK_FEED in locks or FX_LOCK_ALL in locks:
+        if FX_LOCK_FEED in locks:
             if fdx.db_feed_lock: return msg(FX_ERROR_LOCK, _('Feed edit locked!'))
             fdx.db_feed_lock = True
-        if FX_LOCK_RULE in locks or FX_LOCK_ALL in locks:
+        if FX_LOCK_RULE in locks:
             if fdx.db_rule_lock: return msg(FX_ERROR_LOCK, _('Rule edit locked!'))
             fdx.db_rule_lock = True
-        if FX_LOCK_FLAG in locks or FX_LOCK_ALL in locks:
+        if FX_LOCK_FLAG in locks:
             if fdx.db_flag_lock: return msg(FX_ERROR_LOCK, _('Flag edit locked!'))
             fdx.db_flag_lock = True
 
         ret = func(*args, **kargs)
 
-        if FX_LOCK_FETCH in locks or FX_LOCK_ALL in locks: fdx.db_fetch_lock = False
-        if FX_LOCK_ENTRY in locks or FX_LOCK_ALL in locks: fdx.db_entry_lock = False
-        if FX_LOCK_FEED in locks or FX_LOCK_ALL in locks: fdx.db_feed_lock = False
-        if FX_LOCK_RULE in locks or FX_LOCK_ALL in locks: fdx.db_rule_lock = False
-        if FX_LOCK_FLAG in locks or FX_LOCK_ALL in locks: fdx.db_flag_lock = False
+        if FX_LOCK_FETCH in locks: fdx.db_fetch_lock = False
+        if FX_LOCK_ENTRY in locks: fdx.db_entry_lock = False
+        if FX_LOCK_FEED in locks: fdx.db_feed_lock = False
+        if FX_LOCK_RULE in locks: fdx.db_rule_lock = False
+        if FX_LOCK_FLAG in locks: fdx.db_flag_lock = False
 
         return ret
 
@@ -524,7 +522,7 @@ class FeedexDatabase:
 
     def loc_locked(self, **kargs):
         """ Wait for local unlock """
-        timeout = kargs.get('timeout', self.config.get('timeout',30))
+        timeout = kargs.get('timeout', fdx.config.get('timeout',30))
         check = kargs.get('check',False)
         tm = 0
         while fdx.db_lock:
@@ -543,7 +541,7 @@ class FeedexDatabase:
         self.status = 0
 
         vals = slist(vals, 0, None)
-        if type(vals) in (tuple, list): many = 1
+        if isiter(vals): many = 1
         elif type(vals) is dict: many = 0
         else: many = -1
         try:
@@ -720,19 +718,19 @@ class FeedexDatabase:
     def load_terms(self, **kargs):
         """ Load learned terms for recommendations """
         self.load_feed_freq()
-        if not self.config.get('use_keyword_learning', True):
+        if not fdx.config.get('use_keyword_learning', True):
             fdx.terms_cache = ()
             fdx.recom_qr_str = ''
             return 0
 
         debug(2, f'Loading learned terms ({self.conn_id})...')
-        if self.config.get('recom_algo') == 2: fdx.terms_cache = self.qr_sql(LOAD_TERMS_ALGO_2_SQL, all=True)
-        elif self.config.get('recom_algo') == 3: fdx.terms_cache = self.qr_sql(LOAD_TERMS_ALGO_3_SQL, all=True)
+        if fdx.config.get('recom_algo') == 2: fdx.terms_cache = self.qr_sql(LOAD_TERMS_ALGO_2_SQL, all=True)
+        elif fdx.config.get('recom_algo') == 3: fdx.terms_cache = self.qr_sql(LOAD_TERMS_ALGO_3_SQL, all=True)
         else: fdx.terms_cache = self.qr_sql(LOAD_TERMS_ALGO_1_SQL, all=True)
         if self.status != 0: raise FeedexDataError('Error caching learned terms: %a', self.error)
 
         # Build query string for recommendations (better do it once at the beginning)        
-        limit = scast(self.config.get('recom_limit', 250), int, 250)
+        limit = scast(fdx.config.get('recom_limit', 250), int, 250)
 
         qr_str = ''        
         for i,t in enumerate(fdx.terms_cache):
@@ -1088,7 +1086,7 @@ class FeedexDatabase:
 
         self.cache_feeds()
 
-        if type(feed_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries'))
+        if not isiter(feed_data): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries'))
 
         feed = FeedexFeed(self)
         msg(_('Importing feeds/categories from %a...'), ifile)
@@ -1104,7 +1102,7 @@ class FeedexDatabase:
         rule_data = load_json(ifile, -1)
         if rule_data == -1: return -1
 
-        if type(rule_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries...'))
+        if not isiter(rule_data): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries...'))
 
         rule = FeedexRule(self)
         msg(_('Importing rules from %a...'), ifile)
@@ -1119,7 +1117,7 @@ class FeedexDatabase:
         flag_data = load_json(ifile, -1)
         if flag_data == -1: return FX_ERROR_IO
 
-        if type(flag_data) not in (list, tuple): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries...'))
+        if not isiter(flag_data): return msg(FX_ERROR_VAL, _('Invalid input format. Should be list of dictionaries...'))
 
         flag = FeedexFlag(self)
         msg(_('Importing flags from %a...'), ifile)
@@ -1177,13 +1175,13 @@ class FeedexDatabase:
 
             # Check for processing conditions...
             if feed['deleted'] == 1 and not update_only and feed_id == 0: continue
-            if feed['fetch'] in (None,0) and feed_id == 0 and feed_ids is None: continue
+            if feed['fetch'] in {None,0} and feed_id == 0 and feed_ids is None: continue
             if feed_id != 0 and feed_id != feed['id']: continue
             if feed_ids is not None and feed['id'] not in feed_ids: continue
-            if feed['is_category'] not in (0,None) or feed['handler'] in ('local',): continue
+            if feed['is_category'] not in {0,None} or feed['handler'] in {'local',}: continue
 
             # Ignore unhealthy feeds...
-            if scast(feed['error'],int,0) >= self.config.get('error_threshold',5) and not kargs.get('ignore_errors',False):
+            if scast(feed['error'],int,0) >= fdx.config.get('error_threshold',5) and not kargs.get('ignore_errors',False):
                 msg(_('Feed %a ignored due to previous errors'), feed.name(id=True))
                 continue
 
@@ -1191,7 +1189,7 @@ class FeedexDatabase:
             last_checked = scast(feed['lastchecked'], int, 0)
             if not ignore_interval:
                 diff = (started - last_checked)/60
-                if diff < scast(feed['interval'], int, self.config.get('default_interval',45)):
+                if diff < scast(feed['interval'], int, fdx.config.get('default_interval',45)):
                     debug(2, f'Feed {feed["id"]} ignored (interval: {feed["interval"]}, diff: {diff})')
                     continue
 
@@ -1249,7 +1247,7 @@ class FeedexDatabase:
                         else: return msg(err, _('Fetching aborted due to errors...'))
 
                         # Commit if batch size is reached
-                        if tech_counter >= self.config.get('max_items_per_transaction', 2000):                      
+                        if tech_counter >= fdx.config.get('max_items_per_transaction', 2000):                      
                             err = entry.commit()
                             if err == 0: err = feed.commit()
                             if err != 0: return msg(err, _('Fetching aborted due to errors...'))
@@ -1346,7 +1344,7 @@ class FeedexDatabase:
         entry = FeedexEntry(self, exists=True)
 
         if many:
-            batch_size = scast(kargs.get('batch_size'), int, self.config.get('max_items_per_transaction', 1000))
+            batch_size = scast(kargs.get('batch_size'), int, fdx.config.get('max_items_per_transaction', 1000))
 
             if rank: msg(_("Reranking entries..."), log=True)
             if learn: msg(_("Relearning keywords for Entries..."), log=True)
@@ -1419,7 +1417,7 @@ class FeedexDatabase:
 
 
 
-    def empty_trash(self, **kargs): return self.run_locked((FX_LOCK_FETCH, FX_LOCK_FEED, FX_LOCK_ENTRY,), self._empty_trash, **kargs)
+    def empty_trash(self, **kargs): return self.run_locked({FX_LOCK_FETCH, FX_LOCK_FEED, FX_LOCK_ENTRY,}, self._empty_trash, **kargs)
     def _empty_trash(self, **kargs):
         """ Removes all deleted items permanently """
         # Delete permanently with all data

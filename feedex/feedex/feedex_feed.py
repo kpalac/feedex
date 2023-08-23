@@ -112,7 +112,7 @@ class FeedexFeed(SQLContainerEditable):
 
     def validate_regexes2(self, **kargs):
         """ Validate REGEX strings section (short)"""
-        for f in ('rx_images','rx_link'):
+        for f in {'rx_images','rx_link',}:
             if self.vals[f] is not None and not check_if_regex(self.vals[f]):
                 return FX_ERROR_VAL, f'{_("Custom entity parser: Not a valid REGEX")} ({f}): %a', self.vals[f]
         return 0
@@ -142,13 +142,13 @@ class FeedexFeed(SQLContainerEditable):
             elif self.vals.get('cat') is not None: self.vals['parent_id'] = fdx.res_cat_name(self.vals['cat'])
             elif self.vals.get('cat_id') is not None: self.vals['parent_id'] = self.vals['cat_id']
 
-            self.vals['interval'] = coalesce(self.vals.get('interval'), self.config.get('default_interval', 45))
+            self.vals['interval'] = coalesce(self.vals.get('interval'), fdx.config.get('default_interval', 45))
 
 
         elif stage == FX_ENT_STAGE_POST_VAL:
 
             if self.vals['is_category'] == 1:
-                if self.vals['parent_id'] not in (None, 0): return FX_ERROR_VAL, _('Nested categories are not allowed!')
+                if self.vals['parent_id'] not in {None, 0,}: return FX_ERROR_VAL, _('Nested categories are not allowed!')
             else:
                 if self.vals['parent_id'] is not None:
                     cat = fdx.load_cat(self.vals['parent_id'])
@@ -156,8 +156,8 @@ class FeedexFeed(SQLContainerEditable):
                     self.parent_feed.populate(cat)
                     self.vals['parent_id'] = self.parent_feed['id']
 
-                if self.vals['handler'] not in ('rss','local','html','script'): return FX_ERROR_VAL, _('Invalid handler! Must be rss, html, script or local')
-                if self.vals['handler'] in ('rss','html') and not check_url(self.vals['url']): return FX_ERROR_VAL, _('Not a valid URL! (%a)'), self.vals['url']
+                if self.vals['handler'] not in {'rss','local','html','script',}: return FX_ERROR_VAL, _('Invalid handler! Must be rss, html, script or local')
+                if self.vals['handler'] in {'rss','html',} and not check_url(self.vals['url']): return FX_ERROR_VAL, _('Not a valid URL! (%a)'), self.vals['url']
                 if self.vals['link'] is not None and not check_url(self.vals['link']): return FX_ERROR_VAL, _('Not a valid URL! (%a)'), self.vals['link']
 
                 if self.vals['handler'] == 'html':
@@ -168,15 +168,15 @@ class FeedexFeed(SQLContainerEditable):
                     if err != 0: return err
 
                 if self.vals['interval'] is None or self.vals['interval'] < 0: return FX_ERROR_VAL, _('Interval must be >= 0!')
-                if self.vals['autoupdate'] not in (None, 0, 1): return FX_ERROR_VAL, _('Autoupdate flag must be 0 or 1!')
-                if self.vals['fetch'] not in (None, 0, 1): return FX_ERROR_VAL, _('Fetch flag must be 0 or 1!')
+                if self.vals['autoupdate'] not in {None, 0, 1,}: return FX_ERROR_VAL, _('Autoupdate flag must be 0 or 1!')
+                if self.vals['fetch'] not in {None, 0, 1,}: return FX_ERROR_VAL, _('Fetch flag must be 0 or 1!')
 
                 if self.vals['auth'] is not None:
-                    if self.vals['auth'] not in ('detect','basic','digest'): return FX_ERROR_VAL, _('Invalid authentication method (must be NONE, detect, basic or digest)')
-                    if self.vals['passwd'] in ('',None): return FX_ERROR_VAL, _('Password must be provided!')
-                    if self.vals['login'] in ('',None): return FX_ERROR_VAL, _('Login must be provided!')
+                    if self.vals['auth'] not in {'detect','basic','digest',}: return FX_ERROR_VAL, _('Invalid authentication method (must be NONE, detect, basic or digest)')
+                    if self.vals['passwd'] in {'',None,}: return FX_ERROR_VAL, _('Password must be provided!')
+                    if self.vals['login'] in {'',None,}: return FX_ERROR_VAL, _('Login must be provided!')
 
-            if self.vals['deleted'] not in (None, 0, 1): return FX_ERROR_VAL, _('Deleted marker must be 0 or 1!')
+            if self.vals['deleted'] not in {None, 0, 1,}: return FX_ERROR_VAL, _('Deleted marker must be 0 or 1!')
 
             if self.action == FX_ENT_ACT_ADD:
                 self.vals['display_order'] = len(fdx.feeds_cache) + scast(self.vals.get('display_order'), int, 1)
@@ -184,9 +184,9 @@ class FeedexFeed(SQLContainerEditable):
 
                 if self.vals['is_category'] != 1:
                     self.vals['error'] = 0
-                    self.vals['interval'] = scast(self.vals.get('interval'), int, self.config.get('default_interval',45))
+                    self.vals['interval'] = scast(self.vals.get('interval'), int, fdx.config.get('default_interval',45))
         
-                    if self.vals['handler'] in ('rss', 'html',):
+                    if self.vals['handler'] in {'rss', 'html',}:
                         for f in fdx.feeds_cache:
                             if f[self.get_index('url')] == self.vals['url'] and f[self.get_index('deleted')] != 1 :
                                 return FX_ERROR_VAL, _('Channel with this URL already exists (%a)'), f'{f[self.get_index("name")]}:{f[self.get_index("id")]}'
@@ -279,15 +279,15 @@ class FeedexFeed(SQLContainerEditable):
 
 
     def _upd_msg(self, field, **kargs):
-        if field == 'parent_id' and self.vals[field] not in (None, 0): 
+        if field == 'parent_id' and self.vals[field] not in {None, 0,}: 
             return f'{self.ent_name} {_("%a assigned to")} %b', self.name(with_id=True), self.parent_feed.name(with_id=True)
-        elif field == 'parent_id' and self.vals[field] in (None, 0): 
+        elif field == 'parent_id' and self.vals[field] in {None, 0,}: 
             return f'{self.ent_name} {_("%a detached from category")}', self.name(with_id=True)
-        elif field == 'error' and self.vals[field] in (None,0):
+        elif field == 'error' and self.vals[field] in {None,0,}:
             return f'{self.ent_name} {_("%a marked as healthy")}', self.name(with_id=True)                        
-        elif field == 'deleted' and self.vals[field] in (None,0):
+        elif field == 'deleted' and self.vals[field] in {None,0,}:
             return f'{self.ent_name} {_("%a restored")}', self.name(with_id=True)
-        elif field == 'fetch' and self.vals[field] in (None,0):
+        elif field == 'fetch' and self.vals[field] in {None,0,}:
             return _('Fetching disabled for %a'), self.name(with_id=True)
         elif field == 'fetch' and self.vals[field] == 1:
             return _('Fetching enabled for %a'), self.name(with_id=True)
@@ -362,7 +362,7 @@ class FeedexFeed(SQLContainerEditable):
         if err != 0: return err
 
         if kargs.get('no_fetch',False): return 0 # Sometimes fetching must be ommitted to allow further editing (e.g. authentication)
-        if self.vals['handler'] not in ('rss',): return 0 # ...also, don't fetch if channel is not RSS etc.
+        if self.vals['handler'] not in {'rss',}: return 0 # ...also, don't fetch if channel is not RSS etc.
 
         err = self.DB.fetch(id=self.vals['id'], force=True, ignore_interval=True)
         return err
@@ -385,7 +385,7 @@ class FeedexFeed(SQLContainerEditable):
 
         for ii,i in enumerate(ilist):
             tpi = type(i)
-            if tpi in (list, tuple): self.populate(i)
+            if tpi in (list, tuple,): self.populate(i)
             elif tpi is dict:
                 self.clear()
                 self.merge(i)
@@ -548,7 +548,7 @@ class FeedexCatalog(ResultCatItem):
         
         self.present_feeds = []
         for f in fdx.feeds_cache:
-            if f[self.feed.get_index('is_category')] != 1 and f[self.feed.get_index('deleted')] != 1 and f[self.feed.get_index('url')] not in (None, ''):
+            if f[self.feed.get_index('is_category')] != 1 and f[self.feed.get_index('deleted')] != 1 and f[self.feed.get_index('url')] not in {None, '',}:
                 self.present_feeds.append(f[self.feed.get_index('url')])
         
         for ci in fdx.catalog:
