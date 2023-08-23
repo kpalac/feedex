@@ -9,6 +9,14 @@ printf "Installing FEEDEX ...\n\n"
 sudo mkdir -p "/usr/share/feedex/data"
 sudo mkdir -p "/usr/share/feedex/feedex"
 
+# Unpack language models
+[[ ! -d ./data/models/de_index ]] && unzip ./data/models/de_index.zip -d ./data/models
+[[ ! -d ./data/models/en_index ]] && unzip ./data/models/en_index.zip -d ./data/models
+[[ ! -d ./data/models/es_index ]] && unzip ./data/models/es_index.zip -d ./data/models
+[[ ! -d ./data/models/fr_index ]] && unzip ./data/models/fr_index.zip -d ./data/models
+[[ ! -d ./data/models/pl_index ]] && unzip ./data/models/pl_index.zip -d ./data/models
+[[ ! -d ./data/models/ru_index ]] && unzip ./data/models/ru_index.zip -d ./data/models
+
 sudo cp -r ./data "/usr/share/feedex"
 sudo cp ./feedex/*.py "/usr/share/feedex/feedex"
 
@@ -16,6 +24,7 @@ sudo cp ./feedex/feedex "/usr/bin/feedex"
 
 
 sudo cp ./data/examples/config /etc/feedex.conf
+
 
 if [[ "$1" != "no_gui" ]]; then
 
@@ -35,7 +44,6 @@ sudo chmod 755 /usr/share/feedex/data/examples/plugins/*.py
 sudo find /usr/share/feedex/ -type d -exec chmod 755 {} +
 sudo find /usr/share/feedex/ -type f -exec chmod 644 {} +
 
-sudo chmod 755 /usr/share/feedex/data/examples/scripts/*
 sudo chmod 755 /usr/share/feedex/data/examples/plugins/*
 
 

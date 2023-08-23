@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2023-08-16 00:04+CEST\n"
+"POT-Creation-Date: 2023-08-23 23:19+CEST\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,336 +15,336 @@ msgstr ""
 "Generated-By: pygettext.py 1.5\n"
 
 
-#: feeder.py:139
+#: feeder.py:135
 msgid "DB not found. Creating one now at %a..."
 msgstr ""
 
-#: feeder.py:142
+#: feeder.py:138
 msgid "Created %a..."
 msgstr ""
 
-#: feeder.py:143
+#: feeder.py:139
 msgid "DB %a not found. Aborting..."
 msgstr ""
 
-#: feeder.py:161
+#: feeder.py:157
 msgid "Creating SQL DB %a..."
 msgstr ""
 
-#: feeder.py:187
+#: feeder.py:183
 msgid "Database structure created"
 msgstr ""
 
-#: feeder.py:196
+#: feeder.py:192
 msgid "Added defaults..."
 msgstr ""
 
-#: feeder.py:205
+#: feeder.py:201
 msgid "Added default Feeds..."
 msgstr ""
 
-#: feeder.py:232
+#: feeder.py:228
 msgid "Database unlocked"
 msgstr ""
 
-#: feeder.py:239
+#: feeder.py:235
 msgid "Database locked"
 msgstr ""
 
-#: feeder.py:321
+#: feeder.py:317
 msgid "Failed to unlock index at %a (%b)"
 msgstr ""
 
-#: feeder.py:335
+#: feeder.py:331
 msgid "Writing to index..."
 msgstr ""
 
-#: feeder.py:340
+#: feeder.py:336
 msgid "Indexer error: %a"
 msgstr ""
 
-#: feeder.py:342
+#: feeder.py:338
 msgid "Reverting index changes..."
 msgstr ""
 
-#: feeder.py:471
+#: feeder.py:467
 msgid "DB error (%a): locking"
 msgstr ""
 
-#: feeder.py:479
+#: feeder.py:475
 msgid "DB error (%a): unlocking"
 msgstr ""
 
-#: feeder.py:498
+#: feeder.py:496
 msgid "DB locked for fetching!"
 msgstr ""
 
-#: feeder.py:501
+#: feeder.py:499
 msgid "Entry edit locked!"
 msgstr ""
 
-#: feeder.py:504
+#: feeder.py:502
 msgid "Feed edit locked!"
 msgstr ""
 
-#: feeder.py:507
+#: feeder.py:505
 msgid "Rule edit locked!"
 msgstr ""
 
-#: feeder.py:510
+#: feeder.py:508
 msgid "Flag edit locked!"
 msgstr ""
 
-#: feeder.py:562
+#: feeder.py:560
 msgid "DB error (%a) - writeable: %b (%c)"
 msgstr ""
 
-#: feeder.py:603 feeder.py:628
+#: feeder.py:601 feeder.py:626
 msgid "DB locked locally (%a) (sql: %b)"
 msgstr ""
 
-#: feeder.py:617 feeder.py:634
+#: feeder.py:615 feeder.py:632
 msgid "DB error (%a) - read: %b (%c)"
 msgstr ""
 
-#: feeder.py:860
+#: feeder.py:858
 msgid "Cache cleared successfully..."
 msgstr ""
 
-#: feeder.py:868
+#: feeder.py:866
 msgid "Starting DB miantenance"
 msgstr ""
 
-#: feeder.py:870
+#: feeder.py:868
 msgid "Performing VACUUM"
 msgstr ""
 
-#: feeder.py:873
+#: feeder.py:871
 msgid "Performing ANALYZE"
 msgstr ""
 
-#: feeder.py:876
+#: feeder.py:874
 msgid "REINDEXING all tables"
 msgstr ""
 
-#: feeder.py:883
+#: feeder.py:881
 msgid "Updating feed recomm. weights..."
 msgstr ""
 
-#: feeder.py:894
+#: feeder.py:892
 msgid "DB maintenance completed"
 msgstr ""
 
-#: feeder.py:895
+#: feeder.py:893
 msgid "DB maintenance failed!"
 msgstr ""
 
-#: feeder.py:952
+#: feeder.py:950
 msgid "Calculating document count..."
 msgstr ""
 
-#: feeder.py:1063
+#: feeder.py:1061
 msgid "Error reading %a file: %b"
 msgstr ""
 
-#: feeder.py:1066
+#: feeder.py:1064
 msgid "Error parsing JSON: %a"
 msgstr ""
 
-#: feeder.py:1069
+#: feeder.py:1067
 msgid "Invalid input: must be a list of dicts..."
 msgstr ""
 
-#: feeder.py:1071
+#: feeder.py:1069
 msgid "Importing entries ..."
 msgstr ""
 
-#: feeder.py:1072
+#: feeder.py:1070
 msgid "Importing entries from %a..."
 msgstr ""
 
-#: feeder.py:1091
+#: feeder.py:1089
 msgid "Invalid input format. Should be list of dictionaries"
 msgstr ""
 
-#: feeder.py:1094
+#: feeder.py:1092
 msgid "Importing feeds/categories from %a..."
 msgstr ""
 
-#: feeder.py:1107 feeder.py:1122
+#: feeder.py:1105 feeder.py:1120
 msgid "Invalid input format. Should be list of dictionaries..."
 msgstr ""
 
-#: feeder.py:1110
+#: feeder.py:1108
 msgid "Importing rules from %a..."
 msgstr ""
 
-#: feeder.py:1125
+#: feeder.py:1123
 msgid "Importing flags from %a..."
 msgstr ""
 
-#: feeder.py:1187
+#: feeder.py:1185
 msgid "Feed %a ignored due to previous errors"
 msgstr ""
 
-#: feeder.py:1198
+#: feeder.py:1196
 msgid "Processing %a ..."
 msgstr ""
 
-#: feeder.py:1216
+#: feeder.py:1214
 msgid "Channel handled locally... Ignoring..."
 msgstr ""
 
-#: feeder.py:1219
+#: feeder.py:1217
 msgid "Handler %a not recognized!"
 msgstr ""
 
-#: feeder.py:1225
+#: feeder.py:1223
 msgid "Using custom User Agent: %a"
 msgstr ""
 
-#: feeder.py:1237
+#: feeder.py:1235
 msgid "Feed %a ignored due to DB error: %b"
 msgstr ""
 
-#: feeder.py:1249 feeder.py:1255 feeder.py:1286
+#: feeder.py:1247 feeder.py:1253 feeder.py:1284
 msgid "Fetching aborted due to errors..."
 msgstr ""
 
-#: feeder.py:1259
+#: feeder.py:1257
 msgid "Invalid entry format (%a)!"
 msgstr ""
 
-#: feeder.py:1272
+#: feeder.py:1270
 msgid "Updating metadata for %a"
 msgstr ""
 
-#: feeder.py:1289 feedex_feed.py:415 feedex_feed.py:445
+#: feeder.py:1287 feedex_feed.py:415 feedex_feed.py:445
 msgid "Operation aborted due to errors..."
 msgstr ""
 
-#: feeder.py:1309
+#: feeder.py:1307
 msgid "Finished fetching (%a new articles), duration: %b"
 msgstr ""
 
-#: feeder.py:1310
+#: feeder.py:1308
 msgid "Finished updating metadata, duration: %a"
 msgstr ""
 
-#: feeder.py:1342
+#: feeder.py:1340
 msgid "Invalid id/ids given! Should be ID or START_ID..END_ID"
 msgstr ""
 
-#: feeder.py:1351
+#: feeder.py:1349
 msgid "Reranking entries..."
 msgstr ""
 
-#: feeder.py:1352
+#: feeder.py:1350
 msgid "Relearning keywords for Entries..."
 msgstr ""
 
-#: feeder.py:1353
+#: feeder.py:1351
 msgid "Reindexing entries..."
 msgstr ""
 
-#: feeder.py:1379
+#: feeder.py:1377
 msgid "Recalculation aborted due to errors"
 msgstr ""
 
-#: feeder.py:1381
+#: feeder.py:1379
 msgid "Recalculation finished!"
 msgstr ""
 
-#: feeder.py:1408
+#: feeder.py:1406
 msgid "Deleted %a items from search history"
 msgstr ""
 
-#: feeder.py:1418
+#: feeder.py:1416
 msgid "Deleted %a learned keywords"
 msgstr ""
 
-#: feeder.py:1455
+#: feeder.py:1453
 msgid "Trash emptied: %a channels/categories, %b entries, %c learned keywords removed"
 msgstr ""
 
-#: feeder_query.py:146
+#: feeder_query.py:143
 msgid "Wildcards are not allowed with this type of query!"
 msgstr ""
 
-#: feeder_query.py:1066
+#: feeder_query.py:1056
 msgid "--- Unassigned ---"
 msgstr ""
 
-#: feeder_query.py:1188
+#: feeder_query.py:1178
 msgid "Invalid query type!"
 msgstr ""
 
-#: feeder_query.py:1197
+#: feeder_query.py:1187
 msgid "Invalid search field value!"
 msgstr ""
 
-#: feeder_query.py:1203 feeder_query.py:1211
+#: feeder_query.py:1193 feeder_query.py:1201
 msgid "Category not found!"
 msgstr ""
 
-#: feeder_query.py:1207
+#: feeder_query.py:1197
 msgid "Channel not found!"
 msgstr ""
 
-#: feeder_query.py:1221
+#: feeder_query.py:1211
 msgid "Category or Channel not found!"
 msgstr ""
 
-#: feeder_query.py:1245 feedex_containers.py:958 feedex_entry.py:156
+#: feeder_query.py:1235 feedex_containers.py:957 feedex_entry.py:156
 msgid "Flag not found!"
 msgstr ""
 
-#: feeder_query.py:1269
+#: feeder_query.py:1259
 msgid "Could not parse date (date_from)!"
 msgstr ""
 
-#: feeder_query.py:1274
+#: feeder_query.py:1264
 msgid "Could not parse date (date_to)!"
 msgstr ""
 
-#: feeder_query.py:1279
+#: feeder_query.py:1269
 msgid "Could not parse date (date_add_from)!"
 msgstr ""
 
-#: feeder_query.py:1284
+#: feeder_query.py:1274
 msgid "Could not parse date (date_add_to)!"
 msgstr ""
 
-#: feeder_query.py:1327
+#: feeder_query.py:1317
 msgid "Invalid grouping! Must be: %a"
 msgstr ""
 
-#: feeder_query.py:1331
+#: feeder_query.py:1321
 msgid "Depth must be a positive integer!"
 msgstr ""
 
-#: feeder_query.py:1347
+#: feeder_query.py:1337
 msgid "Invalid sorting field: %a!"
 msgstr ""
 
-#: feeder_query.py:1366
+#: feeder_query.py:1356
 msgid "Invalid fallback sorting field: %a!"
 msgstr ""
 
-#: feeder_query.py:1615
+#: feeder_query.py:1605
 msgid "Invalid logical operation! Must be: any, all, near, or phrase"
 msgstr ""
 
-#: feeder_query.py:1633 feedex_entry.py:294 feedex_entry.py:507
-#: feedex_entry.py:572 feedex_entry.py:577 feedex_feed.py:237
+#: feeder_query.py:1623 feedex_entry.py:294 feedex_entry.py:512
+#: feedex_entry.py:577 feedex_entry.py:582 feedex_feed.py:237
 msgid "Index error: %a"
 msgstr ""
 
-#: feeder_query.py:1869 feedex_feed.py:52 feedex_feed.py:155
+#: feeder_query.py:1859 feedex_feed.py:52 feedex_feed.py:155
 msgid "Category %a not found!"
 msgstr ""
 
-#: feeder_query.py:1889
+#: feeder_query.py:1879
 msgid "Invalid search field! Must be name, desc, tags or location."
 msgstr ""
 
@@ -394,45 +394,45 @@ msgstr ""
 msgid "Executing SQL script..."
 msgstr ""
 
-#: feedex_cli.py:88
+#: feedex_cli.py:86
 msgid "Invalid column list format!"
 msgstr ""
 
-#: feedex_cli.py:96
+#: feedex_cli.py:94
 msgid ""
 "Invalid display column name: %a\n"
 "Available column names for this query: %b"
 msgstr ""
 
-#: feedex_cli.py:338
+#: feedex_cli.py:336
 msgid "Result type not supported by desktop notifications. Need to be entries"
 msgstr ""
 
-#: feedex_cli.py:339
+#: feedex_cli.py:337
 msgid "Invalid interface for desktop notifications"
 msgstr ""
 
-#: feedex_cli.py:379 feedex_cli.py:396 feedex_utils.py:251
+#: feedex_cli.py:377 feedex_cli.py:394 feedex_utils.py:259
 msgid "File %a already exists!"
 msgstr ""
 
-#: feedex_cli.py:384
+#: feedex_cli.py:382
 msgid "Data saved to %a as CSV"
 msgstr ""
 
-#: feedex_cli.py:385
+#: feedex_cli.py:383
 msgid "Error saving CSV data to %a file: %b"
 msgstr ""
 
-#: feedex_cli.py:406
+#: feedex_cli.py:404
 msgid "Error saving data to %a file: %b"
 msgstr ""
 
-#: feedex_cli.py:568
+#: feedex_cli.py:566
 msgid "Parent Category Name"
 msgstr ""
 
-#: feedex_clipper.py:33 feedex_clipper.py:34
+#: feedex_clipper.py:32 feedex_clipper.py:33
 msgid "Empty selection!"
 msgstr ""
 
@@ -440,7 +440,7 @@ msgstr ""
 msgid "Field name of an SQL container must be a str!"
 msgstr ""
 
-#: feedex_containers.py:153 feedex_containers.py:424
+#: feedex_containers.py:153 feedex_containers.py:423
 msgid "Filter must be a list or a tuple!"
 msgstr ""
 
@@ -448,7 +448,7 @@ msgstr ""
 msgid "Invalid data type for %a"
 msgstr ""
 
-#: feedex_containers.py:264 feedex_gui_tabs.py:1265
+#: feedex_containers.py:264 feedex_gui_tabs.py:1263
 msgid "Entry"
 msgstr ""
 
@@ -461,8 +461,8 @@ msgstr ""
 msgid "Rule"
 msgstr ""
 
-#: feedex_containers.py:288 feedex_gui_dialogs_utils.py:1008
-#: feedex_gui_dialogs_utils.py:1015
+#: feedex_containers.py:288 feedex_gui_dialogs_utils.py:998
+#: feedex_gui_dialogs_utils.py:1005
 msgid "Flag"
 msgstr ""
 
@@ -470,184 +470,184 @@ msgstr ""
 msgid "Applying changes..."
 msgstr ""
 
-#: feedex_containers.py:462
+#: feedex_containers.py:461
 msgid "Invalid update input format"
 msgstr ""
 
-#: feedex_containers.py:467 feedex_containers.py:486
+#: feedex_containers.py:466 feedex_containers.py:485
 msgid "Editting field %a is not permitted!"
 msgstr ""
 
-#: feedex_containers.py:469
+#: feedex_containers.py:468
 msgid "Invalid update field: %a"
 msgstr ""
 
-#: feedex_containers.py:471
+#: feedex_containers.py:470
 msgid "Update list empty!"
 msgstr ""
 
-#: feedex_containers.py:492 feedex_containers.py:555 feedex_containers.py:621
+#: feedex_containers.py:491 feedex_containers.py:554 feedex_containers.py:620
 #: feedex_feed.py:487
 msgid "Nothing to do"
 msgstr ""
 
-#: feedex_containers.py:504
+#: feedex_containers.py:503
 msgid "No changes detected"
 msgstr ""
 
-#: feedex_containers.py:522
+#: feedex_containers.py:521
 msgid "Invalid new item format (must be list or dict)!"
 msgstr ""
 
-#: feedex_containers.py:691 feedex_containers.py:694
+#: feedex_containers.py:690 feedex_containers.py:693
 msgid "Nothing done"
 msgstr ""
 
-#: feedex_containers.py:712
+#: feedex_containers.py:711
 msgid "Updating %a items..."
 msgstr ""
 
-#: feedex_containers.py:716 feedex_containers.py:732 feedex_containers.py:751
+#: feedex_containers.py:715 feedex_containers.py:731 feedex_containers.py:750
 msgid "Operation aborted due to errors (Item: %a)"
 msgstr ""
 
-#: feedex_containers.py:719
+#: feedex_containers.py:718
 msgid "Updated %a items"
 msgstr ""
 
-#: feedex_containers.py:720 feedex_containers.py:740 feedex_containers.py:757
+#: feedex_containers.py:719 feedex_containers.py:739 feedex_containers.py:756
 msgid "Nothing done."
 msgstr ""
 
-#: feedex_containers.py:727
+#: feedex_containers.py:726
 msgid "Deleting %a items..."
 msgstr ""
 
-#: feedex_containers.py:738
+#: feedex_containers.py:737
 msgid "Permanently deleted %a items"
 msgstr ""
 
-#: feedex_containers.py:739
+#: feedex_containers.py:738
 msgid "Deleted %a items"
 msgstr ""
 
-#: feedex_containers.py:747
+#: feedex_containers.py:746
 msgid "Restoring %a items..."
 msgstr ""
 
-#: feedex_containers.py:756
+#: feedex_containers.py:755
 msgid "Restored %a items"
 msgstr ""
 
-#: feedex_containers.py:774 feedex_feed.py:392
+#: feedex_containers.py:773 feedex_feed.py:392
 msgid "Invalid item %a format (must be list or dict)!"
 msgstr ""
 
-#: feedex_containers.py:803
+#: feedex_containers.py:802
 msgid "Failed to add item %a"
 msgstr ""
 
-#: feedex_containers.py:811
+#: feedex_containers.py:810
 msgid "Added %a items out of %b"
 msgstr ""
 
-#: feedex_containers.py:813
+#: feedex_containers.py:812
 msgid "Nothing to add"
 msgstr ""
 
-#: feedex_containers.py:821
+#: feedex_containers.py:820
 msgid "<NULL>"
 msgstr ""
 
-#: feedex_containers.py:876
+#: feedex_containers.py:875
 msgid "ID taken by another flag"
 msgstr ""
 
-#: feedex_containers.py:878
+#: feedex_containers.py:877
 msgid "Flag name cannot be empty!"
 msgstr ""
 
-#: feedex_containers.py:879
+#: feedex_containers.py:878
 msgid "Invalid CLI color name!"
 msgstr ""
 
-#: feedex_containers.py:919
+#: feedex_containers.py:918
 msgid "Rule %a not found!"
 msgstr ""
 
-#: feedex_containers.py:952
+#: feedex_containers.py:951
 msgid "<UNKNOWN>"
 msgstr ""
 
-#: feedex_containers.py:952 feedex_containers.py:1154 feedex_entry.py:150
+#: feedex_containers.py:951 feedex_containers.py:1152 feedex_entry.py:150
 #: feedex_feed.py:68
 msgid "Channel/Category %a not found!"
 msgstr ""
 
-#: feedex_containers.py:960
+#: feedex_containers.py:959
 msgid "Search string cannot be empty!"
 msgstr ""
 
-#: feedex_containers.py:962
+#: feedex_containers.py:961
 msgid "Invalid query type! Must be string(0), full-text (1), or regex (2)"
 msgstr ""
 
-#: feedex_containers.py:963
+#: feedex_containers.py:962
 msgid "Not a valid regex string!"
 msgstr ""
 
-#: feedex_containers.py:967
+#: feedex_containers.py:966
 msgid "Field to search not valid!"
 msgstr ""
 
-#: feedex_containers.py:971
+#: feedex_containers.py:970
 msgid "Case insensitivity must be 0 or 1!"
 msgstr ""
 
-#: feedex_containers.py:1013 feedex_containers.py:1016
-#: feedex_containers.py:1047 feedex_containers.py:1050
-#: feedex_containers.py:1063 feedex_containers.py:1066
-#: feedex_containers.py:1097 feedex_containers.py:1100
-#: feedex_containers.py:1103 feedex_gui_dialogs_utils.py:90
+#: feedex_containers.py:1012 feedex_containers.py:1015
+#: feedex_containers.py:1046 feedex_containers.py:1049
+#: feedex_containers.py:1062 feedex_containers.py:1065
+#: feedex_containers.py:1096 feedex_containers.py:1099
+#: feedex_containers.py:1102 feedex_gui_dialogs_utils.py:90
 #: feedex_gui_utils.py:529
 msgid "Yes"
 msgstr ""
 
-#: feedex_containers.py:1014 feedex_containers.py:1017
-#: feedex_containers.py:1048 feedex_containers.py:1051
-#: feedex_containers.py:1062 feedex_containers.py:1065
-#: feedex_containers.py:1098 feedex_containers.py:1101
-#: feedex_containers.py:1104 feedex_gui_dialogs_utils.py:91
+#: feedex_containers.py:1013 feedex_containers.py:1016
+#: feedex_containers.py:1047 feedex_containers.py:1050
+#: feedex_containers.py:1061 feedex_containers.py:1064
+#: feedex_containers.py:1097 feedex_containers.py:1100
+#: feedex_containers.py:1103 feedex_gui_dialogs_utils.py:91
 #: feedex_gui_utils.py:529
 msgid "No"
 msgstr ""
 
-#: feedex_containers.py:1069
+#: feedex_containers.py:1068
 msgid "String Matching"
 msgstr ""
 
-#: feedex_containers.py:1070
+#: feedex_containers.py:1069
 msgid "Stemmed Phrase Search"
 msgstr ""
 
-#: feedex_containers.py:1071 feedex_gui_dialogs_entts.py:1509
+#: feedex_containers.py:1070 feedex_gui_dialogs_entts.py:1507
 #: feedex_gui_utils.py:828
 msgid "REGEX"
 msgstr ""
 
-#: feedex_containers.py:1075
+#: feedex_containers.py:1074
 msgid "-- None --"
 msgstr ""
 
-#: feedex_containers.py:1078 feedex_gui_utils.py:858 feedex_gui_utils.py:925
+#: feedex_containers.py:1077 feedex_gui_utils.py:870 feedex_gui_utils.py:937
 msgid "-- All Fields --"
 msgstr ""
 
-#: feedex_containers.py:1081
+#: feedex_containers.py:1080
 msgid "-- All Channels/Catgs. --"
 msgstr ""
 
-#: feedex_containers.py:1151
+#: feedex_containers.py:1149
 msgid "Invalid type for field %a"
 msgstr ""
 
@@ -676,23 +676,23 @@ msgid "Link"
 msgstr ""
 
 #: feedex_data.py:460 feedex_data.py:489 feedex_gui_utils.py:31
-#: feedex_gui_utils.py:927
+#: feedex_gui_utils.py:939
 msgid "Description"
 msgstr ""
 
-#: feedex_data.py:460 feedex_data.py:490 feedex_gui_utils.py:929
+#: feedex_data.py:460 feedex_data.py:490 feedex_gui_utils.py:941
 msgid "Tags"
 msgstr ""
 
-#: feedex_data.py:460 feedex_gui_dialogs_utils.py:1033
+#: feedex_data.py:460 feedex_gui_dialogs_utils.py:1023
 msgid "Handler"
 msgstr ""
 
-#: feedex_data.py:460 feedex_gui_dialogs_utils.py:1035 feedex_gui_utils.py:928
+#: feedex_data.py:460 feedex_gui_dialogs_utils.py:1025 feedex_gui_utils.py:940
 msgid "Location"
 msgstr ""
 
-#: feedex_data.py:460 feedex_gui_utils.py:31 feedex_gui_utils.py:926
+#: feedex_data.py:460 feedex_gui_utils.py:31 feedex_gui_utils.py:938
 msgid "Name"
 msgstr ""
 
@@ -788,7 +788,7 @@ msgstr ""
 msgid "Feed ID"
 msgstr ""
 
-#: feedex_data.py:483 feedex_data.py:587 feedex_gui_dialogs_utils.py:1018
+#: feedex_data.py:483 feedex_data.py:587 feedex_gui_dialogs_utils.py:1008
 msgid "Language"
 msgstr ""
 
@@ -809,8 +809,8 @@ msgid "Title"
 msgstr ""
 
 #: feedex_data.py:491 feedex_feed.py:56 feedex_feed.py:65 feedex_feed.py:196
-#: feedex_feed.py:202 feedex_gui_containers.py:476
-#: feedex_gui_dialogs_utils.py:1028 feedex_gui_utils.py:913
+#: feedex_feed.py:202 feedex_gui_containers.py:472
+#: feedex_gui_dialogs_utils.py:1018 feedex_gui_utils.py:925
 msgid "Category"
 msgstr ""
 
@@ -891,154 +891,150 @@ msgid "Default New Rule Weight"
 msgstr ""
 
 #: feedex_data.py:604
-msgid "Weight to add during Simil. Query"
-msgstr ""
-
-#: feedex_data.py:605
 msgid "Default Limit for Simil. Query"
 msgstr ""
 
-#: feedex_data.py:606
+#: feedex_data.py:605
 msgid "Default Query Depth"
 msgstr ""
 
-#: feedex_data.py:607
+#: feedex_data.py:606
 msgid "Default Page Length"
 msgstr ""
 
-#: feedex_data.py:608
+#: feedex_data.py:607
 msgid "Max Context Length"
 msgstr ""
 
-#: feedex_data.py:611
+#: feedex_data.py:609
 msgid "Follow Link Redirects?"
 msgstr ""
 
-#: feedex_data.py:612
+#: feedex_data.py:610
 msgid "Save Perm. Link Redirects?"
 msgstr ""
 
-#: feedex_data.py:613
+#: feedex_data.py:611
 msgid "Mark unhealthy Feeds as deleted?"
 msgstr ""
 
-#: feedex_data.py:614
+#: feedex_data.py:612
 msgid "Ignore MODIFIED and ETag?"
 msgstr ""
 
-#: feedex_data.py:616
+#: feedex_data.py:614
 msgid "Notify on Fetched News?"
 msgstr ""
 
-#: feedex_data.py:617
+#: feedex_data.py:615
 msgid "Fetch periodicallly in bckgr.?"
 msgstr ""
 
-#: feedex_data.py:618
+#: feedex_data.py:616
 msgid "Grouping for Notif."
 msgstr ""
 
-#: feedex_data.py:620
+#: feedex_data.py:618
 msgid "Depth for Notif."
 msgstr ""
 
-#: feedex_data.py:622
+#: feedex_data.py:620
 msgid "New Item Color"
 msgstr ""
 
-#: feedex_data.py:623
+#: feedex_data.py:621
 msgid "Deleted Item Color"
 msgstr ""
 
-#: feedex_data.py:624
+#: feedex_data.py:622
 msgid "Hilight Color"
 msgstr ""
 
-#: feedex_data.py:625
+#: feedex_data.py:623
 msgid "Default Flag Color"
 msgstr ""
 
-#: feedex_data.py:627
+#: feedex_data.py:625
 msgid "Window Layout"
 msgstr ""
 
-#: feedex_data.py:628
+#: feedex_data.py:626
 msgid "Tab Orientation"
 msgstr ""
 
-#: feedex_data.py:630
+#: feedex_data.py:628
 msgid "Excluded Window Name Strings"
 msgstr ""
 
-#: feedex_data.py:632
+#: feedex_data.py:630
 msgid "Image Viewer"
 msgstr ""
 
-#: feedex_data.py:633
+#: feedex_data.py:631
 msgid "Search Engine"
 msgstr ""
 
-#: feedex_data.py:635
+#: feedex_data.py:633
 msgid "Clear Cache Interval"
 msgstr ""
 
-#: feedex_data.py:637
+#: feedex_data.py:635
 msgid "Add Entry Hotkey"
 msgstr ""
 
-#: feedex_data.py:638
+#: feedex_data.py:636
 msgid "Add Rule Hotkey"
 msgstr ""
 
-#: feedex_data.py:639
+#: feedex_data.py:637
 msgid "Add Item Hotkey"
 msgstr ""
 
-#: feedex_data.py:640
+#: feedex_data.py:638
 msgid "Edit Item Hotkey"
 msgstr ""
 
-#: feedex_data.py:641
+#: feedex_data.py:639
 msgid "Search Hotkey"
 msgstr ""
 
-#: feedex_data.py:643
+#: feedex_data.py:641
 msgid "CLI Normal Color"
 msgstr ""
 
-#: feedex_data.py:644
+#: feedex_data.py:642
 msgid "CLI Bold Color"
 msgstr ""
 
-#: feedex_data.py:645
+#: feedex_data.py:643
 msgid "CLI Emphasis Color"
 msgstr ""
 
-#: feedex_data.py:646
+#: feedex_data.py:644
 msgid "CLI Deleted Color"
 msgstr ""
 
-#: feedex_data.py:647
+#: feedex_data.py:645
 msgid "CLI Snippet Color"
 msgstr ""
 
-#: feedex_data.py:649
+#: feedex_data.py:647
 msgid "Begin Bold Markup"
 msgstr ""
 
-#: feedex_data.py:650
+#: feedex_data.py:648
 msgid "End Bold Markup"
 msgstr ""
 
-#: feedex_data.py:652
+#: feedex_data.py:650
 msgid "CLI Read Marker"
 msgstr ""
 
-#: feedex_data.py:653
+#: feedex_data.py:651
 msgid "CLI Note Marker"
 msgstr ""
 
-#: feedex_data.py:655
+#: feedex_data.py:653
 msgid "Allow Desktop Inter-Process Comm.?"
 msgstr ""
 
@@ -1524,7 +1520,9 @@ msgid ""
 "                                                    \n"
 "    --type=         type of qery\n"
 "                        'fts' - full text (default)\n"
-"                        'string' - simple string matching    --lang=         language used in query for tokenizing and stemming\n"
+"                        'string' - simple string matching \n"
+"                    \n"
+"    --lang=         language used in query for tokenizing and stemming\n"
 "    \n"
 "    --case_ins      query is case insensitive\n"
 "    --case_sens     query is case sensitive\n"
@@ -1630,7 +1628,7 @@ msgid ""
 "\n"
 msgstr ""
 
-#: feedex_docs.py:607
+#: feedex_docs.py:609
 msgid ""
 "\n"
 "\n"
@@ -1739,7 +1737,7 @@ msgid ""
 "\n"
 msgstr ""
 
-#: feedex_docs.py:719
+#: feedex_docs.py:721
 msgid ""
 "\n"
 "\n"
@@ -1831,7 +1829,7 @@ msgid ""
 "    \n"
 msgstr ""
 
-#: feedex_docs.py:812
+#: feedex_docs.py:814
 msgid ""
 "\n"
 "\n"
@@ -1885,7 +1883,7 @@ msgid ""
 "\n"
 msgstr ""
 
-#: feedex_docs.py:867
+#: feedex_docs.py:869
 msgid ""
 "\n"
 "<b>Feedex: Scripting</b>\n"
@@ -1944,7 +1942,7 @@ msgid ""
 "}\n"
 msgstr ""
 
-#: feedex_docs.py:929
+#: feedex_docs.py:931
 msgid ""
 "\n"
 "<b>Feedex: JSON queries</b>\n"
@@ -1998,7 +1996,7 @@ msgid ""
 "\n"
 msgstr ""
 
-#: feedex_docs.py:988
+#: feedex_docs.py:990
 msgid ""
 "\n"
 "<b>Feedex: Plugins</b>\n"
@@ -2141,27 +2139,27 @@ msgstr ""
 msgid "<NONE>"
 msgstr ""
 
-#: feedex_entry.py:631
+#: feedex_entry.py:636
 msgid "Reindexing %a..."
 msgstr ""
 
-#: feedex_entry.py:641
+#: feedex_entry.py:646
 msgid "Entry %a reindexed"
 msgstr ""
 
-#: feedex_entry.py:650
+#: feedex_entry.py:655
 msgid "Ranking %a..."
 msgstr ""
 
-#: feedex_entry.py:660
+#: feedex_entry.py:665
 msgid "Entry %a reranked"
 msgstr ""
 
-#: feedex_entry.py:670
+#: feedex_entry.py:675
 msgid "Relearning %a..."
 msgstr ""
 
-#: feedex_entry.py:679
+#: feedex_entry.py:684
 msgid "Keywords relearned for entry %a"
 msgstr ""
 
@@ -2353,388 +2351,388 @@ msgstr ""
 msgid "Sent to browser (%a)"
 msgstr ""
 
-#: feedex_gui_actions.py:54
+#: feedex_gui_actions.py:52
 msgid "Database locked for fetching"
 msgstr ""
 
-#: feedex_gui_actions.py:54
+#: feedex_gui_actions.py:52
 msgid "Metadata edits are not allowed now"
 msgstr ""
 
-#: feedex_gui_actions.py:55
+#: feedex_gui_actions.py:53
 msgid "Entry editting is locked"
 msgstr ""
 
-#: feedex_gui_actions.py:55 feedex_gui_actions.py:56 feedex_gui_actions.py:57
-#: feedex_gui_actions.py:58
+#: feedex_gui_actions.py:53 feedex_gui_actions.py:54 feedex_gui_actions.py:55
+#: feedex_gui_actions.py:56
 msgid "Please wait for previous action to finish"
 msgstr ""
 
-#: feedex_gui_actions.py:56
+#: feedex_gui_actions.py:54
 msgid "Channel/Category editting is locked"
 msgstr ""
 
-#: feedex_gui_actions.py:57
+#: feedex_gui_actions.py:55
 msgid "Rule editting is locked"
 msgstr ""
 
-#: feedex_gui_actions.py:58
+#: feedex_gui_actions.py:56
 msgid "Flag editting is locked"
 msgstr ""
 
-#: feedex_gui_actions.py:63
+#: feedex_gui_actions.py:61
 msgid "<i>If this message is due to some unforseen error, restart application to lift the locks</i>"
 msgstr ""
 
-#: feedex_gui_actions.py:93
+#: feedex_gui_actions.py:91
 msgid "Checking for news ..."
 msgstr ""
 
-#: feedex_gui_actions.py:153
+#: feedex_gui_actions.py:151
 msgid "Updating channel..."
 msgstr ""
 
-#: feedex_gui_actions.py:160
+#: feedex_gui_actions.py:158
 msgid "Updating all channels..."
 msgstr ""
 
-#: feedex_gui_actions.py:185
+#: feedex_gui_actions.py:183
 msgid "Adding Channel..."
 msgstr ""
 
-#: feedex_gui_actions.py:247
+#: feedex_gui_actions.py:245
 msgid "Adding entry..."
 msgstr ""
 
-#: feedex_gui_actions.py:248
+#: feedex_gui_actions.py:246
 msgid "Writing changes to Entry..."
 msgstr ""
 
-#: feedex_gui_actions.py:291
+#: feedex_gui_actions.py:289
 msgid "Delete Entry"
 msgstr ""
 
-#: feedex_gui_actions.py:292
+#: feedex_gui_actions.py:290
 msgid "Delete Entry permanently"
 msgstr ""
 
-#: feedex_gui_actions.py:300
+#: feedex_gui_actions.py:298
 msgid "Restore Entry"
 msgstr ""
 
-#: feedex_gui_actions.py:334
+#: feedex_gui_actions.py:332
 msgid "Updating ..."
 msgstr ""
 
-#: feedex_gui_actions.py:345
+#: feedex_gui_actions.py:343
 msgid "Done..."
 msgstr ""
 
-#: feedex_gui_actions.py:351
+#: feedex_gui_actions.py:349
 msgid "Opening ..."
 msgstr ""
 
-#: feedex_gui_actions.py:416
+#: feedex_gui_actions.py:414
 msgid "Delete Channel"
 msgstr ""
 
-#: feedex_gui_actions.py:419
+#: feedex_gui_actions.py:417
 msgid "Delete Channel permanently"
 msgstr ""
 
-#: feedex_gui_actions.py:422 feedex_gui_actions.py:425
+#: feedex_gui_actions.py:420 feedex_gui_actions.py:423
 msgid "Delete Category"
 msgstr ""
 
-#: feedex_gui_actions.py:441
+#: feedex_gui_actions.py:439
 msgid "Restore Category"
 msgstr ""
 
-#: feedex_gui_actions.py:442
+#: feedex_gui_actions.py:440
 msgid "Restore Channel"
 msgstr ""
 
-#: feedex_gui_actions.py:473 feedex_gui_main.py:784
+#: feedex_gui_actions.py:471 feedex_gui_main.py:786
 msgid "Delete Rule"
 msgstr ""
 
-#: feedex_gui_actions.py:524 feedex_gui_main.py:832
+#: feedex_gui_actions.py:522 feedex_gui_main.py:834
 msgid "Delete Flag"
 msgstr ""
 
-#: feedex_gui_actions.py:638
+#: feedex_gui_actions.py:636
 msgid "Nothing to do..."
 msgstr ""
 
-#: feedex_gui_actions.py:639
+#: feedex_gui_actions.py:637
 msgid "Mass Edit..."
 msgstr ""
 
-#: feedex_gui_actions.py:645 feedex_gui_actions.py:655 feedex_gui_main.py:746
+#: feedex_gui_actions.py:643 feedex_gui_actions.py:653 feedex_gui_main.py:746
 msgid "Delete"
 msgstr ""
 
-#: feedex_gui_actions.py:650 feedex_gui_dialogs_entts.py:118
-#: feedex_gui_dialogs_entts.py:206 feedex_gui_dialogs_entts.py:572
-#: feedex_gui_dialogs_entts.py:714 feedex_gui_dialogs_entts.py:864
-#: feedex_gui_dialogs_entts.py:1129 feedex_gui_dialogs_entts.py:1516
-#: feedex_gui_dialogs_utils.py:349 feedex_gui_main.py:749
+#: feedex_gui_actions.py:648 feedex_gui_dialogs_entts.py:118
+#: feedex_gui_dialogs_entts.py:206 feedex_gui_dialogs_entts.py:573
+#: feedex_gui_dialogs_entts.py:714 feedex_gui_dialogs_entts.py:863
+#: feedex_gui_dialogs_entts.py:1128 feedex_gui_dialogs_entts.py:1514
+#: feedex_gui_dialogs_utils.py:344 feedex_gui_main.py:752
 msgid "Restore"
 msgstr ""
 
-#: feedex_gui_actions.py:672 feedex_gui_main.py:846
+#: feedex_gui_actions.py:670 feedex_gui_main.py:848
 msgid "Delete Plugin"
 msgstr ""
 
-#: feedex_gui_actions.py:736 feedex_gui_main.py:922
+#: feedex_gui_actions.py:734 feedex_gui_main.py:934
 msgid "Empty Trash"
 msgstr ""
 
-#: feedex_gui_actions.py:745
+#: feedex_gui_actions.py:743
 msgid "Are you sure you want to clear <b>Search History</b>?"
 msgstr ""
 
-#: feedex_gui_actions.py:745 feedex_gui_tabs.py:579
+#: feedex_gui_actions.py:743 feedex_gui_tabs.py:578
 msgid "Clear Search History"
 msgstr ""
 
-#: feedex_gui_actions.py:807
+#: feedex_gui_actions.py:805
 msgid "OK"
 msgstr ""
 
-#: feedex_gui_actions.py:807
+#: feedex_gui_actions.py:805
 msgid "Restart Required"
 msgstr ""
 
-#: feedex_gui_actions.py:807
+#: feedex_gui_actions.py:805
 msgid "Restart is required for all changes to be applied."
 msgstr ""
 
-#: feedex_gui_actions.py:823
+#: feedex_gui_actions.py:821
 msgid "Main Log"
 msgstr ""
 
-#: feedex_gui_actions.py:839
+#: feedex_gui_actions.py:837
 msgid "Tech details"
 msgstr ""
 
-#: feedex_gui_actions.py:849
+#: feedex_gui_actions.py:847
 msgid "Database Statistics"
 msgstr ""
 
-#: feedex_gui_actions.py:855
+#: feedex_gui_actions.py:853
 msgid "Session log"
 msgstr ""
 
-#: feedex_gui_actions.py:876
+#: feedex_gui_actions.py:874
 msgid "About..."
 msgstr ""
 
-#: feedex_gui_actions.py:906
+#: feedex_gui_actions.py:904
 msgid "Are you sure you want to DB maintenance? This may take a long time..."
 msgstr ""
 
-#: feedex_gui_actions.py:906
+#: feedex_gui_actions.py:904
 msgid "DB Maintenance"
 msgstr ""
 
-#: feedex_gui_actions.py:922
+#: feedex_gui_actions.py:920
 msgid "Clear Cache"
 msgstr ""
 
-#: feedex_gui_actions.py:922
+#: feedex_gui_actions.py:920
 msgid "Do you want to delete all downloaded and cached images/thumbnails?"
 msgstr ""
 
-#: feedex_gui_actions.py:930
+#: feedex_gui_actions.py:928
 msgid "Do you want delete all learned Keywords used for recommendations?"
 msgstr ""
 
-#: feedex_gui_actions.py:930 feedex_gui_actions.py:933
+#: feedex_gui_actions.py:928 feedex_gui_actions.py:931
 msgid "Delete Learned Keywords?"
 msgstr ""
 
-#: feedex_gui_actions.py:931
+#: feedex_gui_actions.py:929
 msgid "<i>This action is permanent. Relearning can be time consuming</i>"
 msgstr ""
 
-#: feedex_gui_actions.py:933
+#: feedex_gui_actions.py:931
 msgid "Are you sure?"
 msgstr ""
 
-#: feedex_gui_actions.py:954
+#: feedex_gui_actions.py:952
 msgid "Do you want to relearn Keywords for recommendations?"
 msgstr ""
 
-#: feedex_gui_actions.py:954
+#: feedex_gui_actions.py:952
 msgid "Relearn Keywords?"
 msgstr ""
 
-#: feedex_gui_actions.py:955
+#: feedex_gui_actions.py:953
 msgid "<i>This may take a long time</i>"
 msgstr ""
 
-#: feedex_gui_actions.py:973
+#: feedex_gui_actions.py:971
 msgid "Export Feed data to..."
 msgstr ""
 
-#: feedex_gui_actions.py:983
+#: feedex_gui_actions.py:981
 msgid "Export Rules to..."
 msgstr ""
 
-#: feedex_gui_actions.py:994
+#: feedex_gui_actions.py:992
 msgid "Export Flags to..."
 msgstr ""
 
-#: feedex_gui_actions.py:1003
+#: feedex_gui_actions.py:1001
 msgid "Export Plugins to..."
 msgstr ""
 
-#: feedex_gui_actions.py:1013
+#: feedex_gui_actions.py:1011
 msgid "Import Feeds from..."
 msgstr ""
 
-#: feedex_gui_actions.py:1023
+#: feedex_gui_actions.py:1021
 msgid "Import Rules from..."
 msgstr ""
 
-#: feedex_gui_actions.py:1033
+#: feedex_gui_actions.py:1031
 msgid "Import Flags from..."
 msgstr ""
 
-#: feedex_gui_actions.py:1049
+#: feedex_gui_actions.py:1047
 msgid "Import Entries from..."
 msgstr ""
 
-#: feedex_gui_actions.py:1058
+#: feedex_gui_actions.py:1056
 msgid "Import Plugins from..."
 msgstr ""
 
-#: feedex_gui_actions.py:1071
+#: feedex_gui_actions.py:1069
 msgid "Plugins imported successfully..."
 msgstr ""
 
-#: feedex_gui_actions.py:1096
+#: feedex_gui_actions.py:1094
 msgid "Nothing to export."
 msgstr ""
 
-#: feedex_gui_actions.py:1100
+#: feedex_gui_actions.py:1098
 msgid "Export to..."
 msgstr ""
 
-#: feedex_gui_actions.py:1132
+#: feedex_gui_actions.py:1130
 msgid "Subscribe..."
 msgstr ""
 
-#: feedex_gui_actions.py:1151 feedex_gui_main.py:1799
+#: feedex_gui_actions.py:1149 feedex_gui_main.py:1811
 msgid "Note added"
 msgstr ""
 
-#: feedex_gui_actions.py:1153 feedex_gui_main.py:1795
+#: feedex_gui_actions.py:1151 feedex_gui_main.py:1807
 msgid "Error adding new Note!"
 msgstr ""
 
-#: feedex_gui_actions.py:1164 feedex_gui_main.py:1789
+#: feedex_gui_actions.py:1162 feedex_gui_main.py:1801
 msgid "Adding new Note..."
 msgstr ""
 
-#: feedex_gui_actions.py:1170 feedex_gui_main.py:1790
+#: feedex_gui_actions.py:1168 feedex_gui_main.py:1802
 msgid "Adding new Feed..."
 msgstr ""
 
-#: feedex_gui_actions.py:1173 feedex_gui_main.py:1800
+#: feedex_gui_actions.py:1171 feedex_gui_main.py:1812
 msgid "Feed added"
 msgstr ""
 
-#: feedex_gui_actions.py:1175 feedex_gui_main.py:1796
+#: feedex_gui_actions.py:1173 feedex_gui_main.py:1808
 msgid "Error adding new Feed!"
 msgstr ""
 
-#: feedex_gui_actions.py:1180 feedex_gui_main.py:1791
+#: feedex_gui_actions.py:1178 feedex_gui_main.py:1803
 msgid "Adding new Rule..."
 msgstr ""
 
-#: feedex_gui_actions.py:1183 feedex_gui_main.py:1801
+#: feedex_gui_actions.py:1181 feedex_gui_main.py:1813
 msgid "Rule added"
 msgstr ""
 
-#: feedex_gui_actions.py:1185 feedex_gui_main.py:1797
+#: feedex_gui_actions.py:1183 feedex_gui_main.py:1809
 msgid "Error adding new Rule!"
 msgstr ""
 
-#: feedex_gui_containers.py:473
+#: feedex_gui_containers.py:469
 msgid "Search result"
 msgstr ""
 
-#: feedex_gui_containers.py:474
+#: feedex_gui_containers.py:470
 msgid "All search results"
 msgstr ""
 
-#: feedex_gui_containers.py:475 feedex_gui_utils.py:911
+#: feedex_gui_containers.py:471 feedex_gui_utils.py:923
 msgid "Selected text"
 msgstr ""
 
-#: feedex_gui_containers.py:477 feedex_gui_utils.py:912
+#: feedex_gui_containers.py:473 feedex_gui_utils.py:924
 msgid "Channel"
 msgstr ""
 
-#: feedex_gui_containers.py:478 feedex_gui_utils.py:914
+#: feedex_gui_containers.py:474 feedex_gui_utils.py:926
 msgid "Article/Note"
 msgstr ""
 
-#: feedex_gui_containers.py:507
+#: feedex_gui_containers.py:503
 msgid "Plugin %a not found!"
 msgstr ""
 
-#: feedex_gui_containers.py:522
+#: feedex_gui_containers.py:518
 msgid "Invalid type for %a field"
 msgstr ""
 
-#: feedex_gui_containers.py:524
+#: feedex_gui_containers.py:520
 msgid "Name cannot be empty!"
 msgstr ""
 
-#: feedex_gui_containers.py:526
+#: feedex_gui_containers.py:522
 msgid "Invalid plugin type!"
 msgstr ""
 
-#: feedex_gui_containers.py:527
+#: feedex_gui_containers.py:523
 msgid "Command cannot be empty!"
 msgstr ""
 
-#: feedex_gui_containers.py:545
+#: feedex_gui_containers.py:541
 msgid "Plugin %a added successfully"
 msgstr ""
 
-#: feedex_gui_containers.py:566
+#: feedex_gui_containers.py:562
 msgid "Plugin %a updated successfully"
 msgstr ""
 
-#: feedex_gui_containers.py:586
+#: feedex_gui_containers.py:582
 msgid "Plugin %a deleted"
 msgstr ""
 
-#: feedex_gui_containers.py:623
+#: feedex_gui_containers.py:619
 msgid "Save to..."
 msgstr ""
 
-#: feedex_gui_containers.py:625 feedex_gui_containers.py:629
+#: feedex_gui_containers.py:621 feedex_gui_containers.py:625
 msgid "No file chosen"
 msgstr ""
 
-#: feedex_gui_containers.py:627
+#: feedex_gui_containers.py:623
 msgid "Choose File..."
 msgstr ""
 
-#: feedex_gui_containers.py:631
+#: feedex_gui_containers.py:627
 msgid "Choose Directory..."
 msgstr ""
 
-#: feedex_gui_containers.py:633
+#: feedex_gui_containers.py:629
 msgid "No directory chosen"
 msgstr ""
 
-#: feedex_gui_containers.py:669 feedex_handlers.py:652
+#: feedex_gui_containers.py:665 feedex_handlers.py:651
 msgid "Error executing script: %a"
 msgstr ""
 
@@ -2753,11 +2751,11 @@ msgid "Add"
 msgstr ""
 
 #: feedex_gui_dialogs_entts.py:35 feedex_gui_dialogs_entts.py:117
-#: feedex_gui_dialogs_entts.py:312 feedex_gui_dialogs_entts.py:571
-#: feedex_gui_dialogs_entts.py:713 feedex_gui_dialogs_entts.py:863
-#: feedex_gui_dialogs_entts.py:1128 feedex_gui_dialogs_entts.py:1515
-#: feedex_gui_dialogs_utils.py:348 feedex_gui_dialogs_utils.py:803
-#: feedex_gui_dialogs_utils.py:1041
+#: feedex_gui_dialogs_entts.py:311 feedex_gui_dialogs_entts.py:572
+#: feedex_gui_dialogs_entts.py:713 feedex_gui_dialogs_entts.py:862
+#: feedex_gui_dialogs_entts.py:1127 feedex_gui_dialogs_entts.py:1513
+#: feedex_gui_dialogs_utils.py:343 feedex_gui_dialogs_utils.py:793
+#: feedex_gui_dialogs_utils.py:1031
 msgid "Cancel"
 msgstr ""
 
@@ -2769,13 +2767,13 @@ msgstr ""
 msgid "Add New Category"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:106 feedex_gui_dialogs_entts.py:551
-#: feedex_gui_dialogs_entts.py:695 feedex_gui_dialogs_entts.py:830
-#: feedex_gui_dialogs_entts.py:1428
+#: feedex_gui_dialogs_entts.py:106 feedex_gui_dialogs_entts.py:552
+#: feedex_gui_dialogs_entts.py:695 feedex_gui_dialogs_entts.py:829
+#: feedex_gui_dialogs_entts.py:1426
 msgid "Name:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:107 feedex_gui_dialogs_entts.py:1436
+#: feedex_gui_dialogs_entts.py:107 feedex_gui_dialogs_entts.py:1434
 msgid "Subtitle:"
 msgstr ""
 
@@ -2787,7 +2785,7 @@ msgstr ""
 msgid "Enter subtitle/description name here"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:113 feedex_gui_dialogs_entts.py:1506
+#: feedex_gui_dialogs_entts.py:113 feedex_gui_dialogs_entts.py:1504
 msgid "Icon:"
 msgstr ""
 
@@ -2795,10 +2793,10 @@ msgstr ""
 msgid "Choose icon for this Category"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:116 feedex_gui_dialogs_entts.py:570
-#: feedex_gui_dialogs_entts.py:712 feedex_gui_dialogs_entts.py:862
-#: feedex_gui_dialogs_entts.py:1514 feedex_gui_dialogs_utils.py:347
-#: feedex_gui_dialogs_utils.py:1040
+#: feedex_gui_dialogs_entts.py:116 feedex_gui_dialogs_entts.py:571
+#: feedex_gui_dialogs_entts.py:712 feedex_gui_dialogs_entts.py:861
+#: feedex_gui_dialogs_entts.py:1512 feedex_gui_dialogs_utils.py:342
+#: feedex_gui_dialogs_utils.py:1030
 msgid "Save"
 msgstr ""
 
@@ -2814,55 +2812,59 @@ msgstr ""
 msgid "Edit Entry"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:225
+#: feedex_gui_dialogs_entts.py:223
 msgid ""
 "Choose <b>Category</b> or <b>Channel</b> to assign this Entry to.\n"
 "It is a good idea to have categories exclusively for manually added entries for quick access to notes, hilights etc.\n"
 "<i>Every Entry needs to be assigned to a Category or a Channel</i>"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:229
+#: feedex_gui_dialogs_entts.py:227
 msgid "How should this entry be classified?"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:231
+#: feedex_gui_dialogs_entts.py:228
+msgid "Choose indexing and feature extracting language model"
+msgstr ""
+
+#: feedex_gui_dialogs_entts.py:230
 msgid "Add local image to display with this Entry"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:235
+#: feedex_gui_dialogs_entts.py:234
 msgid "Enter Entry's title here"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:274
+#: feedex_gui_dialogs_entts.py:273
 msgid "Enter Entry's details/description here"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:286
+#: feedex_gui_dialogs_entts.py:285
 msgid "Enter additional text here"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:299
+#: feedex_gui_dialogs_entts.py:298
 msgid "Select flag for this Entry"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:303
+#: feedex_gui_dialogs_entts.py:302
 msgid ""
 "Read counter or feature learning multiplier\n"
 "<i>The higher it is the more this Entry contributes to ranking</i>"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:306
+#: feedex_gui_dialogs_entts.py:305
 msgid "Learn rules?"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:307
+#: feedex_gui_dialogs_entts.py:306
 msgid ""
 "Should Feedex extract Rules from this entry for ranking incomming entries by importance?\n"
 "See <b>Rules</b>->Right-Click-><b>Show learned rules</b> to see those and weights assigned to them\n"
 "Rules are also learned automatically when any Entry/Article is opened in Browser"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:311
+#: feedex_gui_dialogs_entts.py:310
 msgid "  Save  "
 msgstr ""
 
@@ -2870,39 +2872,39 @@ msgstr ""
 msgid "Import image..."
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:529
+#: feedex_gui_dialogs_entts.py:531
 msgid "Add new Flag"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:530 feedex_gui_main.py:831
+#: feedex_gui_dialogs_entts.py:532 feedex_gui_main.py:833
 msgid "Edit Flag"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:553
+#: feedex_gui_dialogs_entts.py:554
 msgid "Display name for this Flag used in Queries etc."
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:557
+#: feedex_gui_dialogs_entts.py:558
 msgid "Color:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:561
+#: feedex_gui_dialogs_entts.py:562
 msgid "Color (CLI):"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:564
+#: feedex_gui_dialogs_entts.py:565
 msgid "ID:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:566
+#: feedex_gui_dialogs_entts.py:567
 msgid "Sometimes it is useful to set up ID manually e.g. to add description to flag deleted before"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:672
+#: feedex_gui_dialogs_entts.py:673
 msgid "Add new Plugin"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:673 feedex_gui_main.py:845
+#: feedex_gui_dialogs_entts.py:674 feedex_gui_main.py:847
 msgid "Edit Plugin"
 msgstr ""
 
@@ -2914,11 +2916,11 @@ msgstr ""
 msgid "Command or Script:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:702 feedex_gui_dialogs_entts.py:1504
+#: feedex_gui_dialogs_entts.py:702 feedex_gui_dialogs_entts.py:1502
 msgid "Search local machine for script file"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:704 feedex_gui_dialogs_entts.py:1040
+#: feedex_gui_dialogs_entts.py:704 feedex_gui_dialogs_entts.py:1039
 msgid "Description:"
 msgstr ""
 
@@ -2930,7 +2932,7 @@ msgstr ""
 msgid "Type of entity this plugin can process (a hook for context menu)"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:753 feedex_gui_dialogs_entts.py:1627
+#: feedex_gui_dialogs_entts.py:753 feedex_gui_dialogs_entts.py:1625
 msgid "Choose Script File"
 msgstr ""
 
@@ -2938,341 +2940,341 @@ msgstr ""
 msgid "Add new Rule"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:809 feedex_gui_main.py:783
+#: feedex_gui_dialogs_entts.py:809 feedex_gui_main.py:785
 msgid "Edit Rule"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:832
+#: feedex_gui_dialogs_entts.py:831
 msgid "Display name for this rule (<i>not used in matching</i>)"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:833
+#: feedex_gui_dialogs_entts.py:832
 msgid "Search string:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:835
+#: feedex_gui_dialogs_entts.py:834
 msgid ""
 "String or Pattern used for search and matching\n"
 "It is used according to <b>Type</b> and should be compatibile with it (e.g. a valid REGEX string)"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:838
+#: feedex_gui_dialogs_entts.py:837
 msgid "Type:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:840
+#: feedex_gui_dialogs_entts.py:839
 msgid "Channel or Category:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:841
+#: feedex_gui_dialogs_entts.py:840
 msgid "-- Every Feed --"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:841
+#: feedex_gui_dialogs_entts.py:840
 msgid "Which Feed/Channel should this Rule filter?"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:842
+#: feedex_gui_dialogs_entts.py:841
 msgid "Field:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:844 feedex_gui_dialogs_utils.py:253
+#: feedex_gui_dialogs_entts.py:843 feedex_gui_dialogs_utils.py:248
 msgid "Language:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:845
+#: feedex_gui_dialogs_entts.py:844
 msgid "Which language should this rule use for Full Text Search?"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:846
+#: feedex_gui_dialogs_entts.py:845
 msgid "Case:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:847
+#: feedex_gui_dialogs_entts.py:846
 msgid "Should this Rule be case sensitive?"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:847 feedex_gui_utils.py:534
+#: feedex_gui_dialogs_entts.py:846 feedex_gui_utils.py:534
 msgid "Case insensitive"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:847 feedex_gui_utils.py:534
+#: feedex_gui_dialogs_entts.py:846 feedex_gui_utils.py:534
 msgid "Case sensitive"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:849
+#: feedex_gui_dialogs_entts.py:848
 msgid "Weight:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:851
+#: feedex_gui_dialogs_entts.py:850
 msgid ""
 "Weight is used to increase/decrease article's <b>importance</b> when matched\n"
 "When recommending, articles are sorted by importance first to keep the most important ones to you on top.\n"
 "Only then, ranking by learned keywords/actions is performed. You can use rules' weight to boost/hide certain articles.\n"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:856
+#: feedex_gui_dialogs_entts.py:855
 msgid ""
 "Main reason for manually added rules is to flag interesting incomming articles independently of importance ranking\n"
 "However, a rule can simply increase importance by its <b>weight</b> without flagging"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:858
+#: feedex_gui_dialogs_entts.py:857
 msgid "Are matches weights additive?"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:997
+#: feedex_gui_dialogs_entts.py:996
 msgid "Custom REGEX string for resource link extraction"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1001
+#: feedex_gui_dialogs_entts.py:1000
 msgid "REGEX strings for HTML parsing"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1010
+#: feedex_gui_dialogs_entts.py:1009
 msgid "REGEX for extracting Images:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1012
+#: feedex_gui_dialogs_entts.py:1011
 msgid "This REGEX will extract links to images from Description and Contents instead of builtin"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1013
+#: feedex_gui_dialogs_entts.py:1012
 msgid "REGEX for extracting Links:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1015
+#: feedex_gui_dialogs_entts.py:1014
 msgid "This REGEX will extract additional links to resources from Description and Contents instead of builtin"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1032
+#: feedex_gui_dialogs_entts.py:1031
 msgid ""
 "This REGEX should extract list of strings for Entries to be parsed by entry-specific REGEXes\n"
 "Parsing will be done match by match with each REGEX below"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1035 feedex_gui_dialogs_entts.py:1432
+#: feedex_gui_dialogs_entts.py:1034 feedex_gui_dialogs_entts.py:1430
 msgid "Title:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1037
+#: feedex_gui_dialogs_entts.py:1036
 msgid "Link:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1039
+#: feedex_gui_dialogs_entts.py:1038
 msgid "Link to entry. If exctracted link is a relative URL, i.e. it starts with a '/' symbol, Channel's homepage will be prepended to it automatically"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1042 feedex_gui_dialogs_entts.py:1461
+#: feedex_gui_dialogs_entts.py:1041 feedex_gui_dialogs_entts.py:1459
 msgid "Author:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1044 feedex_gui_dialogs_entts.py:1476
+#: feedex_gui_dialogs_entts.py:1043 feedex_gui_dialogs_entts.py:1474
 msgid "Category:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1046
+#: feedex_gui_dialogs_entts.py:1045
 msgid "Additional Text:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1048
+#: feedex_gui_dialogs_entts.py:1047
 msgid "Images:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1050
+#: feedex_gui_dialogs_entts.py:1049
 msgid "Published Date:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1053
+#: feedex_gui_dialogs_entts.py:1052
 msgid "Feed's Title:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1055
+#: feedex_gui_dialogs_entts.py:1054
 msgid "Feed's: Published Date:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1057
+#: feedex_gui_dialogs_entts.py:1056
 msgid "Feed's Image:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1059
+#: feedex_gui_dialogs_entts.py:1058
 msgid "Feed's Encoding:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1061
+#: feedex_gui_dialogs_entts.py:1060
 msgid "Feed's Language:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1117
+#: feedex_gui_dialogs_entts.py:1116
 msgid "Entries"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1118 feedex_gui_feeds.py:421
+#: feedex_gui_dialogs_entts.py:1117 feedex_gui_feeds.py:420
 #: feedex_gui_utils.py:769
 msgid "HTML"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1119
+#: feedex_gui_dialogs_entts.py:1118
 msgid "Parsing Preview"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1121
+#: feedex_gui_dialogs_entts.py:1120
 msgid "Load REGEXes from other Chanel"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1121
+#: feedex_gui_dialogs_entts.py:1120
 msgid "Load from..."
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1127 feedex_gui_dialogs_utils.py:802
+#: feedex_gui_dialogs_entts.py:1126 feedex_gui_dialogs_utils.py:792
 msgid "Accept"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1131
+#: feedex_gui_dialogs_entts.py:1130
 msgid "Download resource and test your search string"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1131
+#: feedex_gui_dialogs_entts.py:1130
 msgid "Test REGEXes"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1179
+#: feedex_gui_dialogs_entts.py:1178
 msgid "Link URL is empty. Cannot download resource"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1200
+#: feedex_gui_dialogs_entts.py:1199
 msgid "Error while downloading resource!"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1250
+#: feedex_gui_dialogs_entts.py:1249
 msgid "Error while validating REGEX!"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1411
+#: feedex_gui_dialogs_entts.py:1409
 msgid "Add new Feed"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1423
+#: feedex_gui_dialogs_entts.py:1421
 msgid ""
 "Choose <b>Category</b> to assign this Feed to\n"
 "Categories are useful for bulk-filtering and general organizing"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1430
+#: feedex_gui_dialogs_entts.py:1428
 msgid "Display name for this Channel"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1434
+#: feedex_gui_dialogs_entts.py:1432
 msgid "This is a title given by publisher and downloaded from Feed's page"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1439
+#: feedex_gui_dialogs_entts.py:1437
 msgid "URL:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1442
+#: feedex_gui_dialogs_entts.py:1440
 msgid "Location:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1445
+#: feedex_gui_dialogs_entts.py:1443
 msgid "Homepage:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1447
+#: feedex_gui_dialogs_entts.py:1445
 msgid "URL to Channel's Homepage"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1449
+#: feedex_gui_dialogs_entts.py:1447
 msgid "Autoupdate metadata?"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1453
+#: feedex_gui_dialogs_entts.py:1451
 msgid "Fetch News?"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1454
+#: feedex_gui_dialogs_entts.py:1452
 msgid "If disabled, Channel's news will not be fetched unless manually requested"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1457
+#: feedex_gui_dialogs_entts.py:1455
 msgid "Fetch interval:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1459
+#: feedex_gui_dialogs_entts.py:1457
 msgid "Set news checking/fetching interval for this Channel"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1464
+#: feedex_gui_dialogs_entts.py:1462
 msgid "Author contact:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1467
+#: feedex_gui_dialogs_entts.py:1465
 msgid "Publisher:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1470
+#: feedex_gui_dialogs_entts.py:1468
 msgid "Publisher contact:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1473
+#: feedex_gui_dialogs_entts.py:1471
 msgid "Contributors:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1479
+#: feedex_gui_dialogs_entts.py:1477
 msgid "Tags:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1484
+#: feedex_gui_dialogs_entts.py:1482
 msgid "Domain:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1486
+#: feedex_gui_dialogs_entts.py:1484
 msgid "Domain used in authentication process"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1488
+#: feedex_gui_dialogs_entts.py:1486
 msgid "Login:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1490
+#: feedex_gui_dialogs_entts.py:1488
 msgid "Login used in authentication process"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1492
+#: feedex_gui_dialogs_entts.py:1490
 msgid "Password:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1495
+#: feedex_gui_dialogs_entts.py:1493
 msgid "Password used in authentication process"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1498
+#: feedex_gui_dialogs_entts.py:1496
 msgid "Custom User Agent:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1501
+#: feedex_gui_dialogs_entts.py:1499
 msgid "Fetching script:"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1507
+#: feedex_gui_dialogs_entts.py:1505
 msgid "Choose icon for this Channel"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1509
+#: feedex_gui_dialogs_entts.py:1507
 msgid "Define <b>REGEX strings</b> for <b>HTML</b> parsing"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1637
+#: feedex_gui_dialogs_entts.py:1635
 msgid "Valid <b>URL</b> to Channel"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1639
+#: feedex_gui_dialogs_entts.py:1637
 msgid ""
 "Valid <b>URL</b> to WWW page to be parsed. \n"
 "For HTML parsing it is good to use Webpages with as little JavaScript as possible"
 msgstr ""
 
-#: feedex_gui_dialogs_entts.py:1642
+#: feedex_gui_dialogs_entts.py:1640
 msgid ""
 "For <b>local</b> and <b>script</b> feeds this can be any string, as it is not used\n"
 "Local feeds are updated only by scripts or CLI (<i>--add-entry</i>, <i>--add-entries-from-file</i>, or <i>--add-entries-from-pipe</i> options)\n"
@@ -3283,165 +3285,157 @@ msgstr ""
 msgid "Done"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:158
+#: feedex_gui_dialogs_utils.py:157
 msgid "FEEDEX Preferences"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:170
+#: feedex_gui_dialogs_utils.py:169
 msgid "Enable desktop notifications?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:172
+#: feedex_gui_dialogs_utils.py:171
 msgid "Should Feedex send desktop notifications on incomming news?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:173
+#: feedex_gui_dialogs_utils.py:172
 msgid "Fetch news in the background?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:174
+#: feedex_gui_dialogs_utils.py:173
 msgid "News will be checked in background and downloaded if Channels's fetching interval is exceeded"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:176
+#: feedex_gui_dialogs_utils.py:175
 msgid "Default check interval:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:178
+#: feedex_gui_dialogs_utils.py:177
 msgid "Default fetching interval for newly added feeds"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:180
+#: feedex_gui_dialogs_utils.py:179
 msgid "Recommendation query limit:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:182
+#: feedex_gui_dialogs_utils.py:181
 msgid ""
 "How many top learned keywords are to be used when recommending articles?\n"
 "<i>Going above 1500 may cause performance hit</i>"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:185
+#: feedex_gui_dialogs_utils.py:184
 msgid "Enable Keyword learning?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:186
+#: feedex_gui_dialogs_utils.py:185
 msgid ""
 "If enabled, keywords are extracted and learned \n"
 "every time an article is read or marked as read (or a marked Note added).\n"
 "Those keywords are then used for better recommendation along with user rules"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:191
+#: feedex_gui_dialogs_utils.py:190
 msgid ""
 "Should incoming news be grouped? How?\n"
 "<b>No grouping</b> - all results will be pushed\n"
 "<b>Just number</b> - just a notification about the number of new articles"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:195
+#: feedex_gui_dialogs_utils.py:194
 msgid ""
 "How many results should be shown for each grouping?\n"
 "If no grouping is selected, it will simply show top results"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:198
+#: feedex_gui_dialogs_utils.py:197
 msgid "New Entry default weight:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:200
+#: feedex_gui_dialogs_utils.py:199
 msgid "Default weight/read value for manually added Entries for rule learning. If 0 then no learning will take place when adding new article"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:202
+#: feedex_gui_dialogs_utils.py:201
 msgid "Rule default weight:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:204
+#: feedex_gui_dialogs_utils.py:203
 msgid "Default weight assigned to manually added rule (if not provided)"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:206
-msgid "Weight for similarity search:"
-msgstr ""
-
-#: feedex_gui_dialogs_utils.py:208
-msgid "How much weight for ranking should items for which similar ones are searched for be given. Zero to disable"
-msgstr ""
-
-#: feedex_gui_dialogs_utils.py:210
+#: feedex_gui_dialogs_utils.py:205
 msgid "Recommendation algorithm:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:213
+#: feedex_gui_dialogs_utils.py:208
 msgid "Added entry color:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:217
+#: feedex_gui_dialogs_utils.py:212
 msgid "Deleted color:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:221
+#: feedex_gui_dialogs_utils.py:216
 msgid "Search hilight color:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:225
+#: feedex_gui_dialogs_utils.py:220
 msgid "Default flag color:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:230
+#: feedex_gui_dialogs_utils.py:225
 msgid "Hotkey, add New Entry: Ctrl + "
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:233
+#: feedex_gui_dialogs_utils.py:228
 msgid "Hotkey, add New Rule: Ctrl + "
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:236
+#: feedex_gui_dialogs_utils.py:231
 msgid "Hotkey, add new Item in a tab: Ctrl + "
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:239
+#: feedex_gui_dialogs_utils.py:234
 msgid "Hotkey, edit item from a tab: Ctrl + "
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:242
+#: feedex_gui_dialogs_utils.py:237
 msgid "Hotkey, start search from a tab: Ctrl + "
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:247
+#: feedex_gui_dialogs_utils.py:242
 msgid "Layout:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:248
+#: feedex_gui_dialogs_utils.py:243
 msgid "How main window panes should be displayed? Requires restart"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:250
+#: feedex_gui_dialogs_utils.py:245
 msgid "Orientation:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:251
+#: feedex_gui_dialogs_utils.py:246
 msgid "Pane horizontal sequence"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:256
+#: feedex_gui_dialogs_utils.py:251
 msgid "Default WWW browser:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:258
+#: feedex_gui_dialogs_utils.py:253
 msgid "Command for opening in browser. Use <b>u%</b> symbol to substitute for URL"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:259 feedex_gui_dialogs_utils.py:261
+#: feedex_gui_dialogs_utils.py:254 feedex_gui_dialogs_utils.py:256
 msgid "Choose from installed applications"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:262
+#: feedex_gui_dialogs_utils.py:257
 msgid "External image viewer:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:264
+#: feedex_gui_dialogs_utils.py:259
 msgid ""
 "Command for viewing images by clicking on them.\n"
 "Use <b>%u</b> symbol to substitute for temp filename\n"
@@ -3449,363 +3443,362 @@ msgid ""
 "<b>%a</b> symbol will be replaced by <b>alt</b> field"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:267
+#: feedex_gui_dialogs_utils.py:262
 msgid "Default WWW search engine:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:271
+#: feedex_gui_dialogs_utils.py:266
 msgid "Similarity query limit:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:273
+#: feedex_gui_dialogs_utils.py:268
 msgid "Limit similarity query items for improved query performance"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:275
+#: feedex_gui_dialogs_utils.py:270
 msgid "Max context length:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:277
+#: feedex_gui_dialogs_utils.py:272
 msgid "If the length of a context/snippet is greater than this number, it will not be shown in query results. Needed to avoid long snippets for wildcard searches"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:279
+#: feedex_gui_dialogs_utils.py:274
 msgid "Default grouping depth:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:281
+#: feedex_gui_dialogs_utils.py:276
 msgid "How many results to show when grouping in a tree? If <b>0</b>, every result will be displayed"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:284
+#: feedex_gui_dialogs_utils.py:279
 msgid "Error threshold:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:286
+#: feedex_gui_dialogs_utils.py:281
 msgid "After how many download errors should a Channel be marked as unhealthy and ignored while fetching?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:288
+#: feedex_gui_dialogs_utils.py:283
 msgid "Ignore modified Tags?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:289
+#: feedex_gui_dialogs_utils.py:284
 msgid "Should ETags and Modified fields be ignored while fetching? If yes, Feedex will fetch news even when publisher suggest not to (e.g. no changes where made to feed)"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:291
+#: feedex_gui_dialogs_utils.py:286
 msgid "Clear cached files older than how many days?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:293
+#: feedex_gui_dialogs_utils.py:288
 msgid "Files in cache include thumbnails and images. It is good to keep them but older items should release space"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:295
+#: feedex_gui_dialogs_utils.py:290
 msgid "Database:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:296 feedex_gui_dialogs_utils.py:305
+#: feedex_gui_dialogs_utils.py:291 feedex_gui_dialogs_utils.py:300
 msgid "Search filesystem"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:300 feedex_gui_dialogs_utils.py:314
+#: feedex_gui_dialogs_utils.py:295 feedex_gui_dialogs_utils.py:309
 msgid "Timeout:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:302
+#: feedex_gui_dialogs_utils.py:297
 msgid "This timeout tells after how many seconds should operation on busy database be aborted"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:307
+#: feedex_gui_dialogs_utils.py:302
 msgid "Path to log file"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:309
+#: feedex_gui_dialogs_utils.py:304
 msgid "User Agent:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:316
+#: feedex_gui_dialogs_utils.py:311
 msgid "Timeout for fetching remote resources"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:318
+#: feedex_gui_dialogs_utils.py:313
 msgid "Profile name:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:320
+#: feedex_gui_dialogs_utils.py:315
 msgid ""
 "Name of this configuration profile.\n"
 "If configuration has a name, its sessions are treated as separate with regards to caching, attributes and plugins"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:323
+#: feedex_gui_dialogs_utils.py:318
 msgid "Exclude from Window Name:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:325
+#: feedex_gui_dialogs_utils.py:320
 msgid ""
 "These are comma-separated phrases to exclude when using window name with --clipboard option.\n"
 "It will prevent littering database with Mozilla, Chrome, Safar headers when adding entries by a Hotkey script.        \n"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:329
+#: feedex_gui_dialogs_utils.py:324
 msgid "Redirect?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:330
+#: feedex_gui_dialogs_utils.py:325
 msgid "Should HTTP redirects (codes:301, 302) be followed when fetching?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:332
+#: feedex_gui_dialogs_utils.py:327
 msgid "Save permanent redirects?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:333
+#: feedex_gui_dialogs_utils.py:328
 msgid "Should permanent HTTP redirects (code: 301) be saved to DB?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:335
+#: feedex_gui_dialogs_utils.py:330
 msgid "Mark deleted channels as unhealthy?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:336
+#: feedex_gui_dialogs_utils.py:331
 msgid "Should deleted channels (HTTP code 410) be marked as unhealthy to avoid fetching in the future?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:338
+#: feedex_gui_dialogs_utils.py:333
 msgid "Do not save queries in History?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:339
+#: feedex_gui_dialogs_utils.py:334
 msgid "Should saving search phrases to History be ommitted?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:341
+#: feedex_gui_dialogs_utils.py:336
 msgid "Allow listening for requests?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:342
+#: feedex_gui_dialogs_utils.py:337
 msgid ""
 "If checked, Feedex GUI session will listen for requests from another processes.\n"
 "This allows for adding entries, rules and feeds from external Feedex instances, useful for desktop hotkeys etc."
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:347
+#: feedex_gui_dialogs_utils.py:342
 msgid "Save configuration"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:349
+#: feedex_gui_dialogs_utils.py:344
 msgid "Restore preferences to defaults"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:459
+#: feedex_gui_dialogs_utils.py:452
 msgid "Interface"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:460
+#: feedex_gui_dialogs_utils.py:453
 msgid "Fetching"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:461
+#: feedex_gui_dialogs_utils.py:454
 msgid "Learning and Ranking"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:462
+#: feedex_gui_dialogs_utils.py:455
 msgid "System"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:499
+#: feedex_gui_dialogs_utils.py:492
 msgid "Choose Database..."
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:503
+#: feedex_gui_dialogs_utils.py:496
 msgid "Choose Log File..."
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:515
+#: feedex_gui_dialogs_utils.py:508
 msgid "Choose Default Browser"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:518
+#: feedex_gui_dialogs_utils.py:511
 msgid "Choose Image Viewer"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:545 feedex_gui_dialogs_utils.py:566
-#: feedex_gui_dialogs_utils.py:568 feedex_gui_dialogs_utils.py:570
-#: feedex_gui_dialogs_utils.py:572 feedex_gui_dialogs_utils.py:576
-#: feedex_gui_dialogs_utils.py:577 feedex_gui_dialogs_utils.py:603
-#: feedex_gui_dialogs_utils.py:605 feedex_gui_dialogs_utils.py:607
-#: feedex_gui_dialogs_utils.py:612 feedex_gui_dialogs_utils.py:613
-#: feedex_gui_dialogs_utils.py:615
+#: feedex_gui_dialogs_utils.py:538 feedex_gui_dialogs_utils.py:559
+#: feedex_gui_dialogs_utils.py:561 feedex_gui_dialogs_utils.py:563
+#: feedex_gui_dialogs_utils.py:567 feedex_gui_dialogs_utils.py:568
+#: feedex_gui_dialogs_utils.py:594 feedex_gui_dialogs_utils.py:596
+#: feedex_gui_dialogs_utils.py:598 feedex_gui_dialogs_utils.py:603
+#: feedex_gui_dialogs_utils.py:604 feedex_gui_dialogs_utils.py:606
 msgid "<<ERROR>>"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:790
+#: feedex_gui_dialogs_utils.py:780
 msgid "Choose date range"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:794
+#: feedex_gui_dialogs_utils.py:784
 msgid "  From:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:795
+#: feedex_gui_dialogs_utils.py:785
 msgid "    To:"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:797 feedex_gui_dialogs_utils.py:799
+#: feedex_gui_dialogs_utils.py:787 feedex_gui_dialogs_utils.py:789
 msgid "Empty"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1007
+#: feedex_gui_dialogs_utils.py:997
 msgid "Change Feed/Category of selected items"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1007 feedex_gui_dialogs_utils.py:1014
+#: feedex_gui_dialogs_utils.py:997 feedex_gui_dialogs_utils.py:1004
 msgid "Feed/Category"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1008
+#: feedex_gui_dialogs_utils.py:998
 msgid "Change Flag for selected items"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1009
+#: feedex_gui_dialogs_utils.py:999
 msgid "Change News/Note status for selected items"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1009
+#: feedex_gui_dialogs_utils.py:999
 msgid "Notes/News"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1010
+#: feedex_gui_dialogs_utils.py:1000
 msgid "Change Read Status/Weight used in recommendations"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1010
+#: feedex_gui_dialogs_utils.py:1000
 msgid "Weight/Read"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1011
+#: feedex_gui_dialogs_utils.py:1001
 msgid "Importance"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1011 feedex_gui_dialogs_utils.py:1021
+#: feedex_gui_dialogs_utils.py:1001 feedex_gui_dialogs_utils.py:1011
 msgid "Change Importance boost used in recommendations"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1014
+#: feedex_gui_dialogs_utils.py:1004
 msgid "Which specific Feed/Category should be matched?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1015
+#: feedex_gui_dialogs_utils.py:1005
 msgid "Which flag rules will be giving?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1016
+#: feedex_gui_dialogs_utils.py:1006
 msgid "Query Field"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1016
+#: feedex_gui_dialogs_utils.py:1006
 msgid "Which specific field should be queried?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1017
+#: feedex_gui_dialogs_utils.py:1007
 msgid "Query Type"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1017
+#: feedex_gui_dialogs_utils.py:1007
 msgid "Rules matching type"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1018
+#: feedex_gui_dialogs_utils.py:1008
 msgid "Language used for full text stemming/matching"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1019
+#: feedex_gui_dialogs_utils.py:1009
 msgid "Case Ins."
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1019
+#: feedex_gui_dialogs_utils.py:1009
 msgid "Is matching case insensitive?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1020
+#: feedex_gui_dialogs_utils.py:1010
 msgid "Additive?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1020
+#: feedex_gui_dialogs_utils.py:1010
 msgid "Are Rules' weights additive?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1021
+#: feedex_gui_dialogs_utils.py:1011
 msgid "Weight/Boost"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1024
+#: feedex_gui_dialogs_utils.py:1014
 msgid "Color"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1024
+#: feedex_gui_dialogs_utils.py:1014
 msgid "Flag color used"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1025
+#: feedex_gui_dialogs_utils.py:1015
 msgid "Color (CLI)"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1025
+#: feedex_gui_dialogs_utils.py:1015
 msgid "Flag color used in CLI display"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1028
+#: feedex_gui_dialogs_utils.py:1018
 msgid "Channel's parent category"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1029
+#: feedex_gui_dialogs_utils.py:1019
 msgid "Fetch?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1029
+#: feedex_gui_dialogs_utils.py:1019
 msgid "Should Channel be fetched from? You can decide if some Channels should be skipped"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1030
+#: feedex_gui_dialogs_utils.py:1020
 msgid "Autoupdate?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1030
+#: feedex_gui_dialogs_utils.py:1020
 msgid "Should Channel's metadata be updated upon fetching?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1031
+#: feedex_gui_dialogs_utils.py:1021
 msgid "Check interval"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1031
+#: feedex_gui_dialogs_utils.py:1021
 msgid "How often (in minutes) should thes Channel be checked for new items?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1032
+#: feedex_gui_dialogs_utils.py:1022
 msgid "Error count for a Chanel. You can use this to mark all of them as healthy/unhealthy"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1032
+#: feedex_gui_dialogs_utils.py:1022
 msgid "Errors"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1033
+#: feedex_gui_dialogs_utils.py:1023
 msgid "Which handler to use for fetching?"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1034
+#: feedex_gui_dialogs_utils.py:1024
 msgid "User Agent"
 msgstr ""
 
-#: feedex_gui_dialogs_utils.py:1034
+#: feedex_gui_dialogs_utils.py:1024
 msgid "Which user agent to use for fetching?"
 msgstr ""
 
-#: feedex_gui_feeds.py:64
+#: feedex_gui_feeds.py:63
 msgid ""
 "These are available <b>Places</b>, <b>Channels</b> and <b>Categories</b>\n"
 "                                            \n"
@@ -3818,56 +3811,56 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_feeds.py:314 feedex_gui_feeds.py:348 feedex_gui_feeds.py:379
+#: feedex_gui_feeds.py:313 feedex_gui_feeds.py:347 feedex_gui_feeds.py:378
 msgid "New"
 msgstr ""
 
-#: feedex_gui_feeds.py:380
+#: feedex_gui_feeds.py:379
 msgid "Previous Update"
 msgstr ""
 
-#: feedex_gui_feeds.py:385 feedex_gui_tabs.py:922 feedex_gui_utils.py:584
+#: feedex_gui_feeds.py:384 feedex_gui_tabs.py:921 feedex_gui_utils.py:584
 msgid "Last Hour"
 msgstr ""
 
-#: feedex_gui_feeds.py:386 feedex_gui_tabs.py:925 feedex_gui_utils.py:585
+#: feedex_gui_feeds.py:385 feedex_gui_tabs.py:924 feedex_gui_utils.py:585
 #: feedex_utils.py:93
 msgid "Today"
 msgstr ""
 
-#: feedex_gui_feeds.py:387
+#: feedex_gui_feeds.py:386
 msgid "This Week"
 msgstr ""
 
-#: feedex_gui_feeds.py:388
+#: feedex_gui_feeds.py:387
 msgid "This Month"
 msgstr ""
 
-#: feedex_gui_feeds.py:389
+#: feedex_gui_feeds.py:388
 msgid "This Quarter"
 msgstr ""
 
-#: feedex_gui_feeds.py:390
+#: feedex_gui_feeds.py:389
 msgid "Last Six Month"
 msgstr ""
 
-#: feedex_gui_feeds.py:415 feedex_gui_utils.py:769
+#: feedex_gui_feeds.py:414 feedex_gui_utils.py:769
 msgid "RSS"
 msgstr ""
 
-#: feedex_gui_feeds.py:427 feedex_gui_utils.py:769
+#: feedex_gui_feeds.py:426 feedex_gui_utils.py:769
 msgid "Script"
 msgstr ""
 
-#: feedex_gui_feeds.py:433 feedex_gui_utils.py:772
+#: feedex_gui_feeds.py:432 feedex_gui_utils.py:772
 msgid "Local"
 msgstr ""
 
-#: feedex_gui_feeds.py:444
+#: feedex_gui_feeds.py:443
 msgid "Trash Bin"
 msgstr ""
 
-#: feedex_gui_feeds.py:575
+#: feedex_gui_feeds.py:574
 msgid "Moving %a..."
 msgstr ""
 
@@ -3959,7 +3952,7 @@ msgstr ""
 msgid "Open a new tab showing Saved Rules"
 msgstr ""
 
-#: feedex_gui_main.py:575 feedex_gui_tabs.py:164 feedex_gui_tabs.py:1007
+#: feedex_gui_main.py:575 feedex_gui_tabs.py:163 feedex_gui_tabs.py:1006
 msgid "Rules"
 msgstr ""
 
@@ -3967,7 +3960,7 @@ msgstr ""
 msgid "Open a new tab showing Flags"
 msgstr ""
 
-#: feedex_gui_main.py:576 feedex_gui_tabs.py:178 feedex_gui_tabs.py:1016
+#: feedex_gui_main.py:576 feedex_gui_tabs.py:177 feedex_gui_tabs.py:1015
 msgid "Flags"
 msgstr ""
 
@@ -3975,7 +3968,7 @@ msgstr ""
 msgid "Open a new tab showing Learned Keywords for recommendations"
 msgstr ""
 
-#: feedex_gui_main.py:577 feedex_gui_tabs.py:1011
+#: feedex_gui_main.py:577 feedex_gui_tabs.py:1010
 msgid "Learned Keywords"
 msgstr ""
 
@@ -3983,7 +3976,7 @@ msgstr ""
 msgid "Open a new tab showing Plugins"
 msgstr ""
 
-#: feedex_gui_main.py:579 feedex_gui_tabs.py:191 feedex_gui_tabs.py:1021
+#: feedex_gui_main.py:579 feedex_gui_tabs.py:190 feedex_gui_tabs.py:1020
 msgid "Plugins"
 msgstr ""
 
@@ -3991,7 +3984,7 @@ msgstr ""
 msgid "Preferences"
 msgstr ""
 
-#: feedex_gui_main.py:583 feedex_gui_main.py:938
+#: feedex_gui_main.py:583 feedex_gui_main.py:950
 msgid "Export..."
 msgstr ""
 
@@ -4019,7 +4012,7 @@ msgstr ""
 msgid "Generate ranked Summary grouped by Category/Channel/Similarity or Dates"
 msgstr ""
 
-#: feedex_gui_main.py:608 feedex_gui_tabs.py:220
+#: feedex_gui_main.py:608 feedex_gui_tabs.py:219
 msgid "Summary"
 msgstr ""
 
@@ -4027,7 +4020,7 @@ msgstr ""
 msgid "Search entries"
 msgstr ""
 
-#: feedex_gui_main.py:611 feedex_gui_tabs.py:81 feedex_gui_tabs.py:232
+#: feedex_gui_main.py:611 feedex_gui_tabs.py:80 feedex_gui_tabs.py:231
 msgid "Search"
 msgstr ""
 
@@ -4059,7 +4052,7 @@ msgstr ""
 msgid "Show most talked about terms for Articles"
 msgstr ""
 
-#: feedex_gui_main.py:617 feedex_gui_tabs.py:243
+#: feedex_gui_main.py:617 feedex_gui_tabs.py:242
 msgid "Trends"
 msgstr ""
 
@@ -4075,7 +4068,7 @@ msgstr ""
 msgid "Find New Feeds"
 msgstr ""
 
-#: feedex_gui_main.py:642 feedex_gui_main.py:1057
+#: feedex_gui_main.py:642 feedex_gui_main.py:1069
 msgid "New Tab..."
 msgstr ""
 
@@ -4147,388 +4140,388 @@ msgstr ""
 msgid "Flag as..."
 msgstr ""
 
-#: feedex_gui_main.py:750
-msgid "Delete permanently"
-msgstr ""
-
-#: feedex_gui_main.py:755
+#: feedex_gui_main.py:749
 msgid "Find Entries similar to the one selected"
 msgstr ""
 
-#: feedex_gui_main.py:755
-msgid "Find Similar Entries..."
+#: feedex_gui_main.py:749
+msgid "Similar Entries..."
 msgstr ""
 
-#: feedex_gui_main.py:756
+#: feedex_gui_main.py:753
+msgid "Delete permanently"
+msgstr ""
+
+#: feedex_gui_main.py:758
 msgid "Search for this Entry's Keywords in time"
 msgstr ""
 
-#: feedex_gui_main.py:756
+#: feedex_gui_main.py:758
 msgid "Show Time Relevance..."
 msgstr ""
 
-#: feedex_gui_main.py:760
+#: feedex_gui_main.py:762
 msgid "Articles"
 msgstr ""
 
-#: feedex_gui_main.py:760
+#: feedex_gui_main.py:762
 msgid "Search for other documents by this Author"
 msgstr ""
 
-#: feedex_gui_main.py:761
+#: feedex_gui_main.py:763
 msgid "Activity in Time"
 msgstr ""
 
-#: feedex_gui_main.py:761
+#: feedex_gui_main.py:763
 msgid "Search for other documents by this Author in Time Series"
 msgstr ""
 
-#: feedex_gui_main.py:763
+#: feedex_gui_main.py:765
 msgid "Search WWW for this Author's info"
 msgstr ""
 
-#: feedex_gui_main.py:763 feedex_gui_main.py:1034
+#: feedex_gui_main.py:765 feedex_gui_main.py:1046
 msgid "Search WWW"
 msgstr ""
 
-#: feedex_gui_main.py:764
+#: feedex_gui_main.py:766
 msgid "Other by this Author..."
 msgstr ""
 
-#: feedex_gui_main.py:764
+#: feedex_gui_main.py:766
 msgid "Search for this Author"
 msgstr ""
 
-#: feedex_gui_main.py:766
+#: feedex_gui_main.py:768
 msgid "Search..."
 msgstr ""
 
-#: feedex_gui_main.py:786
+#: feedex_gui_main.py:788
 msgid "Search for this Rule"
 msgstr ""
 
-#: feedex_gui_main.py:787
+#: feedex_gui_main.py:789
 msgid "Show this Rule's Contexts"
 msgstr ""
 
-#: feedex_gui_main.py:788
+#: feedex_gui_main.py:790
 msgid "Show Terms related to this Rule"
 msgstr ""
 
-#: feedex_gui_main.py:789
+#: feedex_gui_main.py:791
 msgid "Show Time Series for this Rule"
 msgstr ""
 
-#: feedex_gui_main.py:802 feedex_gui_main.py:1029
+#: feedex_gui_main.py:804 feedex_gui_main.py:1041
 msgid "Search for this Term"
 msgstr ""
 
-#: feedex_gui_main.py:803 feedex_gui_main.py:1030
+#: feedex_gui_main.py:805 feedex_gui_main.py:1042
 msgid "Show this Term's Contexts"
 msgstr ""
 
-#: feedex_gui_main.py:804 feedex_gui_main.py:1031
+#: feedex_gui_main.py:806 feedex_gui_main.py:1043
 msgid "Show Terms related to this Term"
 msgstr ""
 
-#: feedex_gui_main.py:805 feedex_gui_main.py:1032
+#: feedex_gui_main.py:807 feedex_gui_main.py:1044
 msgid "Show Time Series for this Term"
 msgstr ""
 
-#: feedex_gui_main.py:818
+#: feedex_gui_main.py:820
 msgid "Search this Time Range"
 msgstr ""
 
-#: feedex_gui_main.py:834
+#: feedex_gui_main.py:836
 msgid "Search for this Flag"
 msgstr ""
 
-#: feedex_gui_main.py:835
+#: feedex_gui_main.py:837
 msgid "Time Series search for this Flag"
 msgstr ""
 
-#: feedex_gui_main.py:856
+#: feedex_gui_main.py:858
 msgid "Visit Homepage"
 msgstr ""
 
-#: feedex_gui_main.py:866
+#: feedex_gui_main.py:868
 msgid "Show articles for this Channel or Category sorted from newest"
 msgstr ""
 
-#: feedex_gui_main.py:866
+#: feedex_gui_main.py:868
 msgid "Show from newest..."
 msgstr ""
 
-#: feedex_gui_main.py:867
+#: feedex_gui_main.py:869
 msgid "Show articles sorted from newest in an extended view"
 msgstr ""
 
-#: feedex_gui_main.py:867
+#: feedex_gui_main.py:869
 msgid "Show from newest (wide view)..."
 msgstr ""
 
-#: feedex_gui_main.py:868
+#: feedex_gui_main.py:870
 msgid "Show item's Summary Tree ranked by Trends"
 msgstr ""
 
-#: feedex_gui_main.py:868
+#: feedex_gui_main.py:870
 msgid "Summary..."
 msgstr ""
 
-#: feedex_gui_main.py:872
+#: feedex_gui_main.py:878
 msgid "Add Channel"
 msgstr ""
 
-#: feedex_gui_main.py:873
+#: feedex_gui_main.py:879
 msgid "Add Category"
 msgstr ""
 
-#: feedex_gui_main.py:876
+#: feedex_gui_main.py:888
 msgid "Go to Channel's Homepage"
 msgstr ""
 
-#: feedex_gui_main.py:880
+#: feedex_gui_main.py:892
 msgid "Fetch from selected Channel"
 msgstr ""
 
-#: feedex_gui_main.py:881
+#: feedex_gui_main.py:893
 msgid "Update metadata for Channel"
 msgstr ""
 
-#: feedex_gui_main.py:882
+#: feedex_gui_main.py:894
 msgid "Update metadata for All Channels"
 msgstr ""
 
-#: feedex_gui_main.py:885
+#: feedex_gui_main.py:897
 msgid "Edit Channel"
 msgstr ""
 
-#: feedex_gui_main.py:886
+#: feedex_gui_main.py:898
 msgid "Mark Channel as healthy"
 msgstr ""
 
-#: feedex_gui_main.py:886
+#: feedex_gui_main.py:898
 msgid "This will nullify error count for this Channel so it will not be ommited on next fetching"
 msgstr ""
 
-#: feedex_gui_main.py:888
+#: feedex_gui_main.py:900
 msgid "Remove Channel"
 msgstr ""
 
-#: feedex_gui_main.py:891
+#: feedex_gui_main.py:903
 msgid "Show all technical information about this Channel"
 msgstr ""
 
-#: feedex_gui_main.py:891 feedex_gui_main.py:1021
+#: feedex_gui_main.py:903 feedex_gui_main.py:1033
 msgid "Technical details..."
 msgstr ""
 
-#: feedex_gui_main.py:897
+#: feedex_gui_main.py:909
 msgid "Edit Category"
 msgstr ""
 
-#: feedex_gui_main.py:898
+#: feedex_gui_main.py:910
 msgid "Remove Category"
 msgstr ""
 
-#: feedex_gui_main.py:903
+#: feedex_gui_main.py:915
 msgid "Move"
 msgstr ""
 
-#: feedex_gui_main.py:910
+#: feedex_gui_main.py:922
 msgid "Restore..."
 msgstr ""
 
-#: feedex_gui_main.py:911
+#: feedex_gui_main.py:923
 msgid "Remove Permanently"
 msgstr ""
 
-#: feedex_gui_main.py:928
+#: feedex_gui_main.py:940
 msgid "Delete Learned Keywords"
 msgstr ""
 
-#: feedex_gui_main.py:928
+#: feedex_gui_main.py:940
 msgid "Remove all learned rules from database. Be careful!"
 msgstr ""
 
-#: feedex_gui_main.py:929
+#: feedex_gui_main.py:941
 msgid "Relearn All Keywords"
 msgstr ""
 
-#: feedex_gui_main.py:929
+#: feedex_gui_main.py:941
 msgid "Relearn rules from all read/marked items"
 msgstr ""
 
-#: feedex_gui_main.py:934
+#: feedex_gui_main.py:946
 msgid "Save results from current tab"
 msgstr ""
 
-#: feedex_gui_main.py:934
+#: feedex_gui_main.py:946
 msgid "Save results to CSV"
 msgstr ""
 
-#: feedex_gui_main.py:935
+#: feedex_gui_main.py:947
 msgid "Export results from current tab"
 msgstr ""
 
-#: feedex_gui_main.py:935
+#: feedex_gui_main.py:947
 msgid "Export results to JSON"
 msgstr ""
 
-#: feedex_gui_main.py:944 feedex_gui_main.py:1041
+#: feedex_gui_main.py:956 feedex_gui_main.py:1053
 msgid "Plugins..."
 msgstr ""
 
-#: feedex_gui_main.py:950 feedex_gui_main.py:972
+#: feedex_gui_main.py:962 feedex_gui_main.py:984
 msgid "Select all"
 msgstr ""
 
-#: feedex_gui_main.py:951 feedex_gui_main.py:969 feedex_gui_main.py:973
+#: feedex_gui_main.py:963 feedex_gui_main.py:981 feedex_gui_main.py:985
 msgid "Unselect all"
 msgstr ""
 
-#: feedex_gui_main.py:953 feedex_gui_main.py:976
+#: feedex_gui_main.py:965 feedex_gui_main.py:988
 msgid "Normal Mode..."
 msgstr ""
 
-#: feedex_gui_main.py:956 feedex_gui_main.py:979
+#: feedex_gui_main.py:968 feedex_gui_main.py:991
 msgid "Edit Mode..."
 msgstr ""
 
-#: feedex_gui_main.py:956 feedex_gui_main.py:979
+#: feedex_gui_main.py:968 feedex_gui_main.py:991
 msgid ""
 "Multiple selection mode allows user to check many items at once and perform mass operations on them. \n"
 "Toggle items to select and choose <b>Edit selected...</b> menu option to edit multiple entries at once.\n"
 "Choose <b>Delete</b> to delete selected items"
 msgstr ""
 
-#: feedex_gui_main.py:963
+#: feedex_gui_main.py:975
 msgid "Expand all"
 msgstr ""
 
-#: feedex_gui_main.py:964
+#: feedex_gui_main.py:976
 msgid "Collapse all"
 msgstr ""
 
-#: feedex_gui_main.py:987 feedex_gui_tabs.py:479
+#: feedex_gui_main.py:999 feedex_gui_tabs.py:478
 msgid ""
 "Save column layout and sizing for current tab.\n"
 "It will be used as default in the future"
 msgstr ""
 
-#: feedex_gui_main.py:987 feedex_gui_tabs.py:479
+#: feedex_gui_main.py:999 feedex_gui_tabs.py:478
 msgid "Save layout"
 msgstr ""
 
-#: feedex_gui_main.py:988 feedex_gui_tabs.py:475
+#: feedex_gui_main.py:1000 feedex_gui_tabs.py:474
 msgid "Save current search filters as defaults for future"
 msgstr ""
 
-#: feedex_gui_main.py:988 feedex_gui_tabs.py:475
+#: feedex_gui_main.py:1000 feedex_gui_tabs.py:474
 msgid "Save filters"
 msgstr ""
 
-#: feedex_gui_main.py:1004
+#: feedex_gui_main.py:1016
 msgid "90%"
 msgstr ""
 
-#: feedex_gui_main.py:1005
+#: feedex_gui_main.py:1017
 msgid "80%"
 msgstr ""
 
-#: feedex_gui_main.py:1006
+#: feedex_gui_main.py:1018
 msgid "70%"
 msgstr ""
 
-#: feedex_gui_main.py:1007
+#: feedex_gui_main.py:1019
 msgid "60%"
 msgstr ""
 
-#: feedex_gui_main.py:1008
+#: feedex_gui_main.py:1020
 msgid "50%"
 msgstr ""
 
-#: feedex_gui_main.py:1009
+#: feedex_gui_main.py:1021
 msgid "40%"
 msgstr ""
 
-#: feedex_gui_main.py:1010
+#: feedex_gui_main.py:1022
 msgid "30%"
 msgstr ""
 
-#: feedex_gui_main.py:1011
+#: feedex_gui_main.py:1023
 msgid "20%"
 msgstr ""
 
-#: feedex_gui_main.py:1012
+#: feedex_gui_main.py:1024
 msgid "10%"
 msgstr ""
 
-#: feedex_gui_main.py:1014
+#: feedex_gui_main.py:1026
 msgid "Summarize..."
 msgstr ""
 
-#: feedex_gui_main.py:1016
+#: feedex_gui_main.py:1028
 msgid "Show Details..."
 msgstr ""
 
-#: feedex_gui_main.py:1021
+#: feedex_gui_main.py:1033
 msgid "Show all entry's technical data"
 msgstr ""
 
-#: feedex_gui_main.py:1034
+#: feedex_gui_main.py:1046
 msgid "Search WWW for selected text"
 msgstr ""
 
-#: feedex_gui_main.py:1036
+#: feedex_gui_main.py:1048
 msgid "Add as Rule"
 msgstr ""
 
-#: feedex_gui_main.py:1056
+#: feedex_gui_main.py:1068
 msgid "Go to Tab..."
 msgstr ""
 
-#: feedex_gui_main.py:1058
+#: feedex_gui_main.py:1070
 msgid "Add..."
 msgstr ""
 
-#: feedex_gui_main.py:1060
+#: feedex_gui_main.py:1072
 msgid "Fetch..."
 msgstr ""
 
-#: feedex_gui_main.py:1062
+#: feedex_gui_main.py:1074
 msgid "System..."
 msgstr ""
 
-#: feedex_gui_main.py:1425
+#: feedex_gui_main.py:1437
 msgid "This rule adds its weight to the rest of ranking"
 msgstr ""
 
-#: feedex_gui_main.py:1426
+#: feedex_gui_main.py:1438
 msgid "This rule supercedes wieights of other ranking rules if matched"
 msgstr ""
 
-#: feedex_gui_main.py:1817
+#: feedex_gui_main.py:1829
 msgid "Database locked!"
 msgstr ""
 
-#: feedex_gui_main.py:1830
+#: feedex_gui_main.py:1842
 msgid "Locked for adding Entries!"
 msgstr ""
 
-#: feedex_gui_main.py:1852
+#: feedex_gui_main.py:1864
 msgid "Locked for adding Feeds!"
 msgstr ""
 
-#: feedex_gui_main.py:1855 feedex_gui_main.py:1880
+#: feedex_gui_main.py:1867 feedex_gui_main.py:1892
 msgid "Locked for Fetching!"
 msgstr ""
 
-#: feedex_gui_main.py:1877
+#: feedex_gui_main.py:1889
 msgid "Locked for adding Rules!"
 msgstr ""
 
-#: feedex_gui_tabs.py:76 feedex_gui_tabs.py:88 feedex_gui_tabs.py:215
+#: feedex_gui_tabs.py:75 feedex_gui_tabs.py:87 feedex_gui_tabs.py:214
 msgid ""
 "Double-click to open in browser or edit. \n"
 "Right-click for more options\n"
@@ -4537,12 +4530,12 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:93 feedex_gui_tabs.py:916 feedex_gui_tabs.py:919
+#: feedex_gui_tabs.py:92 feedex_gui_tabs.py:915 feedex_gui_tabs.py:918
 #: feedex_gui_utils.py:782
 msgid "News"
 msgstr ""
 
-#: feedex_gui_tabs.py:101
+#: feedex_gui_tabs.py:100
 msgid ""
 "Search phrase in context is shown here.\n"
 "Double-click to open the entry containing a context.\n"
@@ -4552,11 +4545,11 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:107
+#: feedex_gui_tabs.py:106
 msgid "Search Contexts"
 msgstr ""
 
-#: feedex_gui_tabs.py:114
+#: feedex_gui_tabs.py:113
 msgid ""
 "Items similar to given entry.\n"
 "Double-click to open the entry.\n"
@@ -4566,11 +4559,11 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:120
+#: feedex_gui_tabs.py:119
 msgid "Find Similar"
 msgstr ""
 
-#: feedex_gui_tabs.py:129
+#: feedex_gui_tabs.py:128
 msgid ""
 "Terms related to the one queried for. \n"
 "Right-click for more options            \n"
@@ -4579,11 +4572,11 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:134
+#: feedex_gui_tabs.py:133
 msgid "Term Net"
 msgstr ""
 
-#: feedex_gui_tabs.py:142
+#: feedex_gui_tabs.py:141
 msgid ""
 "Time series for Term(s). \n"
 "Right-click for more options\n"
@@ -4591,11 +4584,11 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:146
+#: feedex_gui_tabs.py:145
 msgid "Time Series"
 msgstr ""
 
-#: feedex_gui_tabs.py:154
+#: feedex_gui_tabs.py:153
 msgid ""
 "These are manually added rules used for ranking and flagging.\n"
 "Each time articles are fetched or notes added, they are matched against these rules.\n"
@@ -4609,7 +4602,7 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:171
+#: feedex_gui_tabs.py:170
 msgid ""
 "Flags used in rules and for manual marking of Entries.\n"
 "Their names, descriptions and colors are completely arbitrary and up to user.\n"
@@ -4620,7 +4613,7 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:185
+#: feedex_gui_tabs.py:184
 msgid ""
 "Plugins available in context menus allowing user to run custom shell commands and scripts on items\n"
 "\n"
@@ -4630,7 +4623,7 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:198
+#: feedex_gui_tabs.py:197
 msgid ""
 "Time distribution for similar documents.\n"
 "It shows how subjects prominent in a Document were relevant in a time range. \n"
@@ -4641,11 +4634,11 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:205
+#: feedex_gui_tabs.py:204
 msgid "Entry Relevance in Time"
 msgstr ""
 
-#: feedex_gui_tabs.py:227
+#: feedex_gui_tabs.py:226
 msgid ""
 "Double-click to edit or open in browser. \n"
 "Right-click for more options\n"
@@ -4654,7 +4647,7 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:238
+#: feedex_gui_tabs.py:237
 msgid ""
 "Strongest trending terms from filtered documents\n"
 "Right-click for more options\n"
@@ -4663,7 +4656,7 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:252
+#: feedex_gui_tabs.py:251
 msgid ""
 "Mark Channels/Categories to Import.\n"
 "If Channel's parent category is selected, it will be imported as well (if a category of the same name does not exist)\n"
@@ -4673,11 +4666,11 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:258 feedex_gui_tabs.py:1027
+#: feedex_gui_tabs.py:257 feedex_gui_tabs.py:1026
 msgid "Find Feeds..."
 msgstr ""
 
-#: feedex_gui_tabs.py:268
+#: feedex_gui_tabs.py:267
 msgid ""
 "List of Keywords learned after <b>adding Entries</b> and <b>reading Articles</b>\n"
 "They are used for recommending articles based on your previous choices.\n"
@@ -4688,81 +4681,81 @@ msgid ""
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:275
+#: feedex_gui_tabs.py:274
 msgid "Learned Rules"
 msgstr ""
 
-#: feedex_gui_tabs.py:307
+#: feedex_gui_tabs.py:306
 msgid ""
 "Right-click on tab headers to quickly switch tabs\n"
 "Right-click on columns or search filters for layout and filters options\n"
 "Hit <b>Ctrl-F2</b> for Quick Main Menu"
 msgstr ""
 
-#: feedex_gui_tabs.py:327
+#: feedex_gui_tabs.py:326
 msgid "Clear search phrase"
 msgstr ""
 
-#: feedex_gui_tabs.py:336
+#: feedex_gui_tabs.py:335
 msgid "Import selected Channels for subscription"
 msgstr ""
 
-#: feedex_gui_tabs.py:336
+#: feedex_gui_tabs.py:335
 msgid "Subscribe to Selected"
 msgstr ""
 
-#: feedex_gui_tabs.py:348
+#: feedex_gui_tabs.py:347
 msgid "Restore filters to defaults"
 msgstr ""
 
-#: feedex_gui_tabs.py:356
+#: feedex_gui_tabs.py:355
 msgid "Select time series grouping"
 msgstr ""
 
-#: feedex_gui_tabs.py:358
+#: feedex_gui_tabs.py:357
 msgid ""
 "Select grouping field\n"
 "<b>Grouping by Similarity will collapse similar entries into most important node</b>\n"
 "<i>Note that grouping by similarity will be very time consuming for large date ranges</i>"
 msgstr ""
 
-#: feedex_gui_tabs.py:360
+#: feedex_gui_tabs.py:359
 msgid "Select how many top results to show for each grouping"
 msgstr ""
 
-#: feedex_gui_tabs.py:368
+#: feedex_gui_tabs.py:367
 msgid "Filter for Read/Unread news. Manually added entries are marked as read by default"
 msgstr ""
 
-#: feedex_gui_tabs.py:370
+#: feedex_gui_tabs.py:369
 msgid "Filter by Flag or lack thereof"
 msgstr ""
 
-#: feedex_gui_tabs.py:372
+#: feedex_gui_tabs.py:371
 msgid "Chose which item type to filter (Notes, News Items or both)"
 msgstr ""
 
-#: feedex_gui_tabs.py:374
+#: feedex_gui_tabs.py:373
 msgid "Which handler protocols should be taken into account?"
 msgstr ""
 
-#: feedex_gui_tabs.py:382
+#: feedex_gui_tabs.py:381
 msgid "Choose a specific field to search"
 msgstr ""
 
-#: feedex_gui_tabs.py:386
+#: feedex_gui_tabs.py:385
 msgid "Filter by Channel's location"
 msgstr ""
 
-#: feedex_gui_tabs.py:391
+#: feedex_gui_tabs.py:390
 msgid "Choose page length for query"
 msgstr ""
 
-#: feedex_gui_tabs.py:594
+#: feedex_gui_tabs.py:593
 msgid "Filters saved as defaults"
 msgstr ""
 
-#: feedex_gui_tabs.py:650
+#: feedex_gui_tabs.py:649
 msgid ""
 "Enter your search phrase here\n"
 "Special tokens: AND, OR, NOT, (,), NEAR (for logical operations)\n"
@@ -4785,7 +4778,7 @@ msgid ""
 "\n"
 msgstr ""
 
-#: feedex_gui_tabs.py:674
+#: feedex_gui_tabs.py:673
 msgid ""
 "Enter your search string here\n"
 "Wildcard: <b>*</b>\n"
@@ -4793,111 +4786,111 @@ msgid ""
 "Escape: \\ (only if before wildcards and field markers)"
 msgstr ""
 
-#: feedex_gui_tabs.py:895
+#: feedex_gui_tabs.py:894
 msgid "Results"
 msgstr ""
 
-#: feedex_gui_tabs.py:909
+#: feedex_gui_tabs.py:908
 msgid "Trash bin"
 msgstr ""
 
-#: feedex_gui_tabs.py:928 feedex_gui_utils.py:586
+#: feedex_gui_tabs.py:927 feedex_gui_utils.py:586
 msgid "Week"
 msgstr ""
 
-#: feedex_gui_tabs.py:931 feedex_gui_utils.py:587
+#: feedex_gui_tabs.py:930 feedex_gui_utils.py:587
 msgid "Month"
 msgstr ""
 
-#: feedex_gui_tabs.py:934 feedex_gui_utils.py:588
+#: feedex_gui_tabs.py:933 feedex_gui_utils.py:588
 msgid "Quarter"
 msgstr ""
 
-#: feedex_gui_tabs.py:937 feedex_gui_utils.py:589
+#: feedex_gui_tabs.py:936 feedex_gui_utils.py:589
 msgid "Six Months"
 msgstr ""
 
-#: feedex_gui_tabs.py:940 feedex_gui_utils.py:590
+#: feedex_gui_tabs.py:939 feedex_gui_utils.py:590
 msgid "Year"
 msgstr ""
 
-#: feedex_gui_tabs.py:943
+#: feedex_gui_tabs.py:942
 msgid "Prev. Updates"
 msgstr ""
 
-#: feedex_gui_tabs.py:949
+#: feedex_gui_tabs.py:948
 msgid "Similar to ..."
 msgstr ""
 
-#: feedex_gui_tabs.py:953
+#: feedex_gui_tabs.py:952
 msgid "Relevance in Time ..."
 msgstr ""
 
-#: feedex_gui_tabs.py:978
+#: feedex_gui_tabs.py:977
 msgid "Recomm."
 msgstr ""
 
-#: feedex_gui_tabs.py:979 feedex_gui_utils.py:657
+#: feedex_gui_tabs.py:978 feedex_gui_utils.py:657
 msgid "Trending"
 msgstr ""
 
-#: feedex_gui_tabs.py:980
+#: feedex_gui_tabs.py:979
 msgid "Debubble"
 msgstr ""
 
-#: feedex_gui_tabs.py:981
+#: feedex_gui_tabs.py:980
 msgid "Latest"
 msgstr ""
 
-#: feedex_gui_tabs.py:983
+#: feedex_gui_tabs.py:982
 msgid "by Category"
 msgstr ""
 
-#: feedex_gui_tabs.py:984
+#: feedex_gui_tabs.py:983
 msgid "by Channel"
 msgstr ""
 
-#: feedex_gui_tabs.py:985
+#: feedex_gui_tabs.py:984
 msgid "by Flag"
 msgstr ""
 
-#: feedex_gui_tabs.py:986
+#: feedex_gui_tabs.py:985
 msgid "by Simil."
 msgstr ""
 
-#: feedex_gui_tabs.py:987
+#: feedex_gui_tabs.py:986
 msgid "by Month"
 msgstr ""
 
-#: feedex_gui_tabs.py:988
+#: feedex_gui_tabs.py:987
 msgid "by Day"
 msgstr ""
 
-#: feedex_gui_tabs.py:989
+#: feedex_gui_tabs.py:988
 msgid "by Hour"
 msgstr ""
 
-#: feedex_gui_tabs.py:1048
+#: feedex_gui_tabs.py:1047
 msgid "Generating summary..."
 msgstr ""
 
-#: feedex_gui_tabs.py:1049
+#: feedex_gui_tabs.py:1048
 msgid "Getting data..."
 msgstr ""
 
-#: feedex_gui_tabs.py:1050
+#: feedex_gui_tabs.py:1049
 msgid "Querying Feed Catalog..."
 msgstr ""
 
-#: feedex_gui_tabs.py:1051
+#: feedex_gui_tabs.py:1050
 msgid "Searching..."
 msgstr ""
 
-#: feedex_gui_tabs.py:1106
+#: feedex_gui_tabs.py:1105
 msgid "Filtering..."
 msgstr ""
 
-#: feedex_gui_tabs.py:1695
+#: feedex_gui_tabs.py:1693
 msgid "Layout marked as default for this tab type"
 msgstr ""
 
@@ -5211,215 +5204,215 @@ msgstr ""
 msgid "Select language used fort query tokenizing and stemming"
 msgstr ""
 
-#: feedex_gui_utils.py:872 feedex_gui_utils.py:881
+#: feedex_gui_utils.py:884 feedex_gui_utils.py:893
 msgid "500"
 msgstr ""
 
-#: feedex_gui_utils.py:873 feedex_gui_utils.py:882
+#: feedex_gui_utils.py:885 feedex_gui_utils.py:894
 msgid "1000"
 msgstr ""
 
-#: feedex_gui_utils.py:874 feedex_gui_utils.py:883
+#: feedex_gui_utils.py:886 feedex_gui_utils.py:895
 msgid "1500"
 msgstr ""
 
-#: feedex_gui_utils.py:875 feedex_gui_utils.py:884
+#: feedex_gui_utils.py:887 feedex_gui_utils.py:896
 msgid "2000"
 msgstr ""
 
-#: feedex_gui_utils.py:876 feedex_gui_utils.py:885
+#: feedex_gui_utils.py:888 feedex_gui_utils.py:897
 msgid "3000"
 msgstr ""
 
-#: feedex_gui_utils.py:877 feedex_gui_utils.py:886
+#: feedex_gui_utils.py:889 feedex_gui_utils.py:898
 msgid "5000"
 msgstr ""
 
-#: feedex_gui_utils.py:897
+#: feedex_gui_utils.py:909
 msgid "Similarity"
 msgstr ""
 
-#: feedex_gui_utils.py:898
+#: feedex_gui_utils.py:910
 msgid "Simil. offset by doc, weight"
 msgstr ""
 
-#: feedex_gui_utils.py:899
+#: feedex_gui_utils.py:911
 msgid "Simil. boosted by readability"
 msgstr ""
 
-#: feedex_gui_utils.py:901
+#: feedex_gui_utils.py:913
 msgid "Which algorithm should be used when recommending documents?"
 msgstr ""
 
-#: feedex_gui_utils.py:909
+#: feedex_gui_utils.py:921
 msgid "Query result"
 msgstr ""
 
-#: feedex_gui_utils.py:910
+#: feedex_gui_utils.py:922
 msgid "All query results"
 msgstr ""
 
-#: feedex_gui_utils.py:923
+#: feedex_gui_utils.py:935
 msgid "Chose field to search"
 msgstr ""
 
-#: feedex_gui_utils.py:1059
+#: feedex_gui_utils.py:1071
 msgid "Error getting image from %a: %b"
 msgstr ""
 
-#: feedex_gui_utils.py:1220 feedex_gui_utils.py:1630
+#: feedex_gui_utils.py:1232 feedex_gui_utils.py:1640
 msgid "Image error: %a"
 msgstr ""
 
-#: feedex_gui_utils.py:1239
+#: feedex_gui_utils.py:1251
 msgid "Save as..."
 msgstr ""
 
-#: feedex_gui_utils.py:1244
+#: feedex_gui_utils.py:1256
 msgid "Open File"
 msgstr ""
 
-#: feedex_gui_utils.py:1249
+#: feedex_gui_utils.py:1261
 msgid "Open Folder"
 msgstr ""
 
-#: feedex_gui_utils.py:1254
+#: feedex_gui_utils.py:1266
 msgid "Choose Image"
 msgstr ""
 
-#: feedex_gui_utils.py:1256
+#: feedex_gui_utils.py:1268
 msgid "Image files"
 msgstr ""
 
-#: feedex_gui_utils.py:1262
+#: feedex_gui_utils.py:1274
 msgid "All files"
 msgstr ""
 
-#: feedex_gui_utils.py:1266
+#: feedex_gui_utils.py:1278
 msgid "No Image"
 msgstr ""
 
-#: feedex_gui_utils.py:1283
+#: feedex_gui_utils.py:1295
 msgid "Target %a is a directory!"
 msgstr ""
 
-#: feedex_gui_utils.py:1286
+#: feedex_gui_utils.py:1298
 msgid "Overwrite?"
 msgstr ""
 
-#: feedex_gui_utils.py:1292
+#: feedex_gui_utils.py:1304
 msgid "Could not remove %a: %b"
 msgstr ""
 
-#: feedex_gui_utils.py:1317
+#: feedex_gui_utils.py:1329
 msgid "Error saving thumbnail from %a: %b"
 msgstr ""
 
-#: feedex_gui_utils.py:1333
+#: feedex_gui_utils.py:1345
 msgid "Error creating %a thumbnail for %b: %c"
 msgstr ""
 
-#: feedex_gui_utils.py:1507
+#: feedex_gui_utils.py:1517
 msgid "Feedex: Database is Locked"
 msgstr ""
 
-#: feedex_gui_utils.py:1508
+#: feedex_gui_utils.py:1518
 msgid "Another instance can be performing operations on Database or Feedex did not close properly last time. Proceed anyway?"
 msgstr ""
 
-#: feedex_gui_utils.py:1522
+#: feedex_gui_utils.py:1532
 msgid "Feedex: Critical Error!"
 msgstr ""
 
-#: feedex_gui_utils.py:1583
+#: feedex_gui_utils.py:1593
 msgid "Expanded feeds invalid. Defaulting..."
 msgstr ""
 
-#: feedex_gui_utils.py:1588
+#: feedex_gui_utils.py:1598
 msgid "No valid layouts found. Defaulting..."
 msgstr ""
 
-#: feedex_gui_utils.py:1592
+#: feedex_gui_utils.py:1602
 msgid "Invalid layout list. Defaulting..."
 msgstr ""
 
-#: feedex_gui_utils.py:1597 feedex_gui_utils.py:1603 feedex_gui_utils.py:1607
+#: feedex_gui_utils.py:1607 feedex_gui_utils.py:1613 feedex_gui_utils.py:1617
 msgid "Invald %a layout. Defaulting..."
 msgstr ""
 
-#: feedex_gui_utils.py:1679
+#: feedex_gui_utils.py:1689
 msgid "Plugin item %a not a valid list! Ommiting"
 msgstr ""
 
-#: feedex_gui_utils.py:1682
+#: feedex_gui_utils.py:1692
 msgid "Invalid plugin item %a! Ommiting"
 msgstr ""
 
-#: feedex_handlers.py:61
+#: feedex_handlers.py:60
 msgid "Invalid type of input feed! Should be FeedexContainer!"
 msgstr ""
 
-#: feedex_handlers.py:85
+#: feedex_handlers.py:84
 msgid "Unrecognized authentication handler (%a). Must be \"digest\" or \"basic\""
 msgstr ""
 
-#: feedex_handlers.py:113
+#: feedex_handlers.py:112
 msgid "Download error: %a"
 msgstr ""
 
-#: feedex_handlers.py:143
+#: feedex_handlers.py:142
 msgid "Could not read HTTP status"
 msgstr ""
 
-#: feedex_handlers.py:149
+#: feedex_handlers.py:148
 msgid "Feed %a moved to new location!"
 msgstr ""
 
-#: feedex_handlers.py:158
+#: feedex_handlers.py:157
 msgid "URL to resource empty!"
 msgstr ""
 
-#: feedex_handlers.py:163
+#: feedex_handlers.py:162
 msgid "Feed %a removed permanently (410)!"
 msgstr ""
 
-#: feedex_handlers.py:169
+#: feedex_handlers.py:168
 msgid "Invalid HTTP return code for %a"
 msgstr ""
 
-#: feedex_handlers.py:175
+#: feedex_handlers.py:174
 msgid "Feed %a unreadable!"
 msgstr ""
 
-#: feedex_handlers.py:214
+#: feedex_handlers.py:213
 msgid "Feed unchanged (304)"
 msgstr ""
 
-#: feedex_handlers.py:220
+#: feedex_handlers.py:219
 msgid "Channel redirected: %a"
 msgstr ""
 
-#: feedex_handlers.py:231
+#: feedex_handlers.py:230
 msgid "Feed unchanged (Published Date)"
 msgstr ""
 
-#: feedex_handlers.py:604
+#: feedex_handlers.py:603
 msgid "No script file or command provided!"
 msgstr ""
 
-#: feedex_handlers.py:659
+#: feedex_handlers.py:658
 msgid "Error decoding script output as JSON: %a"
 msgstr ""
 
-#: feedex_handlers.py:664
+#: feedex_handlers.py:663
 msgid "Invalid input format. Must be a dictionary"
 msgstr ""
 
-#: feedex_handlers.py:669
+#: feedex_handlers.py:668
 msgid "No valid instance ID provided. Aborting"
 msgstr ""
 
-#: feedex_nlp.py:476
+#: feedex_nlp.py:475
 msgid "Summary level must be between 0..100!"
 msgstr ""
 
@@ -5447,23 +5440,23 @@ msgstr ""
 msgid "Input must be a dict!"
 msgstr ""
 
-#: feedex_piper.py:145
+#: feedex_piper.py:142
 msgid "Error writing to %a pipe: %b"
 msgstr ""
 
-#: feedex_piper.py:156
+#: feedex_piper.py:153
 msgid "Could not open %a pipe: %b"
 msgstr ""
 
-#: feedex_piper.py:161
+#: feedex_piper.py:158
 msgid "Could not register %a pipe: %b"
 msgstr ""
 
-#: feedex_piper.py:178
+#: feedex_piper.py:175
 msgid "Request session id mismatch!"
 msgstr ""
 
-#: feedex_piper.py:182
+#: feedex_piper.py:179
 msgid "Request protocol mismatch!"
 msgstr ""
 
@@ -5483,95 +5476,95 @@ msgstr ""
 msgid "<???>"
 msgstr ""
 
-#: feedex_utils.py:234
+#: feedex_utils.py:242
 msgid "JSON file %a does not exist!"
 msgstr ""
 
-#: feedex_utils.py:242
+#: feedex_utils.py:250
 msgid "Error reading from %a: %b"
 msgstr ""
 
-#: feedex_utils.py:256
+#: feedex_utils.py:264
 msgid "Data saved to %a"
 msgstr ""
 
-#: feedex_utils.py:258
+#: feedex_utils.py:266
 msgid "Error writing to %a: %b"
 msgstr ""
 
-#: feedex_utils.py:269
+#: feedex_utils.py:277
 msgid "Error converting to JSON: %a"
 msgstr ""
 
-#: feedex_utils.py:632
+#: feedex_utils.py:640
 msgid "File %a not found!"
 msgstr ""
 
-#: feedex_utils.py:859
+#: feedex_utils.py:873
 msgid "Invalid content type (%a)!"
 msgstr ""
 
-#: feedex_utils.py:865
+#: feedex_utils.py:879
 msgid "Resource indicated size too large (%a)!"
 msgstr ""
 
-#: feedex_utils.py:878 feedex_utils.py:895
+#: feedex_utils.py:892 feedex_utils.py:909
 msgid "Resource too large! Should be %a max"
 msgstr ""
 
-#: feedex_utils.py:1124
+#: feedex_utils.py:1138
 msgid "Config item %a (%b) most be a hotkey - one character"
 msgstr ""
 
-#: feedex_utils.py:1128
+#: feedex_utils.py:1142
 msgid "Config item %a (%b) most be in %c"
 msgstr ""
 
-#: feedex_utils.py:1138
+#: feedex_utils.py:1152
 msgid "Invalid type for config item %a, should be %b"
 msgstr ""
 
-#: feedex_utils.py:1143
+#: feedex_utils.py:1157
 msgid "Invalid value for config item %a (%b)"
 msgstr ""
 
-#: feedex_utils.py:1144
+#: feedex_utils.py:1158
 msgid "Invalid value for config item %a (%b), should be %c"
 msgstr ""
 
-#: feedex_utils.py:1145
+#: feedex_utils.py:1159
 msgid "Invalid value for config item %a (%b), should not be %c"
 msgstr ""
 
-#: feedex_utils.py:1146
+#: feedex_utils.py:1160
 msgid "Invalid value for config item %a (%b), should be > %c"
 msgstr ""
 
-#: feedex_utils.py:1147
+#: feedex_utils.py:1161
 msgid "Invalid value for config item %a (%b), should be < %c"
 msgstr ""
 
-#: feedex_utils.py:1148
+#: feedex_utils.py:1162
 msgid "Invalid value for config item %a (%b), should be >= %c"
 msgstr ""
 
-#: feedex_utils.py:1149
+#: feedex_utils.py:1163
 msgid "Invalid value for config item %a (%b), should be <= %c"
 msgstr ""
 
-#: feedex_utils.py:1150
+#: feedex_utils.py:1164
 msgid "Invalid value for config item %a, length should be %c"
 msgstr ""
 
-#: feedex_utils.py:1170 feedex_utils.py:1175
+#: feedex_utils.py:1184 feedex_utils.py:1189
 msgid "Defaulting %a to %b"
 msgstr ""
 
-#: feedex_utils.py:1203
+#: feedex_utils.py:1217
 msgid "Error reading config from %a: %b"
 msgstr ""
 
-#: feedex_utils.py:1272
+#: feedex_utils.py:1286
 msgid "Configuration saved to %a"
 msgstr ""
 
