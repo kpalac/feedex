@@ -477,8 +477,8 @@ class FeedexEntry(SQLContainerEditable):
         elif self.action == FX_ENT_ACT_UPD:
             if scast(self.backup_vals['desc'], str, '').strip() == '' and scast(self.backup_vals['text'], str, '').strip() == '' and self.backup_vals['lang'] == self.vals['lang']:
                 self.vals['lang'] = self.DB.LP.set_model(self.DB.LP.detect_lang( sample=f"""{self.vals['title']} {self.vals['desc']}  {self.vals['text']} """[:4000]) )    
-        else:
-            self.DB.LP.set_model(self.vals['lang'])
+            else: self.DB.LP.set_model(self.vals['lang']) 
+        else: self.DB.LP.set_model(self.vals['lang'])
 
         self.set_feed()
 
