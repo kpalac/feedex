@@ -464,7 +464,7 @@ Make sure that:
     # Wrapper for printing tables and entities
     def cprint(ent, **kargs):
         fdx.connect_CLP(**params)
-        fdx.CLP.cprint(ent)
+        fdx.CLP.cprint(ent, **kargs)
     
 
     # Create database if specified
@@ -600,7 +600,7 @@ Make sure that:
     elif action == 'examine_feed': cprint(FeedexFeed(feedex, feed_id=argument))
     elif action == 'test_regexes': cprint(FeedexFeed(feedex, feed_id=argument), test_regex=True)
  
-    elif action == 'read_entry': cprint(FeedexEntry(feedex, id=argument))
+    elif action == 'read_entry': cprint(FeedexEntry(feedex, id=argument), summarize=params.get('summarize'), details=params.get('details', False))
 
     elif action == 'mark':
         entry = FeedexEntry(feedex, id=argument)

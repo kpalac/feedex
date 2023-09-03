@@ -55,6 +55,7 @@ class FeedexQueryInterface:
 class FeedexQuery(FeedexQueryInterface):
     """ Class for query parsing, searching and rule matching for Feedex """
 
+
     def __init__(self, db, **kargs):
         
         FeedexQueryInterface.__init__(self)
@@ -90,9 +91,6 @@ class FeedexQuery(FeedexQueryInterface):
         self.result = ResultEntry()
 
         self.snippets_lst = [] # Snippet lists for query results (string search)
-
-        # Regex string for tokenizing query
-        self.REGEX_xap_query = re.compile('''(OR|AND|NOT|XOR|NEAR\d+|~\d+|~|NEAR|<\w+>|[\\\(]|[\\\)]|\(|\)|\"|\'|\w+|\d+|[^\s]+)''')
 
 
 
@@ -777,6 +775,7 @@ class FeedexQuery(FeedexQueryInterface):
         group = filters.get('group','daily')
         rev = filters.get('rev', False)
         filters['rev'] = False
+        filters['page_len'] = filters.get('page_len', 10000)
         self.query(term, filters, w_scheme='coord', rank=False, cnt=True, snippets=False, allow_group=False)
 
         if len(self.results) == 0:
@@ -894,7 +893,6 @@ class FeedexQuery(FeedexQueryInterface):
             filters['rank'] = True
             filters['cnt'] = True
             filters['snippets'] = False
-            filters['config'] = None
             filters['rev'] = False
             filters['sort'] = None
             filters['depth'] = int(len(self.results)/depth)
@@ -918,7 +916,8 @@ class FeedexQuery(FeedexQueryInterface):
                             count += 1
                             matched_ids.append(t[id_ix])
                             node_tmp.append(list(t))
-                            if count >= depth: break
+                            if t[tmp_result.index('rank')] < 20: break
+                            #if count >= depth: break
 
                     tmp_result['children_no'] = count
                     results_tmp.append(tmp_result.listify())
@@ -1178,9 +1177,9 @@ class FeedexQuery(FeedexQueryInterface):
         if qtype == -1: return msg(FX_ERROR_QUERY, _('Invalid query type!'))
         filters['qtype'] = qtype
         
-        lang = coalesce( filters.get('lang'), 'heuristic' )
+        lang = coalesce( filters.get('lang'), fdx.config.get('lang'), 'heuristic' )
 
-        if qtype in {1,2,}: self.LP.set_model(lang)
+        if qtype == 1: self.LP.set_model(lang)
 
         if filters.get('field') is not None:
             filters['field'] = fdx.res_field(filters.get('field'))
@@ -1693,8 +1692,8 @@ class FeedexQuery(FeedexQueryInterface):
                 return {'empty':True, 'beg':False, 'end':False, 'sql':None, 'fts': '', 'spl_string':[], 'spl_string_len':0, 'has_wc':has_wc}
 
             toks = ''
-            for t in self.LP._simple_tokenize(string):
-                t = self.LP.stemmer.stemWord(t.lower())
+            for t in self.LP.tokenize_ix_gen(string, False):
+                if t not in self.LP.divs: t = self.LP.stemmer.stemWord(t.lower())
                 if field is not None: t = f"""{PREFIXES[field]['prefix']}{t}"""
                 toks = f'{toks} {t}'
             if toks != '': toks = toks[1:]
@@ -1714,7 +1713,7 @@ class FeedexQuery(FeedexQueryInterface):
 
             toks = ''
             empty = True
-            for t in re.findall(self.REGEX_xap_query, string):
+            for t in self.LP.tokenize_gen(self.LP.qr_tokenizer, string):
                 if t in {'AND','OR','NEAR','(',')','~','NOT',}: pass
                 elif t.startswith('~') and t.replace('~','').isdigit(): pass
                 elif t.startswith('<') and t.endswith('>'):

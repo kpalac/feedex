@@ -61,6 +61,7 @@ class FeedexRSSHandler:
 
         self.ifeed = feed
         self.feed_delta = {}
+        self.feed_meta_delta = {}
 
         # Set up http headers from saved feed data
         headers = {}
@@ -410,9 +411,9 @@ class FeedexRSSHandler:
         self.feed_meta_delta['lang']                     = self.feed_raw['feed'].get('lang',self.feed_raw['feed'].get('feed',{}).get('language'))
         self.feed_meta_delta['generator']                = self.feed_raw['feed'].get('generator')
 
-        authors = self.ifeed.get('author','')
-        if authors == '' and isiter(self.ifeed.get('authors',())):
-            for a in self.ifeed.get('authors',()): 
+        authors = self.feed_raw.get('author','')
+        if authors == '' and isiter(self.feed_raw.get('authors',())):
+            for a in self.feed_raw.get('authors',()): 
                 if a.get('name','') != '': authors = f"""{authors}{a.get('name','')}; """
         
         self.feed_meta_delta['author']                   = authors
@@ -421,8 +422,8 @@ class FeedexRSSHandler:
         self.feed_meta_delta['publisher_contact']        = nullif( self.feed_raw['feed'].get('publisher_detail',{}).get('email','') + "; " + self.feed_raw['feed'].get('publisher_detail',{}).get('href',''), '; ')
 
         contribs = ''
-        if isiter(self.ifeed.get('contributors',())):
-            for c in self.ifeed.get('contributors',()): 
+        if isiter(self.feed_raw.get('contributors',())):
+            for c in self.feed_raw.get('contributors',()): 
                 if c.get('name','') != '': contribs = f"""{contribs}{c.get('name','')}; """
 
         self.feed_meta_delta['contributors']             = contribs
@@ -434,12 +435,11 @@ class FeedexRSSHandler:
         tags = ''
         for t in self.feed_raw['feed'].get('tags', ()): tags = f"""{tags} {scast(t.get('label',t.get('term','')), str, '')}"""
         self.feed_meta_delta['tags']                     = tags
-        self.feed_meta_delta['name']                     = self.feed_raw['feed'].get('title')
+        self.feed_meta_delta['name']                     = coalesce( nullif(self.ifeed.get('name'),'') , self.feed_raw['feed'].get('title') )
         self.feed_meta_delta['version']                  = self.feed_raw.get('version')
 
 
-        err = self._get_images()
-        if err != 0: return err
+        self._get_images()
         return 0
 
 

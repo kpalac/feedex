@@ -736,6 +736,8 @@ class FeedexDatabase:
         for i,t in enumerate(fdx.terms_cache):
             s = t[0]
             if i > limit: break
+            s = s.strip()
+            if s in {'','~','(',')',}: continue
             if ' ' in s: s = f"""({s.replace(' ',' ~2 ')})"""
             qr_str =f"""{qr_str} OR {s}"""
         if qr_str.startswith(' OR '): qr_str = qr_str[4:]
@@ -1262,7 +1264,7 @@ class FeedexDatabase:
                 handler.set_feed(feed)
                 handler.download(force=force)
 
-
+            #print(handler.feed_delta)
             feed.update_meta_headers(handler.feed_delta, no_commit=True)     
 
             # Autoupdate metadata if needed or specified by 'forced' or 'update_only'

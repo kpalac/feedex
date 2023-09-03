@@ -612,7 +612,7 @@ It will also take some time to perform""") ))
         menu.append( f_menu_item(1, _('Search (wide view)'), self.add_tab, kargs={'type':FX_TAB_NOTES}, icon='format-unordered-list-symbolic', tooltip=_('Search entries in extended view') ))  
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Show Contexts for a Term'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS}, icon='view-list-symbolic', tooltip=_('Search for Term Contexts') ))  
-        menu.append( f_menu_item(1, _('Show Time Series for a Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'...-...':True, 'logic':'phrase', 'group':'monthly'}}, icon='histogram-symbolic', tooltip=_('Generate time series plot') ))  
+        menu.append( f_menu_item(1, _('Show Time Series for a Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'...-...':True, 'logic':'phrase', 'group':'monthly', 'page_len':10000}}, icon='histogram-symbolic', tooltip=_('Generate time series plot') ))  
         menu.append( f_menu_item(0, 'SEPARATOR', None) )
         menu.append( f_menu_item(1, _('Trends'), self.add_tab, kargs={'type':FX_TAB_TRENDS}, icon='comment-symbolic', tooltip=_('Show most talked about terms for Articles') ))  
         menu.append( f_menu_item(1, _('Search for Related Terms'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'filters':{'...-...':True, 'logic':'phrase'}}, icon='emblem-shared-symbolic', tooltip=_('Search for Related Terms from read/opened entries') ))  
@@ -725,6 +725,8 @@ It will also take some time to perform""") ))
                 mark_menu = Gtk.Menu()
                 mark_menu.append( f_menu_item(1, _('Read (+1)'), self.act.on_mark, args=('read', item,), icon='bookmark-new-symbolic', tooltip=_("Number of reads if counted towards this entry keyword's weight when ranking incoming articles") ) )
                 mark_menu.append( f_menu_item(1, _('Read (+5)'), self.act.on_mark, args=('read+5', item,), icon='bookmark-new-symbolic', tooltip=_("Number of reads if counted towards this entry keyword's weight when ranking incoming articles") ) )
+                menu.append( f_menu_item(1, _('Similar Entries...'), self.add_tab,  kargs={'type':FX_TAB_SIMILAR, 'top_entry':item, 'filters':{'...-...': True, 'depth':50}, 'do_search':True}, icon='emblem-shared-symbolic', tooltip=_("Find Entries similar to the one selected") ) )
+                menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 mark_menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 mark_menu.append( f_menu_item(1, _('Unread'), self.act.on_mark, args=('unread', item,), icon='edit-redo-rtl-symbolic', tooltip=_("Unread document does not contriute to ranking rules") ) )
                 menu.append( f_menu_item(3, _('Mark as...'), mark_menu, icon='bookmark-new-symbolic') )
@@ -745,9 +747,6 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Edit Entry'), self.act.on_edit_entry, args=(item,), icon='edit-symbolic') )
                 menu.append( f_menu_item(1, _('Delete'), self.act.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
 
-                menu.append( f_menu_item(0, 'SEPARATOR', None) )
-                menu.append( f_menu_item(1, _('Similar Entries...'), self.add_tab,  kargs={'type':FX_TAB_SIMILAR, 'top_entry':item, 'filters':{'...-...': True, 'depth':50}, 'do_search':True}, icon='emblem-shared-symbolic', tooltip=_("Find Entries similar to the one selected") ) )
-
             elif coalesce(item.get('is_deleted'),0) > 0:
                 menu.append( f_menu_item(1, _('Restore'), self.act.on_restore_entry, args=(item,), icon='edit-redo-rtl-symbolic') )
                 menu.append( f_menu_item(1, _('Delete permanently'), self.act.on_del_entry, args=(item,), icon='edit-delete-symbolic') )
@@ -766,7 +765,6 @@ It will also take some time to perform""") ))
                 search_menu.append( f_menu_item(3, _('Other by this Author...'), author_menu, icon='community-symbolic', tooltip=_("Search for this Author") ) )
 
             menu.append( f_menu_item(3, _('Search...'), search_menu, icon='edit-find-symbolic') ) 
-            menu.append( f_menu_item(0, 'SEPARATOR', None) )
 
             plugin_filter.append(FX_PLUGIN_ENTRY)
             plugin_filter.append(FX_PLUGIN_RESULT)        
@@ -788,7 +786,7 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Search for this Rule'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'query':item['string'], 'filters':{'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Show this Rule\'s Contexts'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS, 'query':item['string'], 'filters':{'qtype':item['type'], 'case_ins':item['case_insensitive']}}, icon='view-list-symbolic'))  
                 menu.append( f_menu_item(1, _('Show Terms related to this Rule'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'query':item['string'], 'filters':{'...-...':True, 'logic':'phrase'} }, icon='emblem-shared-symbolic'))  
-                menu.append( f_menu_item(1, _('Show Time Series for this Rule'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['string'], 'filters': {'qtype':item['type'], 'case_ins':item['case_insensitive'], '...-...':True, 'group':'monthly'}}, icon='histogram-symbolic'))  
+                menu.append( f_menu_item(1, _('Show Time Series for this Rule'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['string'], 'filters': {'qtype':item['type'], 'case_ins':item['case_insensitive'], '...-...':True, 'group':'monthly', 'page_len':10000}}, icon='histogram-symbolic'))  
             
 
 
@@ -804,7 +802,7 @@ It will also take some time to perform""") ))
                 menu.append( f_menu_item(1, _('Search for this Term'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'query':item['term']}, icon='edit-find-symbolic'))  
                 menu.append( f_menu_item(1, _('Show this Term\'s Contexts'), self.add_tab, kargs={'type':FX_TAB_CONTEXTS, 'query':item['term']}, icon='view-list-symbolic'))  
                 menu.append( f_menu_item(1, _('Show Terms related to this Term'), self.add_tab, kargs={'type':FX_TAB_TERM_NET, 'query':item['term'], 'filters':{'...-...':True, 'logic':'phrase'}}, icon='emblem-shared-symbolic'))  
-                menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['term'], 'filters':{'...-...':True, 'logic':'phrase', 'group':'monthly'}}, icon='histogram-symbolic'))  
+                menu.append( f_menu_item(1, _('Show Time Series for this Term'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'query':item['term'], 'filters':{'...-...':True, 'logic':'phrase', 'group':'monthly', 'page_len':10000}}, icon='histogram-symbolic'))  
             plugin_filter.append(FX_PLUGIN_RESULT)
 
 
@@ -834,7 +832,7 @@ It will also take some time to perform""") ))
                     menu.append( f_menu_item(1, _('Delete Flag'), self.act.on_del_flag, args=(item,), icon='edit-delete-symbolic') )
                     menu.append( f_menu_item(0, 'SEPARATOR', None) )
                 menu.append( f_menu_item(1, _('Search for this Flag'), self.add_tab, kargs={'type':FX_TAB_SEARCH, 'filters':{'flag':item['id']}}, icon='edit-find-symbolic'))  
-                menu.append( f_menu_item(1, _('Time Series search for this Flag'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'flag':item['id']}}, icon='histogram-symbolic'))  
+                menu.append( f_menu_item(1, _('Time Series search for this Flag'), self.add_tab, kargs={'type':FX_TAB_TIME_SERIES, 'filters':{'...-...':True, 'flag':item['id'], 'page_len':10000}}, icon='histogram-symbolic'))  
 
 
 
@@ -1130,7 +1128,7 @@ Choose <b>Delete</b> to delete selected items""")) )
 --------------------------------------------------------------------------------------------------------
 <b>{_('Flag distriution:')}</b>"""
 
-            for f,v in flag_dist.items(): disp_str = f"""{disp_str} <span foreground="{fdx.get_flag_color(f)}"><b>{fdx.get_flag_name(f)} ({f})</b>:</span> {v:.3f}"""
+            for f,v in flag_dist.items(): disp_str = f"""{disp_str} <span foreground="{fdx.get_flag_color(f)}"><b>{esc_mu(fdx.get_flag_name(f))} ({f})</b>:</span> {v:.3f}"""
 
             disp_str = f"""{disp_str}
     
@@ -1317,11 +1315,11 @@ Choose <b>Delete</b> to delete selected items""")) )
 
 
         # Hilight query using snippets
-        col = fdx.config.get('gui_hilight_color','blue')
         snip_str = ''
         snips = scast(result.get('snippets'), tuple, ())
         if snips == (): snips = scast(result.get('context'), tuple, ())
         if snips != ():
+            col = fdx.config.get('gui_hilight_color','blue')
             snip_str = f"""\n\n{_('Snippets:')}\n<small>----------------------------------------------------------</small>\n"""
             srch_str = []
             for s in snips:
@@ -1846,6 +1844,8 @@ def feedex_run_aux_win(ent, idict, **kargs):
         entry.action = FX_ENT_ACT_ADD
         entry.merge(idict)
         entry.deraw_vals()
+        session.DB.connect_LP()
+        entry.vals['lang'] = session.DB.LP.detect_lang(f"""{entry.vals['title']} {entry.vals['desc']}  {entry.vals['text']} """[:4000])
 
         dialog = EditEntry(session, entry, new=True)
         dialog.run()

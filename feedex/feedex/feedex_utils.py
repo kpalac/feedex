@@ -641,7 +641,7 @@ class FeedexMainBus:
 
         if command_id == 'search_engine':
             command_id = 'browser'
-            main_arg = self.config.get('search_engine',DEFAULT_CONFIG.get('search_engine', main_arg)).replace('%Q', main_arg)
+            main_arg = self.config.get('search_engine',FEEDEX_DEFAULT_SEARCH).replace('%Q', main_arg)
 
         command = scast( coalesce( nullif(self.config.get(command_id),''), FEEDEX_DEFAULT_BROWSER), str, '')
     
@@ -967,16 +967,16 @@ class FeedexMainBus:
             raw_text = raw_text.replace("<br>","\n")
             raw_text = raw_text.replace("<br />","\n")
             raw_text = raw_text.replace("<br/>","\n")
-            raw_text = raw_text.replace('<em>','»')
-            raw_text = raw_text.replace('</em>','«')
-            raw_text = raw_text.replace('<b>','»')
-            raw_text = raw_text.replace('</b>','«')
-            raw_text = raw_text.replace('<i>','»')
-            raw_text = raw_text.replace('</i>','«')
-            raw_text = raw_text.replace('<u>','»')
-            raw_text = raw_text.replace('</u>','«')
-            raw_text = raw_text.replace('<strong>','»')
-            raw_text = raw_text.replace('</strong>','«')
+            raw_text = raw_text.replace('<em>','**')
+            raw_text = raw_text.replace('</em>','**')
+            raw_text = raw_text.replace('<b>','*')
+            raw_text = raw_text.replace('</b>','*')
+            raw_text = raw_text.replace('<i>','__')
+            raw_text = raw_text.replace('</i>','__')
+            raw_text = raw_text.replace('<u>','_')
+            raw_text = raw_text.replace('</u>','_')
+            raw_text = raw_text.replace('<strong>','**')
+            raw_text = raw_text.replace('</strong>','**')
             stripped_text = re.sub(RSS_HANDLER_STRIP_HTML_RE, '', scast(raw_text, str, ''))
             stripped_text = stripped_text.strip()
         else:

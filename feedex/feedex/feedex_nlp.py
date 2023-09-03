@@ -26,7 +26,6 @@ class FeedexLP(SmallSem):
         if fdx.lings is None:
             self.load_lings()
             fdx.lings = self.lings.copy()
-            fdx.lings.append(HEURISTIC_MODEL)
         
         self.lings = fdx.lings
         self.ling = {}
@@ -88,17 +87,24 @@ class FeedexLP(SmallSem):
 
 
 
+
+
+
+
+    def tokenize_ix_gen(self, text, split):
+        """ Generate tokens for standard indexing decide between regex and simple split """
+        text = scast(text, str, '')
+        if split:
+            for t in text.split(' '): yield t
+        else:
+            for t in self.tokenize_gen(self.tokenizer, text): yield t
+
+
+
     def gen_index_strings(self, text:str, **kwargs):
-        """ Tokenize with tagging and statistics for indexing. 
-                prefix      Provide prefix to add it to tokens
-                stem        Should tokens be stemmed? """
-        split = kwargs.get('split',False)
-        prefix = kwargs.get('prefix','')
+        """ Tokenize with tagging and statistics for indexing. """
         field_offset = kwargs.get('field_offset',0)
         field_len = 0
-
-        if split: raw_tokens = scast(text, str, '').split(' ')
-        else: raw_tokens = self._simple_tokenize(scast(text, str, ''))
 
         ix_token_str = ''
         ix_exact_token_str = ''
@@ -109,7 +115,7 @@ class FeedexLP(SmallSem):
 
         
         # Iterate over all tokens
-        for ipos, t in enumerate(raw_tokens):
+        for ipos, t in enumerate(self.tokenize_ix_gen(text, kwargs.get('split',False))):
 
             tlen = len(t)
             if tlen < 1: continue
@@ -474,6 +480,8 @@ class FeedexLP(SmallSem):
         level = scast(level, int, 0)
         if not (level > 0 and level <= 100): return msg(FX_ERROR_VAL, _("Summary level must be between 0..100!") )
         
+        self.set_model(entry.get('lang','heuristic'))
+
         header = scast(kargs.get('header'), str, '')
         
         # Check if chunked sentences exist for this entry

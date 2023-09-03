@@ -533,7 +533,8 @@ Hit <b>Ctrl-F2</b> for Quick Main Menu"""))
         
         if isinstance(self.table.result, (ResultEntry, ResultContext,)): 
             sel = self.table.get_selection()
-            if isinstance(sel, (ResultEntry, ResultContext,)): self.MW.load_preview(sel)
+            if isinstance(sel, (ResultEntry, ResultContext,)): 
+                self.MW.load_preview(sel)
             elif isinstance(sel, (ResultFeed,)) and sel.get('is_category',0) != 1: self.MW.load_preview_feed(sel)
             else: self.MW.startup_decor()
 
@@ -1250,8 +1251,9 @@ class FeedexGUITable:
                 self.MW.gui_cache['layouts'][self.result.table] = FX_DEF_LAYOUTS[self.result.table]
                 self.layout = self.MW.gui_cache['layouts'][self.result.table]
                 return -1
-
-            if field in self.result.gui_fields: col_name = self.result.get_col_name(field)
+            
+            if field == 'gui_plot': col_name = _('Plot')
+            elif field in self.result.gui_fields: col_name = self.result.get_col_name(field)
             else: col_name = field
 
             if field in self.result.gui_markup_fields: ctype = 1
@@ -1354,8 +1356,12 @@ class FeedexGUITable:
         fill = kargs.get('fill', True)
         tp = type(item)
         if tp in (list, tuple,): self.result.populate(item)
-        elif tp is dict: self.result.strict_merge(item)
-        elif isinstance(item, SQLContainer): self.result.strict_merge(item.vals)
+        elif tp is dict: 
+            self.result.clear()
+            self.result.strict_merge(item)
+        elif isinstance(item, SQLContainer): 
+            self.result.clear()
+            self.result.strict_merge(item.vals)
         else: return -1 
 
         self.result.humanize()

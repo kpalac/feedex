@@ -86,11 +86,14 @@ IM_URL_RE=re.compile('src=\"(.*?)\"', re.IGNORECASE)
 IM_ALT_RE=re.compile('alt=\"(.*?)\"', re.IGNORECASE)
 IM_TITLE_RE=re.compile('title=\"(.*?)\"', re.IGNORECASE)
 
+
 # This is needed to ignore downloading useless icons etc.
 FEEDEX_IGNORE_THUMBNAILS=(
 'http://feeds.feedburner.com',
 )
 
+# Search engine
+FEEDEX_DEFAULT_SEARCH = 'https://duckduckgo.com/?t=ffab&q=%Q&ia=web'
 
 # RSS Handling and parsing
 FEEDEX_USER_AGENT = 'UniversalFeedParser/5.0.1 +http://feedparser.org/'
@@ -101,10 +104,10 @@ RSS_HANDLER_IMAGES_RE2 = re.compile('<div style=".*?image:url\("(.*?)"\)">', re.
 RSS_HANDLER_STRIP_HTML_RE = re.compile('<.*?>')
 
 # Mimetypes
-FEEDEX_IMAGE_MIMES = ('image/jpeg','image/gif','image/png','image/tiff','image/x-icon','image/svg+xml','image/vnd.microsoft.icon','image/webp')
+FEEDEX_IMAGE_MIMES = {'image/jpeg','image/gif','image/png','image/tiff','image/x-icon','image/svg+xml','image/vnd.microsoft.icon','image/webp',}
 FEEDEX_AUDIO_MIMES = ()
 FEEDEX_VIDEO_MIMES = ()
-FEEDEX_TEXT_MIMES = ('text/html','text/plain',)
+FEEDEX_TEXT_MIMES = {'text/html','text/plain',}
 
 
 #Downloads...
@@ -271,9 +274,9 @@ FX_ENT_FETCH = 12
 FX_ENT_HISTORY = 13
 FX_ENT_DB_STATS = 14
 
-FX_ENTITIES = (FX_ENT_ENTRY, FX_ENT_FEED, FX_ENT_FLAG, FX_ENT_RULE, FX_ENT_QUERY, FX_ENT_CAT_ITEM,
+FX_ENTITIES = {FX_ENT_ENTRY, FX_ENT_FEED, FX_ENT_FLAG, FX_ENT_RULE, FX_ENT_QUERY, FX_ENT_CAT_ITEM,
                FX_ENT_CONTEXT, FX_ENT_TERM, FX_ENT_KW_TERM, FX_ENT_TS, FX_ENT_FETCH, FX_ENT_HISTORY, 
-               FX_ENT_DB_STATS,)
+               FX_ENT_DB_STATS,}
 
 
 # Action codes
@@ -285,7 +288,7 @@ FX_ENT_ACT_RES = 5
 FX_ENT_ACT_REINDEX = 6
 FX_ENT_ACT_RELEARN = 7
 FX_ENT_ACT_RERANK = 8
-FX_ACTIONS = (FX_ENT_ACT_ADD, FX_ENT_ACT_UPD, FX_ENT_ACT_DEL, FX_ENT_ACT_DEL_PERM, FX_ENT_ACT_RES,)
+FX_ACTIONS = {FX_ENT_ACT_ADD, FX_ENT_ACT_UPD, FX_ENT_ACT_DEL, FX_ENT_ACT_DEL_PERM, FX_ENT_ACT_RES,}
 # Query codes
 FX_ENT_QR_BASE = 1
 FX_ENT_QR_RECOM = 2
@@ -525,6 +528,18 @@ None:_('All Fields'),
 'contributors'  :PREFIXES['contributors']['name']
 }
 
+# Langs meta
+FEEDEX_LANGS = {
+'en' : _('English'),
+'pl' : _('Polish'),
+'ru' : _('Russian'),
+'de' : _('German'),
+'fr' : _('French'),
+'es' : _('Spanish'),
+}
+
+
+
 
 # Terminal display
 if PLATFORM == 'linux':
@@ -595,7 +610,7 @@ FEEDEX_CONFIG_LIST = (
 ('max_items_per_transaction', _('Max Items per Transaction'), int, 2000,   (('gt',0),) ),
 
 ('use_keyword_learning',_('Use Keyword Learning'),   bool, True,  None ),
-('recom_algo',          _('Recomm. Algorithm'),      int, 1,   (('in', (1,2,3)),) ),
+('recom_algo',          _('Recomm. Algorithm'),      int, 1,   (('in', {1,2,3,}),) ),
 ('recom_limit',         _('Recomm. Term Limit'),     int, 200,   (('gt',0),) ),
 ('no_history',          _('No Search History'),      bool, False,  None ),
 
@@ -613,7 +628,7 @@ FEEDEX_CONFIG_LIST = (
 
 ('gui_desktop_notify',  _('Notify on Fetched News?'), bool, True,  None ),
 ('gui_fetch_periodically',_('Fetch periodicallly in bckgr.?'),   bool, True,  None ),
-('gui_notify_group',    _('Grouping for Notif.'),       str, 'feed',  (('in',('category', 'feed' ,'flag','number')),) ),
+('gui_notify_group',    _('Grouping for Notif.'),       str, 'feed',  (('in',{'category', 'feed' ,'flag','number',}),) ),
 
 ('gui_notify_depth',    _('Depth for Notif.'),          int, 10,   (('gt',0),) ),
 
@@ -622,13 +637,13 @@ FEEDEX_CONFIG_LIST = (
 ('gui_hilight_color',   _('Hilight Color'),            str, 'blue',   None),
 ('gui_default_flag_color', _('Default Flag Color'),    str, 'blue',   None),
 
-('gui_layout',          _('Window Layout'),            int, 0,   (('in', (0,1,2,)),) ),
-('gui_orientation',     _('Tab Orientation'),          int, 0,   (('in', (0,1,)),) ),
+('gui_layout',          _('Window Layout'),            int, 0,   (('in', {0,1,2,}),) ),
+('gui_orientation',     _('Tab Orientation'),          int, 0,   (('in', {0,1,}),) ),
 
 ('window_name_exclude', _('Excluded Window Name Strings'),  str, 'Firefox,firefox,chrome,Chrome,Mozilla,mozilla,Thunderbird,thunderbird',   None),
 
 ('image_viewer',        _('Image Viewer'),              str, FEEDEX_DEFAULT_IM_VIEWER,   None),
-('search_engine',       _('Search Engine'),             str, 'https://duckduckgo.com/?t=ffab&q=%Q&ia=web',   None),
+('search_engine',       _('Search Engine'),             str, FEEDEX_DEFAULT_SEARCH,   None),
 
 ('gui_clear_cache',     _('Clear Cache Interval'),      int, 30,   (('ge',0),) ),
 
@@ -645,7 +660,7 @@ FEEDEX_CONFIG_LIST = (
 ('snipp_hilight_color', _('CLI Snippet Color'),         'term_col', 'CYAN_BOLD', None),
 
 ('bold_markup_beg',     _('Begin Bold Markup'),         str, '<b>',   None),
-('bold_markup_end',     _('End Bold Markup'),           str, '<b>',   None),
+('bold_markup_end',     _('End Bold Markup'),           str, '</b>',   None),
 
 ('read_marker',         _('CLI Read Marker'),           str, '=>  ',   None),
 ('note_marker',         _('CLI Note Marker'),           str, '(*)  ',   None),
@@ -674,13 +689,8 @@ FX_ERROR_REQ = -14
 
 
 
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
-
 # Language data for Feedex NLP module to aid simple semantic search
-
-
-MATH_ENTS=('sin','cos','tan','cot','cotan','sinh','cosh','tanh','coth',
+MATH_ENTS={'sin','cos','tan','cot','cotan','sinh','cosh','tanh','coth',
 'arcsin','arccos','arctan','arccot','arcsec','arccsc',
 '∀','∁','∂','∃','∄','∅','∆','∇','∈','∉','∊','∋','∌','∍','∎','∏',
 '∐','∑','−','∓','∔','∕','∖','∗','∘','∙','√','∛','∜','∝','∞','∟',
@@ -714,11 +724,11 @@ MATH_ENTS=('sin','cos','tan','cot','cotan','sinh','cosh','tanh','coth',
 '⫐','⫑','⫒','⫓','⫔','⫕','⫖','⫗','⫘','⫙','⫚','⫛','⫝̸','⫝','⫞','⫟',
 '⫠','⫡','⫢','⫣','⫤','⫥','⫦','⫧','⫨','⫩','⫪','⫫','⫬','⫭','⫮','⫯',
 '⫰','⫱','⫲','⫳','⫴','⫵','⫶','⫷','⫸','⫹','⫺','⫻','⫼','⫽','⫾','⫿',
-)
+}
 
 
 
-CURRENCY_ENTS=(
+CURRENCY_ENTS={
 'Lek','afn','؋','ars','$','awg','ƒ','aud','$','azn','₼','bsd','$','bdt','৳','bbd','$','byn','Br','bzd','BZ$',
 'bmd','$','bob','$b','bam','KM','bwp','P','bgn','лв','brl','R$','bnd','$','khr','៛',
 'cad','$','kyd','$','clp','$','cny','¥','cop','$','crc','₡','hrk','kn','cup','₱','czk','Kč','dkk','kr',
@@ -730,40 +740,23 @@ CURRENCY_ENTS=(
 'php','₱','pln','zł','qar','﷼','ron','lei','rub','₽','shp','£','sar','﷼','rsd','Дин.','scr','₨',
 'sgd','$','sbd','$','sos','S','krw','₩','zar','R','lkr','₨','sek','kr','chf','CHF','srd','$',
 'syp','£','twd','NT$','thb','฿','ttd','TT$','try','₺','tvd','$','uah','₴','aed','د.إ',
-'gbp','£','usd','$','uyu','$U','uzs','лв','vef','Bs','vnd','₫','yer','﷼','xof','','zwd','Z$')
+'gbp','£','usd','$','uyu','$U','uzs','лв','vef','Bs','vnd','₫','yer','﷼','xof','','zwd','Z$',}
 
-CURRENCY_SHORT_ENTS=('$','¥','€','£','₡',
-'؋','ƒ','₼','৳','៛','₱','£','¢','£','₹','﷼','₩','₭','₨','₮','د.إ','₨','₦','B/.','₱','₽','฿','₺','₴','₫')
+CURRENCY_SHORT_ENTS={'$','¥','€','£','₡',
+'؋','ƒ','₼','৳','៛','₱','£','¢','£','₹','﷼','₩','₭','₨','₮','د.إ','₨','₦','B/.','₱','₽','฿','₺','₴','₫',}
 
 
-UNIT_ENTS=('m','km','cm','mm','kg','g','dag','t','mt','kt','b','Gb','Kb','Mb','byte','Tb','m2','m3','㎡','㎥','Ha','Hpa','km2',
+UNIT_ENTS={'m','km','cm','mm','kg','g','dag','t','mt','kt','b','Gb','Kb','Mb','byte','Tb','m2','m3','㎡','㎥','Ha','Hpa','km2',
 's','kg','a','k','mol','cd','rad','sr','°','°c','Hz','N','Pa','J','W','V','F','Ω','Wb','T','lm','lx','Bq','Gy','Sv','kat',
-'m2','m3','σ','Å','μm',)
+'m2','m3','σ','Å','μm',}
 
 
 
-GREEK_ENTS=('α','alpha','β','beta','γ','gamma','δ','delta','ε','epsilon','ζ','zeta','η','eta','θ','theta','ι','iota','κ','kappa','λ','lambda','μ','mu','ν','nu','ξ','xi','ο','omicron','π','pi','ρ','rho','σ,ς *','sigma','τ','tau','υ','upsilon','φ','phi','χ','chi','ψ','psi','ω','omega',
-            'Δ','Θ','Λ','Ξ','Ο','Π','Σ','Φ','Ψ','Ω')
-RNUM_ENTS=('i','v','x','l','c','d','m')
+GREEK_ENTS={'α','alpha','β','beta','γ','gamma','δ','delta','ε','epsilon','ζ','zeta','η','eta','θ','theta','ι','iota','κ','kappa','λ','lambda','μ','mu','ν','nu','ξ','xi','ο','omicron','π','pi','ρ','rho','σ,ς *','sigma','τ','tau','υ','upsilon','φ','phi','χ','chi','ψ','psi','ω','omega',
+            'Δ','Θ','Λ','Ξ','Ο','Π','Σ','Φ','Ψ','Ω',}
+RNUM_ENTS={'i','v','x','l','c','d','m',}
 
 
-
-
-
-
-
-HEURISTIC_MODEL={
-'names' : ('heuristic',),
-'skip_multiling' : False,
-'REGEX_tokenizer' : r"""([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+|»|«|\w+['-'\w]\w+|\d+[\.,\d]+\d+|\.[a-z][0-9]+|[\.!\?'"”“””&,;:\[\]\{\}\(\)]|#[a-zA-Z0-9]*|\w+\d+|\d+\w+|\d+|\w+)""",
-'stemmer' :'english',
-'pyphen' :'en_EN',
-'stop_list' : (), 
-'swadesh_list' : (),
-'bicameral' : 1,
-'name_cap' : 1,
-'writing_system' : 1,
-}
 
 
 

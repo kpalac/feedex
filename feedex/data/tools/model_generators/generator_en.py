@@ -58,43 +58,45 @@ model = {
 
 # Tokenizer
 # It is advised to include patterns for emails, urls and other useful features for tokenisation
-'REGEX_tokenizer' : r"""([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+|»|«|\w+[^s]['’]s|\w+s[’']|\w+['-'\w]\w+|\d+[\.,\d]+\d+|\.[a-z][0-9]+|[\.!\?'"”“””&,;:\[\]\{\}\(\)]|#[a-zA-Z0-9]*|\w+\d+|\d+\w+|\d+|\w+)""",
+'REGEX_tokenizer' : '''[^\W_]+[^sS]['’][sS]|[^\W_]+[sS][’']|[^\W_]+[nN]['’][tT]''',
+
+
+#'sentence_chunker' : """(?:\.\.\.|\.|\?|!|¿|¡|^\s|[\n\t]*?)((?:\s+[A-Z]\w+|\"\s|\'\s|\n+).*?(?:\.\.\.|\.|\?|!|¿|¡| $))(?:\s+[A-Z]\w+|\"\s|\'\s|[\n\t]*?)"""
+
 
 # Sentence beginnings and endings
-'sent_beg' : ("\n","\t","\r","\r\n"),
-'sent_end' : ('.','...','!','?','!!!','!!','??','???'),
+#'sent_beg' : ("\n","\t","\r","\r\n"),
+#'sent_end' : ('.','...','!','?','!!!','!!','??','???'),
 
-'divs' : ("\n","\t","\r","\r\n", '.','...','!','?','!!!','!!','??','???',',',':',';','[',']','(',')','{','}','"',"'",'“','>>>','>>','“','‘','”','<<<','<<','”','’',
-          '<b>','<i>','<u>','</b>','</i>','</u>',),
+#'divs' : ("\n","\t","\r","\r\n", '.','...','!','?','!!!','!!','??','???',',',':',';','[',']','(',')','{','}','"',"'",'“','>>>','>>','“','‘','”','<<<','<<','”','’',
+#          '<b>','<i>','<u>','</b>','</i>','</u>',),
 
 # Punctation tokens
-'punctation' : (',',':',';','[',']','(',')','{','}','','«','»','&'),
+#'punctation' : (',',':',';','[',']','(',')','{','}','','«','»','&'),
 
-'par_beg' : ('(','[','{'),
-'par_end' : (')',']','}'),
-
+#'par_beg' : ('(','[','{'),
+#'par_end' : (')',']','}'),
 
 # Beginnings and endings of quotations
-'quot_beg' : ('“','>>>','>>','“','‘'),
-'quot_end' : ('”','<<<','<<','”','’'),
+#'quot_beg' : ('“','>>>','>>','“','‘'),
+#'quot_end' : ('”','<<<','<<','”','’'),
 # Quotation marks without marked beginning/ending
-'quot' : ("'",'"'),
+#'quot' : ("'",'"'),
 
 # Emphasizers - from markup, style etc.
-'emph_beg' : (),
-'emph_end' : (),
-
-# Stop words and swadesh list (latter used extensively for language detection and keyword extraction when Xapian DB is not present)
-'stops' : ("it's", "it’s", "i", "a", "about", "above", "across", "after", "afterwards", "again", "against", "all", "almost", "alone", "along", "already", "also","although","always","am","among", "amongst", "amoungst", "amount",  "an", "and", "another", "any","anyhow","anyone","anything","anyway", "anywhere", "are", "around", "as",  "at", "back","be","became", "because","become","becomes", "becoming", "been", "before", "beforehand", "behind", "being", "below", "beside", "besides", "between", "beyond", "bill", "both", "bottom","but", "by", "call", "can", "cannot", "cant", "co", "con", "could", "couldnt", "cry", "de", "describe", "detail", "do", "done", "down", "due", "during", "each", "eg", "eight", "either", "eleven","else", "elsewhere", "empty", "enough", "etc", "even", "ever", "every", "everyone", "everything", "everywhere", "except", "few", "fifteen", "fify", "fill", "find", "fire", "first", "five", "for", "former", "formerly", "forty", "found", "four", "from", "front", "full", "further", "get", "give", "go", "had", "has", "hasnt", "have", "he", "hence", "her", "here", "hereafter", "hereby", "herein", "hereupon", "hers", "herself", "him", "himself", "his", "how", "however", "hundred", "ie", "if", "in", "inc", "indeed", "interest", "into", "is", "it", "its", "itself", "keep", "last", "latter", "latterly", "least", "less", "ltd", "made", "many", "may", "me", "meanwhile", "might", "mill", "mine", "more", "moreover", "most", "mostly", "move", "much", "must", "my", "myself", "name", "namely", "neither", "never", "nevertheless", "next", "nine", "no", "nobody", "none", "noone", "nor", "not", "nothing", "now", "nowhere", "of", "off", "often", "on", "once", "one", "only", "onto", "or", "other", "others", "otherwise", "our", "ours", "ourselves", "out", "over", "own","part", "per", "perhaps", "please", "put", "rather", "re", "same", "see", "seem", "seemed", "seeming", "seems", "serious", "several", "she", "should", "show", "side", "since", "sincere", "six", "sixty", "so", "some", "somehow", "someone", "something", "sometime", "sometimes", "somewhere", "still", "such", "take", "ten", "than", "that", "the", "their", "them", "themselves", "then", "thence", "there", "thereafter", "thereby", "therefore", "therein", "thereupon", "these", "they", "thick", "thin", "third", "this", "those", "though", "three", "through", "throughout", "thru", "thus", "to", "together", "too", "top", "toward", "towards", "twelve", "twenty", "two", "un", "under", "until", "up", "upon", "us", "very", "via", "was", "we", "well", "were", "what", "whatever", "when", "whence", "whenever", "where", "whereafter", "whereas", "whereby", "wherein", "whereupon", "wherever", "whether", "which", "while", "whither", "who", "whoever", "whole", "whom", "whose", "why", "will", "with", "within", "without", "would", "yet", "you", "your", "yours", "yourself", "yourselves", "the"), 
-'swadesh' : ("come", "get", "give", "go", "keep", "let", "make", "put", "seem", "take", "be", "do", "have", "say", "see", "send", "may", "will", "about", "across", "after", "against", "among", "at", "before", "between", "by", "down", "from", "in", "off", "on", "over", "through", "to", "under", "up", "with", "as", "for", "of", "till", "than", "a", "the", "all", "any", "every", "no", "other", "some", "such", "that", "this", "I", "he", "you", "who", "and", "because", "but", "or", "if", "though", "while", "how", "when", "where", "why", "again", "ever", "far", "forward", "here", "near", "now", "out", "still", "then", "there", "together", "well", "almost", "enough", "even", "little", "much", "not", "only", "quite", "so", "very", "tomorrow", "yesterday", "north", "south", "east", "west", "please", "yes"),
-'copulas' : ('is','was','were','am','are'),
+#'emph_beg' : (),
+#'emph_end' : (),
 
 # Normalize strange chars in tokens
-'token_replacements' : {
-'‘' : "'",
-'’' : "'",
-},
+#'token_replacements' : {'‘' : "'", '’' : "'",},
 
+
+
+
+# Stop words and swadesh list (latter used extensively for language detection and keyword extraction when Xapian DB is not present)
+'stops' : ("it's", "it’s", "i", "a", "about", "above", "across", "after", "afterwards", "again", "against", "all", "almost", "alone", "along", "already", "also","although","always","am","among", "amongst", "amoungst", "amount",  "an", "and", "another", "any","anyhow","anyone","anything","anyway", "anywhere", "are", "aren't", "around", "as",  "at", "back","be","became", "because","become","becomes", "becoming", "been", "before", "beforehand", "behind", "being", "below", "beside", "besides", "between", "beyond", "bill", "both", "bottom","but", "by", "call", "can", "cannot", "can't", "co", "con", "could", "couldn't", "cry", "de", "describe", "detail", "do", "does", "doesn't", "done", "did", "didn't", "down", "due", "during", "each", "eg", "eight", "either", "eleven","else", "elsewhere", "empty", "enough", "etc", "even", "ever", "every", "everyone", "everything", "everywhere", "except", "few", "fifteen", "fify", "fill", "find", "fire", "first", "five", "for", "former", "formerly", "forty", "found", "four", "from", "front", "full", "further", "get", "give", "go", "had", "has", "hasn't", "have", "haven't", "he", "hence", "her", "here", "hereafter", "hereby", "herein", "hereupon", "hers", "herself", "him", "himself", "his", "how", "however", "hundred", "ie", "if", "in", "inc", "indeed", "interest", "into", "is", "it", "its", "itself", "keep", "last", "latter", "latterly", "least", "less", "ltd", "made", "many", "may", "me", "meanwhile", "might", "mill", "mine", "more", "moreover", "most", "mostly", "move", "much", "must", "my", "myself", "name", "namely", "neither", "never", "nevertheless", "next", "nine", "no", "nobody", "none", "noone", "nor", "not","need","needn't", "nothing", "now", "nowhere", "of", "off", "often", "on", "once", "one", "only", "onto", "or", "other", "others", "otherwise", "our", "ours", "ourselves", "out", "over", "own","part", "per", "perhaps", "please", "put", "rather", "re", "same", "see", "seem", "seemed", "seeming", "seems", "serious", "several", "she", "should", "show", "side", "since", "sincere", "six", "sixty", "so", "some", "somehow", "someone", "something", "sometime", "sometimes", "somewhere","should","shouldn't", "still", "such", "take", "ten", "than", "that", "the", "their", "them", "themselves", "then", "thence", "there", "thereafter", "thereby", "therefore", "therein", "thereupon", "these", "they", "thick", "thin", "third", "this", "those", "though", "three", "through", "throughout", "thru", "thus", "to", "together", "too", "top", "toward", "towards", "twelve", "twenty", "two", "un", "under", "until", "up", "upon", "us", "very", "via", "was", "we", "well", "were", "what", "whatever", "when", "whence", "whenever", "where", "whereafter", "whereas", "whereby", "wherein", "whereupon", "wherever", "whether", "which", "while", "whither", "who", "whoever", "whole", "whom", "whose", "why", "will","won't", "with", "within", "without", "would","wouldn't", "yet", "you", "your", "yours", "yourself", "yourselves", "the"), 
+'swadesh' : ("come", "get", "give", "go", "keep", "let", "make", "put", "seem", "take", "be", "do", "have", "say", "see", "send", "may", "will", "about", "across", "after", "against", "among", "at", "before", "between", "by", "down", "from", "in", "off", "on", "over", "through", "to", "under", "up", "with", "as", "for", "of", "till", "than", "a", "the", "all", "any", "every", "no", "other", "some", "such", "that", "this", "I", "he", "you", "who", "and", "because", "but", "or", "if", "though", "while", "how", "when", "where", "why", "again", "ever", "far", "forward", "here", "near", "now", "out", "still", "then", "there", "together", "well", "almost", "enough", "even", "little", "much", "not", "only", "quite", "so", "very", "tomorrow", "yesterday", "north", "south", "east", "west", "please", "yes"),
+'copulas' : ('is','was','were','am','are'),
 
 # Aliases will be expanded upon tokenization, case sensitive
 'aliases' :          { 

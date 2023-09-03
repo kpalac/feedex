@@ -214,7 +214,7 @@ FX_TAB_LEARNED: {},
 FX_TAB_SEARCH :         {'search':'combo',  'filters': ('time', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat', 'page',) },
 FX_TAB_NOTES :          {'search':'combo',  'filters': ('time', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat', 'page',) },
 FX_TAB_TREE :           {'search':'combo',  'filters': ('time', 'group', 'depth', 'rank', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat',) },
-FX_TAB_TIME_SERIES :    {'search':'combo',  'filters': ('time', 'time_series', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat',) },
+FX_TAB_TIME_SERIES :    {'search':'combo',  'filters': ('time', 'time_series', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat', 'page',) },
 FX_TAB_TERM_NET :       {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat',) },
 FX_TAB_TRENDS :         {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat',) },
 FX_TAB_CONTEXTS :       {'search':'combo',  'filters': ('time', 'read', 'flag', 'notes', 'case', 'field', 'logic', 'type', 'lang', 'handler', 'location', 'cat', 'page',) },
@@ -228,7 +228,7 @@ FX_TAB_CATALOG :        {'search':'catalog_combo',  'filters': ('catalog_field',
 
 
 
-FEEDEX_IMAGE_EXTS = ('png','jpg','jpeg','bmp','jpe','ico','tif','tiff','icon','bitmap','pcx',)
+FEEDEX_IMAGE_EXTS = {'png','jpg','jpeg','bmp','jpe','ico','tif','tiff','icon','bitmap','pcx',}
 
 
 # HTML REGEX templates
@@ -839,7 +839,7 @@ def f_lang_filter_combo(**kargs):
     store = [(None, _("All Languages"),)]
     for l in fdx.lings:
         if l['names'][0] != 'heuristic':
-            store.append( (l['names'][0], l['names'][0].upper()) )
+            store.append( (l['names'][0], FEEDEX_LANGS.get(l['names'][0], '<???>')) )
     tootlip = kargs.get('tooltip', _('Select language used fort query tokenizing and stemming') )
     return f_dual_combo(store, types=(str, str,), tooltip=tootlip, **kargs)
 
@@ -849,7 +849,7 @@ def f_lang_combo(**kargs):
     store = []
     for l in fdx.lings:
         if l['names'][0] != 'heuristic':
-            store.append( (l['names'][0], l['names'][0].upper()) )
+            store.append( (l['names'][0], FEEDEX_LANGS.get(l['names'][0], '<???>')) )
     return f_dual_combo(store, types=(str, str,), **kargs)
 
 def f_lang_combo_edit(**kargs):
@@ -859,7 +859,7 @@ def f_lang_combo_edit(**kargs):
     found = False
     for l in fdx.lings:
         if l['names'][0] != 'heuristic':
-            store.append( (l['names'][0], l['names'][0].upper()) )
+            store.append( (l['names'][0], FEEDEX_LANGS.get(l['names'][0], '<???>')) )
             if default in l['names']: found = True
     if not found and default is not None: store = [ (default, default) ] + store
     return f_dual_combo(store, types=(str, str,), **kargs)
@@ -879,7 +879,7 @@ def f_field_combo(**kargs):
 def f_page_len_combo(**kargs):
     """ Construct combo for query page length """
     default = kargs.get('default',0)
-    if default != 0 and default not in {500,1000,1500,2000,3000,5000,}: 
+    if default != 0 and default not in {500,1000,1500,2000,3000,5000,10000,25000}: 
         store = ( (default, str(default))
     (500,_('500') ),
     (1000,_('1000') ),
@@ -887,6 +887,8 @@ def f_page_len_combo(**kargs):
     (2000,_('2000') ),
     (3000,_('3000') ),
     (5000,_('5000') ),
+    (10000,_('10000') ),
+    (25000,_('25000') ),
     )
     else:
         store = (
@@ -896,6 +898,8 @@ def f_page_len_combo(**kargs):
     (2000,_('2000') ),
     (3000,_('3000') ),
     (5000,_('5000') ),
+    (10000,_('10000') ),
+    (25000,_('25000') ),
     )
     return f_dual_combo(store, types=(int, str,), **kargs)
 

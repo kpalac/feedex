@@ -34,8 +34,7 @@ import pyphen
 
 
 
-# Constants
-DEFAULT_SENTENCE_CHUNKER_RE="""(?:\.\.\.|\.|\?|!|^\s|[\n\t]*?)((?:\s+[A-Z]\w+|\"\s|\'\s|\n+).*?(?:\.\.\.|\.|\?|!| $))(?:\s+[A-Z]\w+|\"\s|\'\s|[\n\t]*?)"""
+
 
 
 
@@ -56,7 +55,61 @@ class SmallSem:
             ling - language to use
             models_path - a path where language models are stored 
 
+
     """
+
+    # Defaults
+    HEURISTIC_MODEL={
+'names' : ('heuristic',),
+'skip_multiling' : False,
+'REGEX_tokenizer' : '',
+'stemmer' :'english',
+'pyphen' :'en_EN',
+'stop_list' : (), 
+'swadesh_list' : (),
+'bicameral' : 1,
+'name_cap' : 1,
+'writing_system' : 1,
+}
+
+    # Constants
+    DEFAULT_TOKENIZER = '''[^\W_]+-[^\W_]+|\d+[\.,\d]\d+|#[a-zA-Z0-9]+|\.+|\?+|!+|¿+|¡+|\*\*|['"”“””’@#\^\$\+&,;:\[\]\{\}\(\)»«\*\-\=%\\/—~]|[^\w\s]|[^\W_]+\d+|\d+[^\W_]+|\d+|[^\W_]+'''
+    DEFAULT_TOKENIZER_LOGO = '''#[a-zA-Z0-9]+|[a-zA-Z0-9]+|\d+[\.,\d]\d+|\.+|\?+|!+|¿+|¡+|\*\*|['"”“””’@#\^\$\+&,;:\[\]\{\}\(\)»«\*\-\=%\\/—~]|[^\w\s]|\d+|\w'''
+
+    DEFAULT_FEAT_TOKENIZER = '''[^\W_]+-[^\W_]+|\d+[\.,\d]\d+|#[a-zA-Z0-9]+|[^\w\s]|[^\W_]+\d+|\d+[^\W_]+|\d+|[^\W_]+'''
+    DEFAULT_FEAT_TOKENIZER_LOGO = '''#[a-zA-Z0-9]+|[a-zA-Z0-9]+|\d+[\.,\d]\d+[^\w\s]|\d+|\w'''
+
+    DEFAULT_SENTENCE_CHUNKER = """(?:\.+|\?+|!+|¿+|¡+|…|^\s|[\n\t]*?)((?:\s+[A-Z]\w+|\"\s|\'\s|\n+).*?(?:\.+|\?+|!+|¿+|¡+|…| $))(?:\s+[A-Z]\w+|\"\s|\'\s|[\n\t]*?)"""
+    
+    SENT_BEG = {'¿','¡','¿¿¿','¡¡¡','¿¿','¡¡',}
+    SENT_END = {'.','...','!','?','!!!','!!','??','???','…'}
+
+    MARKUP = {'<b>','<i>','<u>','</b>','</i>','</u>','<strong>','</strong>','<emph>','</emph>',} 
+    PT_MARKUP = {'*', '**', '_', '__',}
+    
+    PAR_BEG = {'(','[','{',}
+    PAR_END = {')',']','}',}
+
+    QUOT_BEG = {'“','>>>','>>','“','‘',}
+    QUOT_END = {'”','<<<','<<','”','’',}
+    QUOT = {"'",'"',}
+
+    EMPH_BEG = {'»','>>',}
+    EMPH_END = {'«','<<',}
+
+    PUNCTATIONS = {',',':',';','','&','/','\\','-','—','–','|','^','&','*','(',')','[',']','{','}','%','#','@','…','~','−'} | PAR_BEG | PAR_END | MARKUP | PT_MARKUP | SENT_BEG | SENT_END | QUOT | QUOT_BEG | QUOT_END | EMPH_BEG | EMPH_END
+    DIVS = PUNCTATIONS | {' ',}
+
+    # Chars normalizations
+    REPLACEMENTS = {'‘' : "'", '’' : "'",}
+
+    # Regex string for tokenizing query
+    REGEX_XAP_QUERY_RE = '''OR|AND|NOT|XOR|NEAR\d+|~\d+|~|NEAR|<[a-zA-Z]+>|[\\\(]|[\\\)]|\(|\)|\"|\''''
+
+
+
+
+
 
     def __init__(self, models_path:str, **kwargs) -> None:
 
@@ -72,11 +125,11 @@ class SmallSem:
         self.ling = {}
         self.load_lings()
 
-        if kwargs.get('ling') is not None: self.set_model(kwargs.get('ling'))
+        self.set_model(kwargs.get('ling', 'en'))
 
         self.raw_text = ''
 
-        self.tokens = []
+        self.tokens = ()
 
         # summarization stuff...
         self.ranked_sents = [] # List of tokenized and ranked sentences
@@ -92,6 +145,7 @@ class SmallSem:
         """ Load language headers """
         self.lings = []
         self.ling = {}
+
         for f in os.listdir(self.models_path):
             
             filename = os.path.join(self.models_path, f)
@@ -102,6 +156,8 @@ class SmallSem:
             except (OSError,) as e:
                 sys.stderr.write(f'Error loading {filename} file: {e}')
                 continue
+
+        self.lings.append(self.HEURISTIC_MODEL)
 
 
 
@@ -138,14 +194,36 @@ class SmallSem:
                     self.index_path = os.path.join(self.models_path, f"""{model_id}_index""")
                     self.vocab_path = os.path.join(self.models_path, f"""{model_id}_vocab.pkl""")
 
-                # Init model lists
+                # Init model constants
+                self.writing_system = h.get('writing_system',1)
+                
+                # Init tokenizers
+                if 'tokenizer' not in h.keys():
+                    rx_tok = h.get('REGEX_tokenizer','')
+                    if not rx_tok.endswith('|') and rx_tok.strip() != '': rx_tok = f'{rx_tok}|'
+                    if self.writing_system == 1:
+                        h['tokenizer'] = re.compile(f'({rx_tok}{self.DEFAULT_TOKENIZER})')
+                        h['feat_tokenizer'] = re.compile(f'({rx_tok}{self.DEFAULT_FEAT_TOKENIZER})')
+                        h['qr_tokenizer'] = re.compile(f'({self.REGEX_XAP_QUERY_RE}|{rx_tok}{self.DEFAULT_FEAT_TOKENIZER})')
+                    else:
+                        h['tokenizer'] = re.compile(f'({rx_tok}{self.DEFAULT_TOKENIZER_LOGO})')
+                        h['feat_tokenizer'] = re.compile(f'({rx_tok}{self.DEFAULT_FEAT_TOKENIZER_LOGO})')
+                        h['qr_tokenizer'] = re.compile(f'({self.REGEX_XAP_QUERY_RE}|{rx_tok}{self.DEFAULT_FEAT_TOKENIZER})')
+
+                self.tokenizer = h['tokenizer']
+                self.feat_tokenizer = h['feat_tokenizer']
+                self.qr_tokenizer = h['qr_tokenizer']
+
+                if 'sent_chunker' not in h.keys(): h['sent_chunker'] = re.compile(h.get('sentence_chunker', self.DEFAULT_SENTENCE_CHUNKER))
+                self.sent_chunker = h['sent_chunker']
+
                 self.aliases = h.get('aliases',{})
-                self.divs = h.get('divs',())
+                self.divs = h.get('divs',self.DIVS)
                 self.stops = h.get('stops',())
-                self.punctation = h.get('punctation',())
-                self.tok_repl = h.get('token_replacements',{})
-                self.sent_beg = h.get('sent_beg',())
-                self.sent_end = h.get('sent_end',())
+                self.punctation = h.get('punctation',self.PUNCTATIONS)
+                self.tok_repl = h.get('token_replacements',self.REPLACEMENTS)
+                self.sent_beg = h.get('sent_beg',self.SENT_BEG)
+                self.sent_end = h.get('sent_end',self.SENT_END)
                 self.commons = h.get('commons_stemmed',())
                 self.swadesh = h.get('swadesh',())
  
@@ -197,69 +275,46 @@ class SmallSem:
 
 
 
-    def _simple_tokenize(self, text):
-        """ Basic tokenization """
-        # Make sure a model is loaded
+
+
+
+    def tokenize_gen(self, regex, text, **kwargs):
+        """ Token generator """
         if self.get_model() is None: self.set_model('unknown', sample=text)
-        # Use tokenizing REGEX from model
 
-        raw_tokens = re.findall(self.ling.get('REGEX_tokenizer',"[\w]+"), text)
-
-        rt = []
-        for t in raw_tokens:
+        for t in re.findall(regex, text):
             # Clear trash that might have been put in token
             t = t.replace(' ','').replace("\n",'').replace("\t",'').replace("\r",'')
             if len(t) < 1: continue
+            for k,v in self.tok_repl.items(): t = t.replace(k,v)    
             # This part expands aliases
             if t in self.aliases.keys():
                 tts = self.aliases[t]
-                for tt in tts: rt.append(tt)
-            else: rt.append(t)          
-
-        return rt
-
-
-
-
-
-
-
-
-    def tokenize(self, text, **kwargs):
-        """ Tokenize with normalization and (if specified) stemming and dividing into units 
-                stem:bool       should tokens be stemmed?
-        """
-        
-        # Terms are stemmed
-        stem = kwargs.get('stem',True)
-
-        # Points to xapian writable db
-        writeable_xap = kwargs.get('writeable_xap',None)
-
-        raw_tokens = self._simple_tokenize(text)        
-
-        self.tokens = []
-        
-        for t in raw_tokens:
+                for tt in tts: yield tt
+            else: yield t
             
-            if t in self.punctation or t in self.divs: continue
-            if self._isnum(t): continue # This is debatable but I decided to ignore numbers as features
 
-            for k,v in self.tok_repl.items(): t = t.replace(k,v)
+
+
+    def tokenize_feat_gen(self, text, **kwargs):
+        """ Token generator trimmed of trash and stops """
+        
+        for i,t in enumerate(self.tokenize_gen(self.feat_tokenizer, text)):
             
-            if stem:
-                variant = t.lower()
-                stemmed = self.stemmer.stemWord(variant)
-                if stemmed in self.stops or variant in self.stops: continue
-                tokl = len(stemmed)
-                # Unstemmed variants are added as xapian synonyms (might be useful later on ...)
-                if writeable_xap is not None and tokl < 150 and len(variant) < 150: # ... but do it only when writable xapian is provided
-                    writeable_xap.add_synonym(stemmed, variant)
-            else:
-                stemmed = t
-                tokl = len(stemmed)
+            if t in self.divs: continue
+            if self._isnum(t): continue
 
-            if tokl < 150: self.tokens.append(stemmed)
+            tok = t.lower()
+            stemmed = self.stemmer.stemWord(tok)
+            
+            if tok in self.stops or stemmed in self.stops: continue
+
+            if len(tok) >= 150 or len(stemmed) >= 150: continue
+
+            token = {'pos':i, 'var':t, 'term':stemmed}
+            yield token.copy()
+
+
 
 
 
@@ -340,35 +395,23 @@ class SmallSem:
         """ Main method for extracting keywords from a given string. 
             Returns a list of tuples with n strongest candidates with weights and stemmed forms"""        
 
-        token = {}
         tokens = []
         token_freqs = {}
         token_tf_idfs = {}
-
-        self.tokenize(text, units=False, stem=False)
 
         # Lazily connect to xapian
         self._xap_connect()
         if self.ix_db is None: use_xap = False
         else: use_xap = True
 
-        # Populate token list with dict
-        for i,t in enumerate(self.tokens):
-            
-            term = self.stemmer.stemWord(t.lower())
-            if t in self.stops or term in self.stops: continue
-
-            token = {'pos':i, 'var':t, 'term':term}
-            tokens.append(token.copy())
-
 
         # Create variant frequency distribution
-        for t in tokens:
+        doc_len = 0
+        for t in self.tokenize_feat_gen(text):
+            doc_len += 1
             fr = token_freqs.get(t['var'],[0,None])[0] + 1
             token_freqs[t['var']] = (fr, t['term'])
-
-        # Get metrics that might be useful...
-        doc_len = len(tokens)
+            tokens.append(t)
 
         # Ignore empty documents
         if doc_len == 0: return []
@@ -506,19 +549,18 @@ class SmallSem:
         features = self.extract_features(text, 100)
         
         self.ranked_sents = []
-        sents_raw = re.findall(self.ling.get('sentence_chunker', DEFAULT_SENTENCE_CHUNKER_RE), text)
+        sents_raw = re.findall(self.sent_chunker, text)
 
         # Tokenize and rank each sentence separately and create a list
         for s in sents_raw:
 
             if type(s) is not str: continue
 
-            s = s.replace("\n",'').replace("\t",'').replace('\r','')
-            self.tokenize(s, units=False, stem=True)
+            s = s.replace("\n",'').replace("\t",'').replace('\r','').strip()
 
             # Construct a string for ranking
             sent_string = ' '
-            for t in self.tokens: sent_string = f"""{sent_string}{t} """
+            for t in self.tokenize_gen(self.tokenizer, s): sent_string = f"""{sent_string}{t} """
 
             weight = 0
             for f in features:
@@ -542,10 +584,11 @@ class SmallSem:
 
         # Sort weights for normalization
         sents = []
-
         if level == 0: thres = 0
         else:
-            for i,s in enumerate(self.ranked_sents): sents.append( (i,s[1]) )
+            for i,s in enumerate(self.ranked_sents): 
+                #print(s)
+                sents.append( (i,s[1]) )
             sents.sort(key=lambda x: x[1])
 
             divider = int(round(len(sents)*level/100, 0) - 1)
@@ -630,40 +673,45 @@ class SmallSemTrainer:
         self.doc_counter = 0
         self.sent_counter = 0
 
-        # Semantic Units for vectorization
-        self.units = []
 
 
 
 
 
-    def learn_text(self, text:str, doc_id, **kwargs):
-        """ Indexes given text and adds terms to vocab 
-            doc_id = int    Main document counter """
+    def learn_text(self, text:str, **kwargs):
+        """ Indexes given text and adds terms to vocab """
         weight = kwargs.get('weight', 1)
         self.ke.raw_text = text
-        sents = re.findall(self.ke.ling.get('sentence_chunker', DEFAULT_SENTENCE_CHUNKER_RE), text)
+        sents = re.findall(self.ke.sent_chunker, text)
+
+        self.ix_db.begin_transaction()
         
-        self.units.clear()
-        for s in sents: 
-            self.ke.tokenize(s, writeable_xap=self.ix_db)
-            self.units.append(self.ke.tokens.copy())
 
-
-        for i,u in enumerate(self.units):
+        for i,s in enumerate(sents):
 
             doc_string = ''
-            for t in u: doc_string = f'{doc_string} {t}'
+            for t in self.ke.tokenize_gen(self.ke.feat_tokenizer, s):
+                
+                if t in self.ke.divs: continue
+                if self.ke._isnum(t): continue
 
-            #did = f'{doc_id};{i}'
-            #doc.add_boolean_term(f'DID {did}')
-            #doc.add_boolean_term(f'UID {i}')
-            #doc.set_data(did)
+                t = t.lower()
+                stemmed = self.stemmer.stemWord(t)
+
+                if len(t) >= 150 or len(stemmed) >= 150: continue
+
+                self.ix_db.add_synonym(t, stemmed)
+                doc_string = f'{doc_string} {stemmed}'
+
             doc = xapian.Document()
             self.ix_tg.set_document(doc)
             self.ix_tg.index_text_without_positions(doc_string, weight)
             self.ix_db.add_document(doc)
 
+            self.sent_counter += 1
+
+        self.doc_counter += 1
+        self.ix_db.commit_transaction()
 
 
 
@@ -686,7 +734,7 @@ class SmallSemTrainer:
                 continue
             
             print(f'Indexing {filename} (encoding: {encoding})...')
-            self.learn_text(contents, i, weight=weight)
+            self.learn_text(contents, weight=weight)
             print(f'Done.')
 
 
