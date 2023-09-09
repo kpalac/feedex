@@ -614,8 +614,8 @@ class FeedexGUIActions:
                     doper['id'] = id 
                     deltas.append(doper)
 
-            if oper in {FX_ENT_ACT_DEL, FX_ENT_ACT_DEL_PERM,}: fdx.bus_append( (FX_ACTION_DELETE, deltas, compat) )
-            elif type(oper) is dict: fdx.bus_append( (FX_ACTION_EDIT, deltas, compat) )
+            if type(oper) is dict: fdx.bus_append( (FX_ACTION_EDIT, deltas, compat) )
+            elif oper in {FX_ENT_ACT_DEL, FX_ENT_ACT_DEL_PERM,}: fdx.bus_append( (FX_ACTION_DELETE, deltas, compat) )
 
         DB.close()
         return 0
